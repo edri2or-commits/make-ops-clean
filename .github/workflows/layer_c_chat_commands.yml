@@ -110,7 +110,7 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" '{chat_id:$chat_id,text:$text}')"
 
-      # ---- EU2 smoke ----
+      # ---- /make.smoke ----
       - name: /make.smoke — EU2 GET
         if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
         id: make
@@ -119,24 +119,26 @@ jobs:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
         run: |
           set -euo pipefail
+          : "${MSG_FILE:=msg_make_smoke.txt}"
           url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=1"
           code=$(curl -sS -D headers.txt -o eu2_list.json -w "%{http_code}" \
             -H "Accept: application/json" \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url" || echo "000")
           xreq=$(grep -i '^x-request-id:' headers.txt 2>/dev/null | awk '{print $2}' | tr -d '\r')
-          echo "http=$code" >> "$GITHUB_OUTPUT" || true
-          echo "xreq=${xreq:-}" >> "$GITHUB_OUTPUT" || true
+          [ "$code" = "200" ] && status="✅" || status="⚠️"
+          printf 'make.smoke %s http=%s; x-request-id=%s\n' "$status" "${code:-∅}" "${xreq:-∅}" > "$MSG_FILE"
+          # Best-effort outputs (לא קריטי אם יחסר):
+          echo "http=$code" >> "$GITHUB_OUTPUT" 2>/dev/null || true
+          echo "xreq=${xreq:-}" >> "$GITHUB_OUTPUT" 2>/dev/null || true
+          echo "msg_file=$MSG_FILE" >> "$GITHUB_OUTPUT" 2>/dev/null || true
 
       - name: Reply for /make.smoke
         if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
         run: |
-          http="${{ steps.make.outputs.http }}"
-          xreq="${{ steps.make.outputs.xreq }}"
-          status=$([ "$http" = "200" ] && echo "✅" || echo "⚠️")
-          msg="make.smoke ${status} http=${http:-∅}; x-request-id=${xreq:-∅}"
+          MSG="$(cat msg_make_smoke.txt 2>/dev/null || echo 'make.smoke ⚠️ internal')"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H 'Content-Type: application/json' \
-            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$msg" '{chat_id:$chat_id,text:$text}')"
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
       # ---- /make.scenarios ----
       - name: /make.scenarios — list EU2
