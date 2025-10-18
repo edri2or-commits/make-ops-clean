@@ -118,6 +118,7 @@ jobs:
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
         run: |
+          set -euo pipefail
           url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=1"
           code=$(curl -sS -D headers.txt -o eu2_list.json -w "%{http_code}" \
             -H "Accept: application/json" \
@@ -127,7 +128,7 @@ jobs:
           echo "xreq=${xreq:-}" >> "$GITHUB_OUTPUT" || true
 
       - name: Reply for /make.smoke
-        if: ${{ always() }}
+        if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
         run: |
           http="${{ steps.make.outputs.http }}"
           xreq="${{ steps.make.outputs.xreq }}"
@@ -145,6 +146,7 @@ jobs:
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
         run: |
+          set -euo pipefail
           url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=10"
           curl -sS -D headers_scenarios.txt -o eu2_scenarios.json \
             -H "Accept: application/json" \
@@ -152,7 +154,7 @@ jobs:
           jq -r '.data[] | "\(.id) — \(.name)"' eu2_scenarios.json | head -n 6 > scenarios_top.txt || true
 
       - name: Reply for /make.scenarios
-        if: steps.list.conclusion == 'success'
+        if: startsWith(steps.parse.outputs.cmd, '/make.scenarios')
         run: |
           if [ -s scenarios_top.txt ]; then
             LINES=$(cat scenarios_top.txt | sed ':a;N;$!ba;s/\n/\\n/g')
@@ -201,6 +203,14 @@ jobs:
               printf '%s\n' "make.run ⚠️ id=${scen_id}; http=${code:-?}" > run_msg.txt
             fi
           fi
+
+      - name: Reply for /make.run
+        if: startsWith(steps.parse.outputs.cmd, '/make.run')
+        run: |
+          MSG="$(cat run_msg.txt 2>/dev/null || echo 'make.run ⚠️ internal')"
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
       - name: Upload artifacts (always)
         if: ${{ always() }}
