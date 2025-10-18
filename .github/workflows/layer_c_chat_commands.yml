@@ -4,6 +4,11 @@ on:
   repository_dispatch:
     types: [chat.run]
   workflow_dispatch:
+    inputs:
+      text:
+        description: "Chat command text (e.g. /make.scenarios)"
+        required: true
+        type: string
 
 concurrency:
   group: chat-commands
@@ -35,7 +40,7 @@ jobs:
       - name: Parse command from Telegram text
         id: parse
         run: |
-          TEXT=$(jq -r '.client_payload.message.text // .client_payload.text // ""' event.json)
+          TEXT=$(jq -r '.client_payload.message.text // .client_payload.text // .inputs.text // ""' event.json)
           TEXT="$(printf '%s' "$TEXT" | tr -s '[:space:]' ' ')"
           CMD="$(printf '%s' "$TEXT" | awk '{print $1}')"
           ARG="$(printf '%s' "$TEXT" | cut -d' ' -f2-)"
