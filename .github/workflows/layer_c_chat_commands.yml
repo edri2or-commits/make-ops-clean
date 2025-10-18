@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       text:
-        description: "Command text as if from Telegram (e.g. /ping, /make.scenarios, /make.smoke)"
+        description: "Command text as if from Telegram (e.g. /ping, /make.scenarios, /make.smoke, /make.teams, /make.bootstrap <teamId>)"
         required: false
         default: "/ping"
 
@@ -120,8 +120,7 @@ jobs:
           url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=1"
           code=$(curl -sS -D headers.txt -o eu2_list.json -w "%{http_code}" \
             -H "Accept: application/json" \
-            -H "Authorization: Token ${{ secrets.MAKE_API_TOKEN }}" "$url" || echo "000")
-          # חילוץ X-Request-Id ללא grep שיפיל את הצעד:
+            -H "Authorization: ${{ secrets.MAKE_API_TOKEN }}" "$url" || echo "000")
           xreq="$(awk -F': ' 'tolower($1)=="x-request-id"{gsub(/\r/,"",$2); print $2}' headers.txt 2>/dev/null | tail -n1)"
           [ "$code" = "200" ] && status="✅" || status="⚠️"
           printf 'make.smoke %s http=%s; x-request-id=%s\n' "$status" "${code:-∅}" "${xreq:-∅}" > "$MSG_FILE"
@@ -144,7 +143,7 @@ jobs:
           url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=10"
           curl -sS -D headers_scenarios.txt -o eu2_scenarios.json \
             -H "Accept: application/json" \
-            -H "Authorization: Token ${{ secrets.MAKE_API_TOKEN }}" "$url"
+            -H "Authorization: ${{ secrets.MAKE_API_TOKEN }}" "$url"
           jq -r '.data[] | "\(.id) — \(.name)"' eu2_scenarios.json | head -n 6 > scenarios_top.txt || true
 
       - name: Reply for /make.scenarios
@@ -160,46 +159,86 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
-      # ---- /make.run <id> [wait] ----
-      - name: /make.run — run scenario
-        if: startsWith(steps.parse.outputs.cmd, '/make.run')
-        id: run
-        continue-on-error: true
+      # ---- NEW: /make.teams ----
+      - name: /make.teams — list teams (for teamId)
+        if: startsWith(steps.parse.outputs.cmd, '/make.teams')
+        id: teams
         run: |
           set -euo pipefail
-          raw="${{ steps.parse.outputs.arg }}"
-          scen_id="$(printf '%s' "$raw" | awk '{print $1}')"
-          flag="$(printf '%s' "$raw" | awk '{print $2}')"
-          wait=false
-          [ "$flag" = "wait" ] && wait=true
+          url="${EU_BASE}/teams?organizationId=${ORG_ID}"
+          curl -sS -D headers_teams.txt -o eu2_teams.json \
+            -H "Accept: application/json" \
+            -H "Authorization: ${{ secrets.MAKE_API_TOKEN }}" "$url"
+          jq -r '.teams[] | "\(.id) — \(.name)"' eu2_teams.json | head -n 6 > teams_top.txt || true
 
-          if ! printf '%s' "$scen_id" | grep -Eq '^[0-9]+$'; then
-            echo '{"error":"missing_or_invalid_id"}' > eu2_run_resp.json
-            printf '%s\n' "make.run ⚠️ missing/invalid id" > run_msg.txt
+      - name: Reply for /make.teams
+        if: startsWith(steps.parse.outputs.cmd, '/make.teams')
+        run: |
+          if [ -s teams_top.txt ]; then
+            LINES=$(cat teams_top.txt | sed ':a;N;$!ba;s/\n/\\n/g')
+            MSG="make.teams ✅ (top):\n${LINES}\n\nהשתמש: /make.bootstrap <teamId>"
           else
-            body=$(jq -n --argjson responsive "$wait" '{responsive:$responsive}')
-            printf '%s' "$body" > eu2_run_req.json
-            url="${EU_BASE}/scenarios/${scen_id}/run"
-            curl -sS -D headers_run.txt -o eu2_run_resp.json -X POST \
+            MSG="make.teams ⚠️ no teams"
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
+
+      # ---- NEW: /make.bootstrap <teamId> ----
+      - name: /make.bootstrap — create & start minimal scenario
+        if: startsWith(steps.parse.outputs.cmd, '/make.bootstrap')
+        id: bootstrap
+        run: |
+          set -euo pipefail
+          TEAM="$(printf '%s' "${{ steps.parse.outputs.arg }}" | awk '{print $1}')"
+          MSG_FILE="msg_bootstrap.txt"
+          if ! printf '%s' "$TEAM" | grep -Eq '^[0-9]+$'; then
+            printf '%s\n' "make.bootstrap ⚠️ missing/invalid teamId" > "$MSG_FILE"
+          else
+            bp=$(jq -c '.' <<'JSON'
+            {
+              "name": "nc2-empty",
+              "flow": [
+                { "id": 1, "module": "json:ParseJSON", "version": 1 }
+              ],
+              "metadata": {
+                "version": 1,
+                "scenario": {
+                  "roundtrips": 1, "maxErrors": 3, "autoCommit": true, "autoCommitTriggerLast": true,
+                  "sequential": false, "confidential": false, "dataloss": false, "dlq": false, "freshVariables": false
+                },
+                "designer": { "orphans": [] }
+              }
+            }
+            JSON
+            )
+            sched=$(jq -c '.' <<'JSON'
+            { "type": "indefinitely", "interval": 900 }
+            JSON
+            )
+            body=$(jq -n --arg bp "$bp" --arg sched "$sched" --argjson team $TEAM '{blueprint:$bp, teamId:$team, scheduling:$sched, confirmed:true}')
+            curl -sS -D headers_bootstrap.txt -o bootstrap_resp.json -X POST \
               -H "Accept: application/json" \
               -H "Content-Type: application/json" \
-              -H "Authorization: Token ${{ secrets.MAKE_API_TOKEN }}" \
-              --data "$body" "$url" || true
-
-            execId=$(jq -r '.executionId // empty' eu2_run_resp.json)
-            status=$(jq -r '.status // empty' eu2_run_resp.json)
-            if [ -n "$execId" ]; then
-              printf '%s\n' "make.run ✅ id=${scen_id}; executionId=${execId}; status=${status:-n/a}" > run_msg.txt
+              -H "Authorization: ${{ secrets.MAKE_API_TOKEN }}" \
+              --data "$body" "${EU_BASE}/scenarios"
+            id=$(jq -r '.scenario.id // .id // empty' bootstrap_resp.json)
+            name=$(jq -r '.scenario.name // .name // "nc2-empty"' bootstrap_resp.json)
+            if [ -n "$id" ]; then
+              curl -sS -D headers_start.txt -o start_resp.json -X POST \
+                -H "Authorization: ${{ secrets.MAKE_API_TOKEN }}" \
+                "${EU_BASE}/scenarios/${id}/start" || true
+              printf 'make.bootstrap ✅ id=%s; name=%s (started)\n" ' "$id" "$name" > "$MSG_FILE"
             else
-              code=$(head -n1 headers_run.txt | awk '{print $2}')
-              printf '%s\n' "make.run ⚠️ id=${scen_id}; http=${code:-?}" > run_msg.txt
+              code=$(head -n1 headers_bootstrap.txt | awk '{print $2}')
+              printf 'make.bootstrap ⚠️ http=%s\n' "${code:-?}" > "$MSG_FILE"
             fi
           fi
 
-      - name: Reply for /make.run
-        if: startsWith(steps.parse.outputs.cmd, '/make.run')
+      - name: Reply for /make.bootstrap
+        if: startsWith(steps.parse.outputs.cmd, '/make.bootstrap')
         run: |
-          MSG="$(cat run_msg.txt 2>/dev/null || echo 'make.run ⚠️ internal')"
+          MSG="$(cat msg_bootstrap.txt 2>/dev/null || echo 'make.bootstrap ⚠️ internal')"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
@@ -217,6 +256,9 @@ jobs:
             headers_scenarios.txt
             eu2_scenarios.json
             scenarios_top.txt
-            eu2_run_req.json
-            eu2_run_resp.json
-            headers_run.txt
+            headers_teams.txt
+            eu2_teams.json
+            gh_runs.json
+            headers_bootstrap.txt
+            bootstrap_resp.json
+            headers_start.txt
