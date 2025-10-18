@@ -8,7 +8,6 @@ on:
       text:
         description: "Chat command text (e.g. /make.scenarios)"
         required: true
-        type: string
 
 concurrency:
   group: chat-commands
@@ -174,47 +173,6 @@ jobs:
             headers_teams.txt
             teams_top.txt
 
-      - name: /make.team.create — create team
-        if: startsWith(steps.parse.outputs.cmd, '/make.team.create')
-        id: team_create
-        env: { MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }} }
-        run: |
-          set -euo pipefail
-          name="$(printf '%s' "${{ steps.parse.outputs.arg }}" | sed 's/^ *//;s/ *$//')"
-          if [ -z "$name" ]; then echo "MSG=make.team.create ⚠️ missing name" >> "$GITHUB_OUTPUT"; exit 0; fi
-          url="${EU_BASE}/teams"
-          body=$(jq -n --arg name "$name" --argjson orgId $ORG_ID '{name:$name, organizationId:$orgId}')
-          printf '%s' "$body" > eu2_team_create_req.json
-          curl -sS -D headers_team.txt -o eu2_team_create.json -X POST \
-            -H "Accept: application/json" -H "Content-Type: application/json" \
-            -H "Authorization: Token ${MAKE_API_TOKEN}" --data "$body" "$url" || true
-          code=$(head -n1 headers_team.txt | awk '{print $2}')
-          id=$(jq -r '.team.id // empty' eu2_team_create.json)
-          if [ "$code" = "200" ] && [ -n "$id" ]; then
-            echo "MSG=make.team.create ✅ id=$id" >> "$GITHUB_OUTPUT"
-          else
-            echo "MSG=make.team.create ⚠️ http=${code:-?}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Reply /make.team.create
-        if: startsWith(steps.parse.outputs.cmd, '/make.team.create')
-        run: |
-          MSG="${{ steps.team_create.outputs.MSG }}"
-          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
-
-      - name: Upload team-create artifacts
-        if: ${{ always() && hashFiles('eu2_team_create.json') != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: eu2_team_create
-          path: |
-            eu2_team_create_req.json
-            eu2_team_create.json
-            headers_team.txt
-
-      # ---------- EU2: scenarios ----------
       - name: /make.scenarios — list EU2
         if: startsWith(steps.parse.outputs.cmd, '/make.scenarios')
         id: list
