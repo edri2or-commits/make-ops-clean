@@ -1,0 +1,220 @@
+name: Layer C — Chat Commands (tg)
+
+on:
+  repository_dispatch:
+    types: [chat.run]
+  workflow_dispatch:
+    inputs:
+      text:
+        description: "Command text as if from Telegram (e.g. /ping, /make.scenarios, /make.smoke)"
+        required: false
+        default: "/ping"
+
+concurrency:
+  group: chat-commands
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  REPO_FULL: ${{ github.repository }}
+  OWNER: ${{ github.repository_owner }}
+  EU_BASE: https://eu2.make.com/api/v2
+  ORG_ID: "5226765"
+
+jobs:
+  route:
+    name: Route & Execute Chat Command
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Save event payload (for artifacts)
+        run: |
+          cp "$GITHUB_EVENT_PATH" event.json
+          jq -r '.' event.json > event.pretty.json || true
+
+      - name: Parse command (repo_dispatch OR manual)
+        id: parse
+        run: |
+          TEXT_FILE=$(jq -r '.client_payload.message.text // .client_payload.text // empty' event.json)
+          if [ -n "$TEXT_FILE" ]; then
+            TEXT="$TEXT_FILE"
+          else
+            TEXT="${{ github.event.inputs.text }}"
+          fi
+          TEXT="$(printf '%s' "$TEXT" | tr -s '[:space:]' ' ')"
+          CMD="$(printf '%s' "$TEXT" | awk '{print $1}')"
+          ARG="$(printf '%s' "$TEXT" | cut -d' ' -f2-)"
+          echo "text=$TEXT" >> "$GITHUB_OUTPUT"
+          echo "cmd=$CMD"  >> "$GITHUB_OUTPUT"
+          echo "arg=$ARG"  >> "$GITHUB_OUTPUT"
+
+      - name: /ping /echo /status
+        if: startsWith(steps.parse.outputs.cmd, '/ping') || startsWith(steps.parse.outputs.cmd, '/echo') || startsWith(steps.parse.outputs.cmd, '/status')
+        run: |
+          cmd="${{ steps.parse.outputs.cmd }}"
+          arg="${{ steps.parse.outputs.arg }}"
+          case "$cmd" in
+            /ping)   MSG="pong" ;;
+            /echo)   MSG="${arg:-∅}" ;;
+            /status) MSG="C:ready · sha:${GITHUB_SHA::7}" ;;
+            *)       MSG="unknown" ;;
+          esac
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
+
+      - name: /gh.run — dispatch workflow
+        if: startsWith(steps.parse.outputs.cmd, '/gh.run')
+        id: ghrun
+        env:
+          BOT_PAT: ${{ secrets.BOT_PAT }}
+        run: |
+          set -euo pipefail
+          wf="${{ steps.parse.outputs.arg }}"
+          if [ -z "$wf" ] || [ "$wf" = "null" ]; then
+            echo "No workflow file provided"; exit 1
+          fi
+          repo="${{ env.REPO_FULL }}"
+          defbranch=$(curl -fsSL -H "Authorization: token ${BOT_PAT}" "https://api.github.com/repos/${repo}" | jq -r '.default_branch')
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: token ${BOT_PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${repo}/actions/workflows/${wf}/dispatches" \
+            -d "{\"ref\":\"${defbranch}\"}")
+          echo "http_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "204" ]; then
+            echo "Failed to dispatch ${wf} (HTTP $code)"; exit 1
+          fi
+          sleep 2
+          runs=$(curl -fsSL -H "Authorization: token ${BOT_PAT}" \
+            "https://api.github.com/repos/${repo}/actions/workflows/${wf}/runs?event=workflow_dispatch&per_page=1")
+          echo "$runs" > gh_runs.json
+          run_id=$(jq -r '.workflow_runs[0].id // empty' gh_runs.json)
+          html_url=$(jq -r '.workflow_runs[0].html_url // empty' gh_runs.json)
+          echo "run_id=$run_id"   >> "$GITHUB_OUTPUT"
+          echo "html_url=$html_url" >> "$GITHUB_OUTPUT"
+
+      - name: Reply for /gh.run
+        if: steps.ghrun.conclusion == 'success'
+        run: |
+          rid="${{ steps.ghrun.outputs.run_id }}"
+          url="${{ steps.ghrun.outputs.html_url }}"
+          code="${{ steps.ghrun.outputs.http_code }}"
+          text="gh.run ➜ ${code}; run_id=${rid:-pending}; ${url:-n/a}"
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" '{chat_id:$chat_id,text:$text}')"
+
+      # ---- EU2 smoke ----
+      - name: /make.smoke — EU2 GET
+        if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
+        id: make
+        continue-on-error: true
+        env:
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        run: |
+          url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=1"
+          code=$(curl -sS -D headers.txt -o eu2_list.json -w "%{http_code}" \
+            -H "Accept: application/json" \
+            -H "Authorization: Token ${MAKE_API_TOKEN}" "$url" || echo "000")
+          xreq=$(grep -i '^x-request-id:' headers.txt 2>/dev/null | awk '{print $2}' | tr -d '\r')
+          echo "http=$code" >> "$GITHUB_OUTPUT" || true
+          echo "xreq=${xreq:-}" >> "$GITHUB_OUTPUT" || true
+
+      - name: Reply for /make.smoke
+        if: ${{ always() }}
+        run: |
+          http="${{ steps.make.outputs.http }}"
+          xreq="${{ steps.make.outputs.xreq }}"
+          status=$([ "$http" = "200" ] && echo "✅" || echo "⚠️")
+          msg="make.smoke ${status} http=${http:-∅}; x-request-id=${xreq:-∅}"
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$msg" '{chat_id:$chat_id,text:$text}')"
+
+      # ---- /make.scenarios ----
+      - name: /make.scenarios — list EU2
+        if: startsWith(steps.parse.outputs.cmd, '/make.scenarios')
+        id: list
+        continue-on-error: true
+        env:
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        run: |
+          url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=10"
+          curl -sS -D headers_scenarios.txt -o eu2_scenarios.json \
+            -H "Accept: application/json" \
+            -H "Authorization: Token ${MAKE_API_TOKEN}" "$url"
+          jq -r '.data[] | "\(.id) — \(.name)"' eu2_scenarios.json | head -n 6 > scenarios_top.txt || true
+
+      - name: Reply for /make.scenarios
+        if: steps.list.conclusion == 'success'
+        run: |
+          if [ -s scenarios_top.txt ]; then
+            LINES=$(cat scenarios_top.txt | sed ':a;N;$!ba;s/\n/\\n/g')
+            MSG="make.scenarios ✅ (top):\n${LINES}"
+          else
+            MSG="make.scenarios ⚠️ no items"
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
+
+      # ---- /make.run <id> [wait] ----
+      - name: /make.run — run scenario
+        if: startsWith(steps.parse.outputs.cmd, '/make.run')
+        id: run
+        continue-on-error: true
+        env:
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          raw="${{ steps.parse.outputs.arg }}"
+          scen_id="$(printf '%s' "$raw" | awk '{print $1}')"
+          flag="$(printf '%s' "$raw" | awk '{print $2}')"
+          wait=false
+          [ "$flag" = "wait" ] && wait=true
+
+          if ! printf '%s' "$scen_id" | grep -Eq '^[0-9]+$'; then
+            echo '{"error":"missing_or_invalid_id"}' > eu2_run_resp.json
+            printf '%s\n' "make.run ⚠️ missing/invalid id" > run_msg.txt
+          else
+            body=$(jq -n --argjson responsive "$wait" '{responsive:$responsive}')
+            printf '%s' "$body" > eu2_run_req.json
+            url="${EU_BASE}/scenarios/${scen_id}/run"
+            curl -sS -D headers_run.txt -o eu2_run_resp.json -X POST \
+              -H "Accept: application/json" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Token ${MAKE_API_TOKEN}" \
+              --data "$body" "$url" || true
+
+            execId=$(jq -r '.executionId // empty' eu2_run_resp.json)
+            status=$(jq -r '.status // empty' eu2_run_resp.json)
+            if [ -n "$execId" ]; then
+              printf '%s\n' "make.run ✅ id=${scen_id}; executionId=${execId}; status=${status:-n/a}" > run_msg.txt
+            else
+              code=$(head -n1 headers_run.txt | awk '{print $2}')
+              printf '%s\n' "make.run ⚠️ id=${scen_id}; http=${code:-?}" > run_msg.txt
+            fi
+          fi
+
+      - name: Upload artifacts (always)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat_event
+          path: |
+            event.json
+            event.pretty.json
+            headers.txt
+            eu2_list.json
+            headers_scenarios.txt
+            eu2_scenarios.json
+            scenarios_top.txt
+            eu2_run_req.json
+            eu2_run_resp.json
+            headers_run.txt
