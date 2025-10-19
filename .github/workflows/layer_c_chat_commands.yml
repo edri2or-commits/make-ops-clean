@@ -116,6 +116,39 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
+      # ADDED: gh.dispatch (send repository_dispatch from chat)
+      - name: /gh.dispatch — repository_dispatch
+        if: startsWith(steps.parse.outputs.cmd, '/gh.dispatch')
+        id: ghdispatch
+        env:
+          BOT_PAT: ${{ secrets.BOT_PAT }}
+        run: |
+          set -euo pipefail
+          arg="${{ steps.parse.outputs.arg }}"
+          text="${arg:-/make.scenarios}"
+          repo="${{ env.REPO_FULL }}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: token ${BOT_PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${repo}/dispatches" \
+            -d "{\"event_type\":\"chat.run\",\"client_payload\":{\"text\":\"${text}\"}}")
+          echo "HTTP=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "204" ]; then
+            echo "MSG=gh.dispatch ✅ 204 (repository_dispatch sent)" >> "$GITHUB_OUTPUT"
+          else
+            echo "MSG=gh.dispatch ⚠️ http=$code" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ADDED: reply for gh.dispatch
+      - name: Reply /gh.dispatch
+        if: startsWith(steps.parse.outputs.cmd, '/gh.dispatch')
+        run: |
+          MSG="${{ steps.ghdispatch.outputs.MSG }}"
+          MSG="$MSG"$'\n'"run: ${RUN_URL}"
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
+
       # ---------- EU2: smoke ----------
       - name: /make.smoke — EU2 GET
         if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
