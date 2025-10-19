@@ -1,8 +1,7 @@
-# Delta:
-# 1) Added workflow_dispatch + inputs.text (optional)
-# 2) Parser now falls back to .inputs.text (UI run)
-# 3) Artifact steps: ensured path: is under with:
-# 4) ASCII workflow name to reduce edge cases
+# Delta in this version:
+# - Robust JSON parsing for lists:
+#   scenarios: parse from .data[] or .scenarios[] or .response.scenarios[]
+#   teams:     parse from .data[] or .teams[] or .response.teams[]
 
 name: Layer C Chat Commands (tg)
 
@@ -47,7 +46,6 @@ jobs:
         id: parse
         run: |
           TEXT=$(jq -r '.client_payload.message.text // .client_payload.text // .inputs.text // ""' event.json)
-          # Fallback from inputs context (only exists on workflow_dispatch)
           FALLBACK="${{ inputs.text }}"
           [ -z "$TEXT" -o "$TEXT" = "null" ] && TEXT="${FALLBACK}"
           TEXT="$(printf '%s' "$TEXT" | tr -s '[:space:]' ' ')"
@@ -112,7 +110,7 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
-      # ---------- EU2: smoke ----------
+      # ---------- EU2: list scenarios (org scope) ----------
       - name: /make.smoke — EU2 GET
         if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
         id: make
@@ -159,7 +157,7 @@ jobs:
           curl -sS -D headers_teams.txt -o eu2_teams.json \
             -H "Accept: application/json" \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url" || true
-          jq -r '.data[]? | "\(.id) — \(.name)"' eu2_teams.json | head -n 6 > teams_top.txt || true
+          jq -r '[ (.data // []), (.teams // []), (.response.teams // []) ] | add | .[]? | "\(.id) — \(.name)"' eu2_teams.json | head -n 6 > teams_top.txt || true
 
       - name: Reply /make.teams
         if: startsWith(steps.parse.outputs.cmd, '/make.teams')
@@ -196,7 +194,7 @@ jobs:
           curl -sS -D headers_scenarios.txt -o eu2_scenarios.json \
             -H "Accept: application/json" \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url"
-          jq -r '.data[]? | "\(.id) — \(.name)"' eu2_scenarios.json | head -n 6 > scenarios_top.txt || true
+          jq -r '[ (.data // []), (.scenarios // []), (.response.scenarios // []) ] | add | .[]? | "\(.id) — \(.name)"' eu2_scenarios.json | head -n 6 > scenarios_top.txt || true
 
       - name: Reply /make.scenarios
         if: startsWith(steps.parse.outputs.cmd, '/make.scenarios')
@@ -222,47 +220,6 @@ jobs:
             scenarios_top.txt
 
       # ---------- EU2: create/start/run ----------
-      - name: /make.team.create — create team
-        if: startsWith(steps.parse.outputs.cmd, '/make.team.create')
-        id: team_create
-        env:
-          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          name="$(printf '%s' "${{ steps.parse.outputs.arg }}" | sed 's/^ *//;s/ *$//')"
-          if [ -z "$name" ]; then echo "MSG=make.team.create ⚠️ missing name" >> "$GITHUB_OUTPUT"; exit 0; fi
-          url="${EU_BASE}/teams"
-          body=$(jq -n --arg name "$name" --argjson orgId $ORG_ID '{name:$name, organizationId:$orgId}')
-          printf '%s' "$body" > eu2_team_create_req.json
-          curl -sS -D headers_team.txt -o eu2_team_create.json -X POST \
-            -H "Accept: application/json" -H "Content-Type: application/json" \
-            -H "Authorization: Token ${MAKE_API_TOKEN}" --data "$body" "$url" || true
-          code=$(head -n1 headers_team.txt | awk '{print $2}')
-          id=$(jq -r '.team.id // empty' eu2_team_create.json)
-          if [ "$code" = "200" ] && [ -n "$id" ]; then
-            echo "MSG=make.team.create ✅ id=$id" >> "$GITHUB_OUTPUT"
-          else
-            echo "MSG=make.team.create ⚠️ http=${code:-?}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Reply /make.team.create
-        if: startsWith(steps.parse.outputs.cmd, '/make.team.create')
-        run: |
-          MSG="${{ steps.team_create.outputs.MSG }}"
-          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
-
-      - name: Upload team-create artifacts
-        if: ${{ always() && hashFiles('eu2_team_create.json') != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: eu2_team_create
-          path: |
-            eu2_team_create_req.json
-            eu2_team_create.json
-            headers_team.txt
-
       - name: /make.scenario.create — minimal scenario
         if: startsWith(steps.parse.outputs.cmd, '/make.scenario.create')
         id: sc_create
