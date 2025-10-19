@@ -1,4 +1,4 @@
-name: Layer C — Chat Commands (tg)
+name: Layer C Chat Commands (tg)
 
 on:
   repository_dispatch:
@@ -203,7 +203,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: eu2_scenarios
-          path: |
+        path: |
             eu2_scenarios.json
             headers_scenarios.txt
             scenarios_top.txt
