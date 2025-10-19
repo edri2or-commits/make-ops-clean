@@ -1,0 +1,20 @@
+name: Manual Dispatch Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: "Optional text to echo"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show inputs
+        run: |
+          echo "inputs.text=${{ github.event.inputs.text }}"
+          echo "::notice title=Smoke::OK (workflow_dispatch visible and runnable)"
