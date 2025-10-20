@@ -1,11 +1,11 @@
 name: ops.edit (PR-only via GitHub App)
 
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [ops.edit]
-  workflow_dispatch:
 
-# לא מסתמכים על GITHUB_TOKEN להרשאות כתיבה; משתמשים בטוקן ההתקנה של ה-App
+# לא משתמשים ב-GITHUB_TOKEN לכתיבה; רק בטוקן ההתקנה
 permissions:
   contents: read
   pull-requests: read
@@ -13,17 +13,14 @@ permissions:
 jobs:
   pr_only:
     runs-on: ubuntu-latest
-
     steps:
-      # מנפיק טוקן התקנה קצר-חיים (≈ שעה) מתוך ה-App
       - uses: actions/create-github-app-token@v2
         id: app
         with:
-          app-id: ${{ secrets.APP_ID }}          # ← חשוב: APP_ID כסוד/מספר ישיר
-          private-key: ${{ secrets.PRIVATE_KEY }}# ← ה-PEM כסוד
-          installation-id: 90749344              # ← ההתקנה שלך (repo-scoped)
+          app-id: ${{ secrets.APP_ID }}          # או המספר 2145601
+          private-key: ${{ secrets.PRIVATE_KEY }}# PEM מלא
+          installation-id: 90749344
 
-      # יוצר ענף, קובץ הוכחה, ו-PR — הכול ב-REST (ללא gh)
       - name: Create branch & file and open PR (curl only)
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -31,36 +28,21 @@ jobs:
         run: |
           set -euo pipefail
           repo="${GITHUB_REPOSITORY}"
-
-          # 1) קובע את ענף הבסיס (ברירת מחדל של הריפו)
           base=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
                  "$API/repos/$repo" | python3 -c "import sys,json;print(json.load(sys.stdin)['default_branch'])")
-
-          # 2) יוצר ענף עבודה חדש מתוך base
-          ts=$(date -u +%Y%m%dT%H%M%SZ)
-          branch="ops/${ts}"
+          ts=$(date -u +%Y%m%dT%H%M%SZ); branch="ops/${ts}"
           base_sha=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
                     "$API/repos/$repo/git/ref/heads/$base" | python3 -c "import sys,json;print(json.load(sys.stdin)['object']['sha'])")
           curl -sL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-               "$API/repos/$repo/git/refs" \
-               -d "{\"ref\":\"refs/heads/${branch}\",\"sha\":\"${base_sha}\"}" \
+               "$API/repos/$repo/git/refs" -d "{\"ref\":\"refs/heads/${branch}\",\"sha\":\"${base_sha}\"}" \
                || echo "note: branch may exist already"
-
-          # 3) יוצר קובץ הוכחה ב-branch
           path=".chatops/runs/${ts}.txt"
           content=$(printf "PR proof via App Installation at %s\n" "$ts" | base64 -w0)
           curl -sL -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
                "$API/repos/$repo/contents/${path}" \
                -d "{\"message\":\"chore(chatops): e2e proof (no-merge)\",\"content\":\"${content}\",\"branch\":\"${branch}\"}"
-
-          # 4) פותח PR (ללא merge)
           pr_json=$(curl -sL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
                    "$API/repos/$repo/pulls" \
                    -d "{\"title\":\"chatops: e2e proof (no-merge)\",\"head\":\"${branch}\",\"base\":\"${base}\"}")
-          pr_url=$(python3 - <<'PY'
-import sys, json
-print(json.load(sys.stdin)['html_url'])
-PY
-          <<< "$pr_json")
-
+          pr_url=$(python3 - <<'PY'\nimport sys,json\nprint(json.load(sys.stdin)['html_url'])\nPY\n          <<< "$pr_json")
           echo "PR: ${pr_url}"
