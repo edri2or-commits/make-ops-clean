@@ -5,7 +5,6 @@ on:
   repository_dispatch:
     types: [ops.edit]
 
-# לא משתמשים ב-GITHUB_TOKEN לכתיבה; רק בטוקן ההתקנה
 permissions:
   contents: read
   pull-requests: read
@@ -14,12 +13,20 @@ jobs:
   pr_only:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate PRIVATE_KEY format (no output of secrets)
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PRIVATE_KEY" > key.pem
+          # יאפס ב־non-zero אם המפתח לא PEM תקין; לא מדפיס את המפתח
+          openssl pkey -in key.pem -noout >/dev/null
+
       - uses: actions/create-github-app-token@v2
         id: app
         with:
-          app-id: ${{ secrets.APP_ID }}          # או המספר 2145601
-          private-key: ${{ secrets.PRIVATE_KEY }}# PEM מלא
-          installation-id: 90749344
+          app-id: ${{ secrets.APP_ID }}           # או המספר 2145601
+          private-key: ${{ secrets.PRIVATE_KEY }} # PEM כפי שהורד מגיטהאב
 
       - name: Create branch & file and open PR (curl only)
         env:
@@ -44,5 +51,9 @@ jobs:
           pr_json=$(curl -sL -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
                    "$API/repos/$repo/pulls" \
                    -d "{\"title\":\"chatops: e2e proof (no-merge)\",\"head\":\"${branch}\",\"base\":\"${base}\"}")
-          pr_url=$(python3 - <<'PY'\nimport sys,json\nprint(json.load(sys.stdin)['html_url'])\nPY\n          <<< "$pr_json")
+          pr_url=$(python3 - <<'PY'
+import sys, json
+print(json.load(sys.stdin)['html_url'])
+PY
+          <<< "$pr_json")
           echo "PR: ${pr_url}"
