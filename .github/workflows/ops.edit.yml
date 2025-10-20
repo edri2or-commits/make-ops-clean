@@ -1,0 +1,39 @@
+name: ops.edit (PR-only via GitHub App)
+on:
+  repository_dispatch:
+    types: [ops.edit]
+  workflow_dispatch:
+
+jobs:
+  pr_only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+
+      - name: Create branch & file and open PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BASE: main
+        run: |
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          branch="ops/${ts}"
+          base_sha=$(gh api repos/${GITHUB_REPOSITORY}/git/ref/heads/${BASE} --jq .object.sha)
+          gh api repos/${GITHUB_REPOSITORY}/git/refs -X POST -f ref="refs/heads/${branch}" -f sha="${base_sha}"
+          path=".chatops/runs/${ts}.txt"
+          content=$(printf "PR proof via App Installation at %s\n" "$ts" | base64 -w0)
+          gh api repos/${GITHUB_REPOSITORY}/contents/${path} -X PUT \
+            -f message="chore(chatops): e2e proof (no-merge)" \
+            -f content="${content}" -f branch="${branch}"
+          pr_url=$(gh api repos/${GITHUB_REPOSITORY}/pulls -X POST \
+            -f title="chatops: e2e proof (no-merge)" \
+            -f head="${branch}" -f base="${BASE}" --jq .html_url)
+          echo "PR: ${pr_url}"
