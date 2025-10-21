@@ -5,6 +5,7 @@ on:
   repository_dispatch:
     types: [ops.edit]
 
+# משאירים את GITHUB_TOKEN לקריאה בלבד — כל הכתיבה נעשית עם טוקן ההתקנה של ה-App
 permissions:
   contents: read
   pull-requests: read
@@ -19,26 +20,26 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$PRIVATE_KEY" > key.pem
-          # fails if not a valid PEM; prints nothing
+          # ייכשל אם המפתח לא PEM תקין; לא מדפיס את המפתח
           openssl pkey -in key.pem -noout >/dev/null
 
       - name: Create GitHub App installation token
         id: app
         uses: actions/create-github-app-token@v2
         with:
-          app_id: ${{ secrets.APP_ID }}            # או המספר של האפליקציה
-          private_key: ${{ secrets.PRIVATE_KEY }}  # ה-PEM מה-GitHub App
+          app-id: ${{ secrets.APP_ID }}            # מספר ה-App (לא installation)
+          private-key: ${{ secrets.PRIVATE_KEY }}  # ה-PEM הרב-שורה מה-GitHub App
 
       - name: Create branch, add file, open PR (curl only)
         id: pr
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}   # טוקן התקנה של ה-App
           API: https://api.github.com
         run: |
           set -euo pipefail
           REPO="${GITHUB_REPOSITORY}"
 
-          # 1) fetch default branch
+          # 1) קבלת ענף ברירת המחדל
           BASE=$(
             curl -sS \
               -H "Authorization: Bearer $GH_TOKEN" \
@@ -48,7 +49,7 @@ jobs:
           )
           test -n "$BASE" -a "$BASE" != "null"
 
-          # 2) get base SHA
+          # 2) SHA של הבסיס
           BASE_SHA=$(
             curl -sS \
               -H "Authorization: Bearer $GH_TOKEN" \
@@ -58,7 +59,7 @@ jobs:
           )
           test -n "$BASE_SHA" -a "$BASE_SHA" != "null"
 
-          # 3) create branch
+          # 3) יצירת ענף חדש
           TS=$(date -u +%Y%m%dT%H%M%SZ)
           BR="ops/$TS"
           curl -sS -X POST \
@@ -69,7 +70,7 @@ jobs:
             -d "{\"ref\":\"refs/heads/$BR\",\"sha\":\"$BASE_SHA\"}" \
             || echo "note: branch may exist already"
 
-          # 4) add file
+          # 4) הוספת קובץ לדוגמה
           FILE=".chatops/runs/$TS.txt"
           CONTENT=$(printf "PR proof via App Installation at %s\n" "$TS" | base64 -w 0)
           curl -sS -X PUT \
@@ -79,7 +80,7 @@ jobs:
             "$API/repos/$REPO/contents/$FILE" \
             -d "{\"message\":\"chore(chatops): e2e proof (no-merge)\",\"content\":\"$CONTENT\",\"branch\":\"$BR\"}"
 
-          # 5) open PR
+          # 5) פתיחת PR
           RESP=$(
             curl -sS -X POST \
               -H "Authorization: Bearer $GH_TOKEN" \
