@@ -1,0 +1,26 @@
+{
+   "registry_version":"v1",
+   "routes":{
+      "ping":{
+         "in":{},
+         "proof":{
+            "dod":"proof.text==\"pong\"",
+            "fields":["text"]
+          },
+          "permissions":["Telegram: sendMessage"],
+          "headers":[],
+          "notify_default":{"chat_id":5786217215,"mode":"loud"}
+       },
+      "pr.open":{
+          "in":{"head":"<string>","base":"<string>"},
+          "proof":{
+            "dod":"includes(proof.html_url,\"/pull/\")",
+            "fields":["html_url","number"]
+          },
+          "permissions":["GitHub App: contents/pull_requests:write"],
+          "headers":["X-GitHub-Api-Version: 2022-11-28"],
+          "secrets":["APP_ID","INSTALLATION_ID","CHATOPS_APP_PEM"],
+          "notify_default":{"chat_id":5786217215,"mode":"loud"}
+        }
+    }
+}
