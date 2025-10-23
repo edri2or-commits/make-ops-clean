@@ -1,34 +1,36 @@
 {
-   "registry_version":"v1",
-   "routes":{
-      "ping":{
-         "in":{},
-         "proof":{
-            "dod":"proof.text==\"pong\"",
-            "fields":["text"]
-          },
-          "permissions":["Telegram: sendMessage"],
-          "headers":[],
-          "notify_default":{"chat_id":5786217215,"mode":"loud"}
-       },
-      "pr.open":{
-          "in":{"head":"<string>","base":"<string>"},
-          "proof":{
-            "dod":"includes(proof.html_url,\"/pull/\")",
-            "fields":["html_url","number"]
-          },
-          "permissions":["GitHub App: contents/pull_requests:write"],
-          "headers":["X-GitHub-Api-Version: 2022-11-28"],
-          "secrets":["APP_ID","INSTALLATION_ID","CHATOPS_APP_PEM"],
-          "notify_default":{"chat_id":5786217215,"mode":"loud"}
-        },
-    "drive.find": {
-    "in": { "q": "<string>", "pageSize": 10 },
-    "proof": { "dod": "len(proof.files)>=0", "fields": ["files"] },
-    "permissions": ["Google Drive: files.readonly"],
-    "headers": [],
-    "secrets": ["GDRIVE_OAUTH_OR_SA"],
-    "notify_default": { "chat_id": 5786217215, "mode": "loud" }
-  }
+  "$schema": ".chatops/registry.schema.v1.json",
+  "version": "1.0",
+  "routes": {
+    "ping": { "summary": "בדיקת חיים", "dod": "proof.text==\"pong\"" },
+    "pr.open": { "summary": "פתיחת PR", "dod": "includes(proof.html_url, \"/pull/\")" },
+    "drive.find": { "summary": "חיפוש קבצים בדרייב", "dod": "len(proof.files) >= 0" },
+    "init.b": {
+      "summary": "להפעיל את Scenario B ולחבר webhook לטלגרם",
+      "inputs": { "scenario_id": 7745337, "telegram_bot": "SALAMTUKBOT" },
+      "actions": [
+        "make.scenario.ensureActive(inputs.scenario_id)",
+        "make.hook.ensureAttached(inputs.scenario_id) -> hook_url",
+        "telegram.setWebhook(bot=inputs.telegram_bot, url=hook_url)",
+        "telegram.getWebhookInfo() -> tgi"
+      ],
+      "proof_contract": {
+        "required_fields": [
+          "observed_at","ok","latency_ms","route","source","idempotency_key",
+          "proof.scenario_id","proof.scenario_status","proof.telegram_webhook_url","proof.telegram_pending_update_count"
+        ]
+      },
+      "dod": "proof.scenario_status==\"active\" && proof.telegram_webhook_url~\"https://\" && proof.telegram_pending_update_count >= 0"
     }
+  },
+  "proof_template": {
+    "observed_at": "RFC3339Z",
+    "ok": true,
+    "latency_ms": 0,
+    "route": "<auto>",
+    "source": "chat.telegram",
+    "idempotency_key": "tg:<update_id>:<chat_id>",
+    "inputs": {},
+    "proof": {}
+  }
 }
