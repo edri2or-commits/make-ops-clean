@@ -1,0 +1,86 @@
+name: init.b → Scenario B bridge
+
+on:
+  push:
+    paths: [".chatops/registry.v1.json", ".github/workflows/init-b-bridge.yml"]
+  workflow_dispatch:
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Parse registry (init.b)
+        id: reg
+        run: |
+          test -f .chatops/registry.v1.json
+          SCENARIO_ID=$(jq -r '."init.b".scenario_id // empty' .chatops/registry.v1.json)
+          BOT=$(jq -r '."init.b".bot // empty' .chatops/registry.v1.json)
+          if [ -z "$SCENARIO_ID" ] || [ -z "$BOT" ]; then
+            echo "missing init.b.scenario_id/bot"; exit 1; fi
+          echo "scenario_id=$SCENARIO_ID" >> $GITHUB_OUTPUT
+          echo "bot=$BOT" >> $GITHUB_OUTPUT
+
+      - name: Activate Scenario B (Make API)
+        env:
+          MAKE_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          MAKE_BASE: ${{ vars.MAKE_BASE }}
+          SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
+        run: |
+          : "${MAKE_BASE:=https://eu2.make.com/api/v2}"
+          if [ -z "$MAKE_TOKEN" ]; then echo "missing MAKE_API_TOKEN secret"; exit 1; fi
+          curl -fsS -X POST "$MAKE_BASE/scenarios/${SCENARIO_ID}/start" \
+            -H "Authorization: Token ${MAKE_TOKEN}" -H "Accept: application/json" \
+            | jq .
+
+      - name: Resolve Make webhook URL (optional but preferred)
+        id: hook
+        env:
+          MAKE_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          MAKE_BASE: ${{ vars.MAKE_BASE }}
+          TEAM_ID: ${{ secrets.MAKE_TEAM_ID }}
+          SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
+        run: |
+          : "${MAKE_BASE:=https://eu2.make.com/api/v2}"
+          if [ -z "$TEAM_ID" ]; then
+            echo "hook_url=" >> $GITHUB_OUTPUT
+            echo "No TEAM_ID provided; skipping hook discovery."
+            exit 0
+          fi
+          RES=$(curl -fsS "$MAKE_BASE/hooks?teamId=${TEAM_ID}&viewForScenarioId=${SCENARIO_ID}&assigned=true" \
+            -H "Authorization: Token ${MAKE_TOKEN}" -H "Accept: application/json")
+          echo "$RES" > hooks.json
+          HOOK_URL=$(jq -r '.items[0].url // .[0].url // empty' hooks.json)
+          echo "hook_url=$HOOK_URL" >> $GITHUB_OUTPUT
+          test -n "$HOOK_URL" && echo "Make hook url: $HOOK_URL" || echo "No hook URL found (ok if using polling)."
+
+      - name: (Optional) Set Telegram webhook → Make hook
+        if: ${{ steps.hook.outputs.hook_url != '' && secrets.TELEGRAM_BOT_TOKEN != '' }}
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          HOOK_URL: ${{ steps.hook.outputs.hook_url }}
+        run: |
+          curl -fsS -X POST "https://api.telegram.org/bot${TG_TOKEN}/setWebhook" \
+            -d "url=${HOOK_URL}" -d "allowed_updates=message" | jq .
+
+      - name: Proof: getWebhookInfo (always)
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -z "$TG_TOKEN" ]; then
+            echo '{"note":"no TG token in secrets; skipping"}' > webhook_info.json
+          else
+            curl -fsS "https://api.telegram.org/bot${TG_TOKEN}/getWebhookInfo" | tee webhook_info.json
+          fi
+
+      - name: Upload proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: initb_bridge_proof
+          path: |
+            webhook_info.json
+            hooks.json
