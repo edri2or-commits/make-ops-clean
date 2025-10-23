@@ -21,6 +21,14 @@
           "headers":["X-GitHub-Api-Version: 2022-11-28"],
           "secrets":["APP_ID","INSTALLATION_ID","CHATOPS_APP_PEM"],
           "notify_default":{"chat_id":5786217215,"mode":"loud"}
-        }
+        },
+    "drive.find": {
+    "in": { "q": "<string>", "pageSize": 10 },
+    "proof": { "dod": "len(proof.files)>=0", "fields": ["files"] },
+    "permissions": ["Google Drive: files.readonly"],
+    "headers": [],
+    "secrets": ["GDRIVE_OAUTH_OR_SA"],
+    "notify_default": { "chat_id": 5786217215, "mode": "loud" }
+  }
     }
 }
