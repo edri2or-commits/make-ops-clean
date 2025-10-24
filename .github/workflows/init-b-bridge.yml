@@ -1,4 +1,4 @@
-name: init.b → Scenario B bridge
+name: init.b → Scenario B bridge (compat)
 
 on:
   push:
@@ -25,30 +25,57 @@ jobs:
           echo "scenario_id=$SCENARIO_ID" >> $GITHUB_OUTPUT
           echo "bot=$BOT" >> $GITHUB_OUTPUT
 
+      - name: Collect secrets (compat aliases)
+        id: sec
+        env:
+          A: ${{ secrets.MAKE_API_TOKEN }}
+          B: ${{ secrets.MAKE_TOKEN_ID }}
+          C: ${{ secrets.MAKE_API_KEY }}
+          D: ${{ secrets.MAKE_TOKEN }}
+          T1: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          T2: ${{ secrets.telegram-bot-token }}
+          T3: ${{ secrets.TELEGRAM_TOKEN }}
+          G1: ${{ secrets.MAKE_TEAM_ID }}
+          G2: ${{ secrets.MAKE_TEAM }}
+          G3: ${{ vars.MAKE_TEAM_ID }}
+          BASE: ${{ vars.MAKE_BASE }}
+        run: |
+          MAKE_TOKEN="${A:-${B:-${C:-${D:-}}}}"
+          TG_TOKEN="${T1:-${T2:-${T3:-}}}"
+          TEAM_ID="${G1:-${G2:-${G3:-}}}"
+          MAKE_BASE="${BASE:-https://eu2.make.com/api/v2}"
+          if [ -z "$MAKE_TOKEN" ]; then echo "No Make token provided via any alias"; exit 1; fi
+          {
+            echo "make_token_set=$([ -n "$MAKE_TOKEN" ] && echo true || echo false)"
+            echo "tg_token_set=$([ -n "$TG_TOKEN" ] && echo true || echo false)"
+            echo "team_id_set=$([ -n "$TEAM_ID" ] && echo true || echo false)"
+            echo "make_base=$MAKE_BASE"
+          } | tee sec_summary.txt
+          echo "MAKE_TOKEN=$MAKE_TOKEN" >> $GITHUB_OUTPUT
+          echo "TG_TOKEN=$TG_TOKEN" >> $GITHUB_OUTPUT
+          echo "TEAM_ID=$TEAM_ID" >> $GITHUB_OUTPUT
+          echo "MAKE_BASE=$MAKE_BASE" >> $GITHUB_OUTPUT
+
       - name: Activate Scenario B (Make API)
         env:
-          MAKE_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
-          MAKE_BASE: ${{ vars.MAKE_BASE }}
+          MAKE_TOKEN: ${{ steps.sec.outputs.MAKE_TOKEN }}
+          MAKE_BASE:  ${{ steps.sec.outputs.MAKE_BASE }}
           SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
         run: |
-          : "${MAKE_BASE:=https://eu2.make.com/api/v2}"
-          if [ -z "$MAKE_TOKEN" ]; then echo "missing MAKE_API_TOKEN secret"; exit 1; fi
           curl -fsS -X POST "$MAKE_BASE/scenarios/${SCENARIO_ID}/start" \
-            -H "Authorization: Token ${MAKE_TOKEN}" -H "Accept: application/json" \
-            | jq .
+            -H "Authorization: Token ${MAKE_TOKEN}" -H "Accept: application/json" | jq .
 
-      - name: Resolve Make webhook URL (optional but preferred)
+      - name: Resolve Make webhook URL (optional)
         id: hook
         env:
-          MAKE_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
-          MAKE_BASE: ${{ vars.MAKE_BASE }}
-          TEAM_ID: ${{ secrets.MAKE_TEAM_ID }}
+          MAKE_TOKEN: ${{ steps.sec.outputs.MAKE_TOKEN }}
+          MAKE_BASE:  ${{ steps.sec.outputs.MAKE_BASE }}
+          TEAM_ID:    ${{ steps.sec.outputs.TEAM_ID }}
           SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
         run: |
-          : "${MAKE_BASE:=https://eu2.make.com/api/v2}"
           if [ -z "$TEAM_ID" ]; then
             echo "hook_url=" >> $GITHUB_OUTPUT
-            echo "No TEAM_ID provided; skipping hook discovery."
+            echo "No TEAM_ID provided; skipping hook discovery." | tee hooks.json
             exit 0
           fi
           RES=$(curl -fsS "$MAKE_BASE/hooks?teamId=${TEAM_ID}&viewForScenarioId=${SCENARIO_ID}&assigned=true" \
@@ -59,9 +86,9 @@ jobs:
           test -n "$HOOK_URL" && echo "Make hook url: $HOOK_URL" || echo "No hook URL found (ok if using polling)."
 
       - name: (Optional) Set Telegram webhook → Make hook
-        if: ${{ steps.hook.outputs.hook_url != '' && secrets.TELEGRAM_BOT_TOKEN != '' }}
+        if: ${{ steps.hook.outputs.hook_url != '' && steps.sec.outputs.TG_TOKEN != '' }}
         env:
-          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_TOKEN: ${{ steps.sec.outputs.TG_TOKEN }}
           HOOK_URL: ${{ steps.hook.outputs.hook_url }}
         run: |
           curl -fsS -X POST "https://api.telegram.org/bot${TG_TOKEN}/setWebhook" \
@@ -69,18 +96,13 @@ jobs:
 
       - name: Proof: getWebhookInfo (always)
         env:
-          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_TOKEN: ${{ steps.sec.outputs.TG_TOKEN }}
         run: |
           if [ -z "$TG_TOKEN" ]; then
-            echo '{"note":"no TG token in secrets; skipping"}' > webhook_info.json
+            echo '{"note":"no TG token; skipping Telegram proof"}' > webhook_info.json
           else
             curl -fsS "https://api.telegram.org/bot${TG_TOKEN}/getWebhookInfo" | tee webhook_info.json
           fi
 
       - name: Upload proof
-        uses: actions/upload-artifact@v4
-        with:
-          name: initb_bridge_proof
-          path: |
-            webhook_info.json
-            hooks.json
+        uses: actions/upload-art
