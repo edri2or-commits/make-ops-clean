@@ -1,0 +1,56 @@
+name: token sanity check
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make token check (HTTP code only)
+        id: make
+        shell: bash
+        run: |
+          : "${MAKE_BASE:=https://eu2.make.com}"
+          : "${SCENARIO_ID:=unknown}"
+          URL="${MAKE_BASE}/api/v2/scenarios/${SCENARIO_ID}"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${MAKE_API_TOKEN}" "$URL" || echo "000")
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+        env:
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+
+      - name: Telegram token check (ok only)
+        id: tg
+        shell: bash
+        run: |
+          RESP=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" || true)
+          OK=$(printf "%s" "$RESP" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("ok", False))' 2>/dev/null || echo false)
+          echo "ok=$OK" >> "$GITHUB_OUTPUT"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+      - name: Write report
+        shell: bash
+        run: |
+          : "${MAKE_BASE:=https://eu2.make.com}"
+          mkdir -p token_check_report
+          cat > token_check_report/report.json <<JSON
+          {
+            "make_http_code": "${{ steps.make.outputs.code }}",
+            "telegram_ok": "${{ steps.tg.outputs.ok }}",
+            "base": "${MAKE_BASE}"
+          }
+          JSON
+          cat token_check_report/report.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: token_check_report
+          path: token_check_report
+          if-no-files-found: error
