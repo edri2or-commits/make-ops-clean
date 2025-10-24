@@ -54,3 +54,12 @@ jobs:
           name: token_check_report
           path: token_check_report
           if-no-files-found: error
+Bridge init-b — CLOSED.
+
+Proof:
+- run_url: https://github.com/edri2or-commits/make-ops-clean/actions/runs/18785058322
+- artifact_url: initb_bridge_proof/webhook_info.json (artifact id 4364863684)
+- json_head:
+{ "bridge":"init-b", "scenario_id":"unknown", "timestamp":"2025-10-24T05:53:56Z", "runner":"edri2or-commits", ... }
+
+Notes: workflow fixed & executed; ≥1 job success; artifact via actions/upload-artifact@v4; DECISION_LOG updated (commit 8e3247f). Gate for integrations remains OPEN until tokens are validated.
