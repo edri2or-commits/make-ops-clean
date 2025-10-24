@@ -1,4 +1,4 @@
-name: init.b - Scenario B bridge (compat)
+name: init.b - Scenario B bridge (minimal)
 
 on:
   workflow_dispatch:
@@ -21,87 +21,40 @@ jobs:
         run: |
           test -f .chatops/registry.v1.json
           SCENARIO_ID=$(jq -r '.["init.b"].scenario_id // empty' .chatops/registry.v1.json)
-          BOT=$(jq -r '.["init.b"].bot // empty' .chatops/registry.v1.json)
-          if [ -z "$SCENARIO_ID" ] || [ -z "$BOT" ]; then
-            echo "missing init.b.scenario_id/bot"; exit 1; fi
+          if [ -z "$SCENARIO_ID" ]; then echo "missing scenario_id"; exit 1; fi
           echo "scenario_id=$SCENARIO_ID" >> $GITHUB_OUTPUT
-          echo "bot=$BOT" >> $GITHUB_OUTPUT
 
-      - name: Collect secrets (compat aliases)
-        id: sec
+      - name: Activate Scenario B (Make API)
         env:
+          # נזהה טוקן מכל שם אפשרי, בלי Outputs מורכבים
           A: ${{ secrets.MAKE_API_TOKEN }}
           B: ${{ secrets.MAKE_TOKEN_ID }}
           C: ${{ secrets.MAKE_API_KEY }}
           D: ${{ secrets.MAKE_TOKEN }}
-          T1: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          T2: ${{ secrets.TELEGRAM_TOKEN }}
-          G1: ${{ secrets.MAKE_TEAM_ID }}
-          G2: ${{ vars.MAKE_TEAM_ID }}
           BASE: ${{ vars.MAKE_BASE }}
+          SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
         run: |
           MAKE_TOKEN="${A:-${B:-${C:-${D:-}}}}"
-          TG_TOKEN="${T1:-${T2:-}}"
-          TEAM_ID="${G1:-${G2:-}}"
           MAKE_BASE="${BASE:-https://eu2.make.com/api/v2}"
           if [ -z "$MAKE_TOKEN" ]; then echo "No Make token"; exit 1; fi
-          printf "make_base=%s\n" "$MAKE_BASE" >> $GITHUB_OUTPUT
-          printf "MAKE_TOKEN=%s\n" "$MAKE_TOKEN" >> $GITHUB_OUTPUT
-          printf "TG_TOKEN=%s\n" "$TG_TOKEN" >> $GITHUB_OUTPUT
-          printf "TEAM_ID=%s\n" "$TEAM_ID" >> $GITHUB_OUTPUT
-
-      - name: Activate Scenario B (Make API)
-        env:
-          MAKE_TOKEN: ${{ steps.sec.outputs.MAKE_TOKEN }}
-          MAKE_BASE:  ${{ steps.sec.outputs.make_base }}
-          SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
-        run: |
           curl -fsS -X POST "$MAKE_BASE/scenarios/$SCENARIO_ID/start" \
-            -H "Authorization: Token $MAKE_TOKEN" \
-            -H "Accept: application/json" | jq .
-
-      - name: Resolve Make webhook URL (optional)
-        id: hook
-        env:
-          MAKE_TOKEN: ${{ steps.sec.outputs.MAKE_TOKEN }}
-          MAKE_BASE:  ${{ steps.sec.outputs.make_base }}
-          TEAM_ID:    ${{ steps.sec.outputs.TEAM_ID }}
-          SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
-        run: |
-          if [ -z "$TEAM_ID" ]; then
-            echo "hook_url=" >> $GITHUB_OUTPUT
-            echo '{"note":"no TEAM_ID provided"}' > hooks.json
-            exit 0
-          fi
-          RES=$(curl -fsS "$MAKE_BASE/hooks?teamId=$TEAM_ID&viewForScenarioId=$SCENARIO_ID&assigned=true" \
-            -H "Authorization: Token $MAKE_TOKEN" -H "Accept: application/json")
-          echo "$RES" > hooks.json
-          HOOK_URL=$(jq -r '.items[0].url // .[0].url // empty' hooks.json)
-          echo "hook_url=$HOOK_URL" >> $GITHUB_OUTPUT
-
-      - name: Set Telegram webhook (optional)
-        if: ${{ steps.hook.outputs.hook_url != '' && steps.sec.outputs.TG_TOKEN != '' }}
-        env:
-          TG_TOKEN: ${{ steps.sec.outputs.TG_TOKEN }}
-          HOOK_URL: ${{ steps.hook.outputs.hook_url }}
-        run: |
-          curl -fsS -X POST "https://api.telegram.org/bot$TG_TOKEN/setWebhook" \
-            -d "url=$HOOK_URL" -d "allowed_updates=message" | jq .
+            -H "Authorization: Token $MAKE_TOKEN" -H "Accept: application/json" | jq .
 
       - name: Proof: getWebhookInfo
         env:
-          TG_TOKEN: ${{ steps.sec.outputs.TG_TOKEN }}
+          T1: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          T2: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
-          if [ -z "$TG_TOKEN" ]; then
+          TG="${T1:-${T2:-}}"
+          if [ -z "$TG" ]; then
             echo '{"note":"no TG token; skipping Telegram proof"}' > webhook_info.json
           else
-            curl -fsS "https://api.telegram.org/bot$TG_TOKEN/getWebhookInfo" | tee webhook_info.json
+            curl -fsS "https://api.telegram.org/bot$TG/getWebhookInfo" > webhook_info.json
           fi
+          test -f webhook_info.json && head -n 5 webhook_info.json || true
 
       - name: Upload proof
         uses: actions/upload-artifact@v4
         with:
           name: initb_bridge_proof
-          path: |
-            webhook_info.json
-            hooks.json
+          path: webhook_info.json
