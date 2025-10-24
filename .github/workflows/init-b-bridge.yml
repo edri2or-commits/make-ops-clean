@@ -1,4 +1,4 @@
-name: init.b - Scenario B bridge (minimal)
+name: init.b - Scenario B bridge (proof fix)
 
 on:
   workflow_dispatch:
@@ -15,11 +15,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install jq
-        run: sudo apt-get update -y && sudo apt-get install -y jq
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y && sudo apt-get install -y jq
 
       - name: Parse registry (init.b)
         id: reg
         run: |
+          set -euo pipefail
           test -f .chatops/registry.v1.json
           SCENARIO_ID=$(jq -r '.["init.b"].scenario_id // empty' .chatops/registry.v1.json)
           if [ -z "$SCENARIO_ID" ]; then echo "missing scenario_id"; exit 1; fi
@@ -27,7 +30,6 @@ jobs:
 
       - name: Activate Scenario B (Make API)
         env:
-          # …Hebrew comments…
           A: ${{ secrets.MAKE_API_TOKEN }}
           B: ${{ secrets.MAKE_TOKEN_ID }}
           C: ${{ secrets.MAKE_API_KEY }}
@@ -35,6 +37,7 @@ jobs:
           BASE: ${{ vars.MAKE_BASE }}
           SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
         run: |
+          set -euo pipefail
           MAKE_TOKEN="${A:-${B:-${C:-${D:-}}}}"
           MAKE_BASE="${BASE:-https://eu2.make.com/api/v2}"
           if [ -z "$MAKE_TOKEN" ]; then echo "No Make token"; exit 1; fi
@@ -45,6 +48,7 @@ jobs:
           T1: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           T2: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
+          set -euo pipefail
           TG="${T1:-${T2:-}}"
           if [ -z "$TG" ]; then
             echo '{"note":"no TG token; skipping Telegram proof"}' > webhook_info.json
@@ -52,3 +56,9 @@ jobs:
             curl -fsS "https://api.telegram.org/bot$TG/getWebhookInfo" > webhook_info.json
           fi
           test -f webhook_info.json && head -n 5 webhook_info.json || true
+
+      - name: Upload proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: initb_bridge_proof
+          path: webhook_info.json
