@@ -3,9 +3,10 @@ name: init.b - Scenario B bridge (minimal)
 on:
   workflow_dispatch:
   push:
-    paths:
-      - .chatops/registry.v1.json
-      - .github/workflows/init-b-bridge.yml
+    branches: [ main ]
+
+env:
+  MAKE_BASE: https://eu2.make.com/api/v2
 
 jobs:
   bridge:
@@ -26,7 +27,7 @@ jobs:
 
       - name: Activate Scenario B (Make API)
         env:
-          # נזהה טוקן מכל שם אפשרי, בלי Outputs מורכבים
+          # …Hebrew comments…
           A: ${{ secrets.MAKE_API_TOKEN }}
           B: ${{ secrets.MAKE_TOKEN_ID }}
           C: ${{ secrets.MAKE_API_KEY }}
@@ -37,8 +38,7 @@ jobs:
           MAKE_TOKEN="${A:-${B:-${C:-${D:-}}}}"
           MAKE_BASE="${BASE:-https://eu2.make.com/api/v2}"
           if [ -z "$MAKE_TOKEN" ]; then echo "No Make token"; exit 1; fi
-          curl -fsS -X POST "$MAKE_BASE/scenarios/$SCENARIO_ID/start" \
-            -H "Authorization: Token $MAKE_TOKEN" -H "Accept: application/json" | jq .
+          curl -fsS -X POST "$MAKE_BASE/scenarios/$SCENARIO_ID/start" \n            -H "Authorization: Token $MAKE_TOKEN" -H "Accept: application/json" | jq .
 
       - name: Proof: getWebhookInfo
         env:
@@ -52,9 +52,3 @@ jobs:
             curl -fsS "https://api.telegram.org/bot$TG/getWebhookInfo" > webhook_info.json
           fi
           test -f webhook_info.json && head -n 5 webhook_info.json || true
-
-      - name: Upload proof
-        uses: actions/upload-artifact@v4
-        with:
-          name: initb_bridge_proof
-          path: webhook_info.json
