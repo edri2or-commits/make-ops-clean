@@ -23,3 +23,4 @@ Fix the broken YAML by rewriting `.github/workflows/init-b-bridge.yml` with vali
 ## Alternatives Considered
 - Running workflow on branch via `workflow_dispatch`: not possible because the invalid YAML on main disables the run button.
 - Changing repository actions settings: unnecessary; problem caused by syntax error.
+init-b bridge | DoD met (run+artifact+json_head) | run: 18785058322 | artifact: 4364863684 | commit: 8e3247f | gate: integrations-proof-only-until-tokens
