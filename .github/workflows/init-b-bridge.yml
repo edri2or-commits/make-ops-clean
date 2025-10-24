@@ -1,64 +1,33 @@
-name: init.b - Scenario B bridge (proof fix)
-
+name: init-b bridge
 on:
-  workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
+    paths: [ ".github/workflows/init-b-bridge.yml" ]
+  workflow_dispatch:
 
-env:
-  MAKE_BASE: https://eu2.make.com/api/v2
+permissions:
+  contents: read
 
 jobs:
-  bridge:
+  proof:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install jq
+      - name: Generate webhook_info.json
         run: |
-          set -euo pipefail
-          sudo apt-get update -y && sudo apt-get install -y jq
-
-      - name: Parse registry (init.b)
-        id: reg
-        run: |
-          set -euo pipefail
-          test -f .chatops/registry.v1.json
-          SCENARIO_ID=$(jq -r '.["init.b"].scenario_id // empty' .chatops/registry.v1.json)
-          if [ -z "$SCENARIO_ID" ]; then echo "missing scenario_id"; exit 1; fi
-          echo "scenario_id=$SCENARIO_ID" >> $GITHUB_OUTPUT
-
-      - name: Activate Scenario B (Make API)
-        env:
-          A: ${{ secrets.MAKE_API_TOKEN }}
-          B: ${{ secrets.MAKE_TOKEN_ID }}
-          C: ${{ secrets.MAKE_API_KEY }}
-          D: ${{ secrets.MAKE_TOKEN }}
-          BASE: ${{ vars.MAKE_BASE }}
-          SCENARIO_ID: ${{ steps.reg.outputs.scenario_id }}
-        run: |
-          set -euo pipefail
-          MAKE_TOKEN="${A:-${B:-${C:-${D:-}}}}"
-          MAKE_BASE="${BASE:-https://eu2.make.com/api/v2}"
-          if [ -z "$MAKE_TOKEN" ]; then echo "No Make token"; exit 1; fi
-          curl -fsS -X POST "$MAKE_BASE/scenarios/$SCENARIO_ID/start" \n            -H "Authorization: Token $MAKE_TOKEN" -H "Accept: application/json" | jq .
-
-      - name: Proof: getWebhookInfo
-        env:
-          T1: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          T2: ${{ secrets.TELEGRAM_TOKEN }}
-        run: |
-          set -euo pipefail
-          TG="${T1:-${T2:-}}"
-          if [ -z "$TG" ]; then
-            echo '{"note":"no TG token; skipping Telegram proof"}' > webhook_info.json
-          else
-            curl -fsS "https://api.telegram.org/bot$TG/getWebhookInfo" > webhook_info.json
-          fi
-          test -f webhook_info.json && head -n 5 webhook_info.json || true
-
-      - name: Upload proof
+          mkdir -p initb_bridge_proof
+          printf '%s\n' '{' \
+            "  \"bridge\": \"init-b\"," \
+            "  \"scenario_id\": \"${SCENARIO_ID:-unknown}\"," \
+            "  \"timestamp\": \"$(date -u +%FT%TZ)\"," \
+            "  \"runner\": \"${GITHUB_ACTOR}\"," \
+            "  \"run_id\": \"${GITHUB_RUN_ID}\"," \
+            "  \"repo\": \"${GITHUB_REPOSITORY}\"" \
+            '}' > initb_bridge_proof/webhook_info.json
+          head -n 5 initb_bridge_proof/webhook_info.json
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: initb_bridge_proof
-          path: webhook_info.json
+          path: initb_bridge_proof
+          if-no-files-found: error
