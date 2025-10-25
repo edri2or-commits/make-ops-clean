@@ -103,7 +103,6 @@ jobs:
           echo "pr_title=$pr_title" >> "$GITHUB_OUTPUT"
           echo "pr_body=$pr_body" >> "$GITHUB_OUTPUT"
 
-      # --- FIX: בלי heredoc; העברת משתנים ל-env; YAML יציב ---
       - name: Validate required fields
         shell: bash
         env:
@@ -111,11 +110,12 @@ jobs:
           PATH_VALUE: ${{ steps.resolve.outputs.path }}
         run: |
           set -euo pipefail
+          # must have path and content
           if [ -z "$PATH_VALUE" ]; then echo "Missing path"; exit 1; fi
           if [ -z "$CONTENT" ]; then echo "Missing content_b64"; exit 1; fi
-          python -c "import base64, os, sys; b=os.environ['CONTENT'].strip(); \
-try: base64.b64decode(b, validate=True); print('OK'); \
-except Exception as e: print('Invalid base64:', e); sys.exit(1)"
+          # validate base64 (no python, YAML-safe)
+          echo "$CONTENT" | base64 -d >/dev/null 2>/dev/null || { echo "Invalid base64"; exit 1; }
+          echo "OK"
 
       - name: Ops Edit (branch, file, PR)
         id: ops-edit
