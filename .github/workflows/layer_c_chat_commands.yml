@@ -1,10 +1,3 @@
-# Delta in this version:
-# - Added workflow_dispatch + inputs.text
-# - Parser reads from client_payload.* and inputs.text
-# - Fixed upload-artifact indentation (path under with)
-# - ASCII workflow name
-# - Append run URL to every Telegram reply
-
 name: Layer C Chat Commands (tg)
 
 on:
@@ -30,8 +23,10 @@ env:
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   REPO_FULL: ${{ github.repository }}
   OWNER: ${{ github.repository_owner }}
-  EU_BASE: https://eu2.make.com/api/v2
-  ORG_ID: "5226765"
+  # עדיף לקבל אזור מה-Variables; ניפול חזרה ל-eu2 בתוך הסקריפטים אם ריק
+  MAKE_BASE: ${{ vars.MAKE_BASE }}
+  EU_BASE: https://${{ vars.MAKE_BASE }}.make.com/api/v2
+  ORG_ID: ${{ vars.MAKE_ORG_ID }}
 
 jobs:
   route:
@@ -42,13 +37,17 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Save event payload (for artifacts)
+        shell: bash
         run: |
+          set -euo pipefail
           cp "$GITHUB_EVENT_PATH" event.json
           jq -r '.' event.json > event.pretty.json || true
 
       - name: Parse command from text (repo/dispatch + workflow_dispatch)
         id: parse
+        shell: bash
         run: |
+          set -euo pipefail
           TEXT=$(jq -r '.client_payload.message.text // .client_payload.text // .inputs.text // ""' event.json)
           FALLBACK="${{ inputs.text }}"
           [ -z "$TEXT" -o "$TEXT" = "null" ] && TEXT="${FALLBACK}"
@@ -61,7 +60,9 @@ jobs:
 
       - name: /ping /echo /status
         if: startsWith(steps.parse.outputs.cmd, '/ping') || startsWith(steps.parse.outputs.cmd, '/echo') || startsWith(steps.parse.outputs.cmd, '/status')
+        shell: bash
         run: |
+          set -euo pipefail
           cmd="${{ steps.parse.outputs.cmd }}"; arg="${{ steps.parse.outputs.arg }}"
           case "$cmd" in
             /ping)   MSG="pong" ;;
@@ -79,8 +80,10 @@ jobs:
         id: ghrun
         env:
           BOT_PAT: ${{ secrets.BOT_PAT }}
+        shell: bash
         run: |
           set -euo pipefail
+          [ -z "${BOT_PAT:-}" ] && { echo "MSG=gh.run ⚠️ missing BOT_PAT" >> "$GITHUB_OUTPUT"; exit 0; }
           wf="${{ steps.parse.outputs.arg }}"
           if [ -z "$wf" ] || [ "$wf" = "null" ]; then
             echo "MSG=gh.run ⚠️ missing workflow file" >> "$GITHUB_OUTPUT"; exit 0
@@ -100,7 +103,7 @@ jobs:
           run_id=$(jq -r '.workflow_runs[0].id // empty' gh_runs.json)
           html_url=$(jq -r '.workflow_runs[0].html_url // empty' gh_runs.json)
           echo "RUN_ID=$run_id"   >> "$GITHUB_OUTPUT"
-          echo "URL=$html_url" >> "$GITHUB_OUTPUT"
+          echo "URL=$html_url"    >> "$GITHUB_OUTPUT"
           if [ "$code" = "204" ]; then
             echo "MSG=gh.run ✅ 204; run_id=${run_id:-pending}; ${html_url:-n/a}" >> "$GITHUB_OUTPUT"
           else
@@ -109,21 +112,24 @@ jobs:
 
       - name: Reply /gh.run
         if: startsWith(steps.parse.outputs.cmd, '/gh.run')
+        shell: bash
         run: |
+          set -euo pipefail
           MSG="${{ steps.ghrun.outputs.MSG }}"
           MSG="$MSG"$'\n'"run: ${RUN_URL}"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
-      # ADDED: gh.dispatch (send repository_dispatch from chat)
       - name: /gh.dispatch — repository_dispatch
         if: startsWith(steps.parse.outputs.cmd, '/gh.dispatch')
         id: ghdispatch
         env:
           BOT_PAT: ${{ secrets.BOT_PAT }}
+        shell: bash
         run: |
           set -euo pipefail
+          [ -z "${BOT_PAT:-}" ] && { echo "MSG=gh.dispatch ⚠️ missing BOT_PAT" >> "$GITHUB_OUTPUT"; exit 0; }
           arg="${{ steps.parse.outputs.arg }}"
           text="${arg:-/make.scenarios}"
           repo="${{ env.REPO_FULL }}"
@@ -139,10 +145,11 @@ jobs:
             echo "MSG=gh.dispatch ⚠️ http=$code" >> "$GITHUB_OUTPUT"
           fi
 
-      # ADDED: reply for gh.dispatch
       - name: Reply /gh.dispatch
         if: startsWith(steps.parse.outputs.cmd, '/gh.dispatch')
+        shell: bash
         run: |
+          set -euo pipefail
           MSG="${{ steps.ghdispatch.outputs.MSG }}"
           MSG="$MSG"$'\n'"run: ${RUN_URL}"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
@@ -150,14 +157,19 @@ jobs:
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$MSG" '{chat_id:$chat_id,text:$text}')"
 
       # ---------- EU2: smoke ----------
-      - name: /make.smoke — EU2 GET
+      - name: /make.smoke — EU Base GET
         if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
         id: make
         continue-on-error: true
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        shell: bash
         run: |
-          url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=1"
+          set -euo pipefail
+          base="${EU_BASE:-}"
+          [ -z "$base" ] && base="https://eu2.make.com/api/v2"
+          org="${ORG_ID:-}"
+          url="${base}/scenarios?organizationId=${org}&limit=1"
           code=$(curl -sS -D headers.txt -o eu2_list.json -w "%{http_code}" \
             -H "Accept: application/json" \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url" || echo "000")
@@ -167,7 +179,9 @@ jobs:
 
       - name: Reply /make.smoke
         if: startsWith(steps.parse.outputs.cmd, '/make.smoke')
+        shell: bash
         run: |
+          set -euo pipefail
           http="${{ steps.make.outputs.HTTP }}"; xreq="${{ steps.make.outputs.XREQ }}"
           status=$([ "$http" = "200" ] && echo "✅" || echo "⚠️")
           MSG="make.smoke ${status} http=${http:-∅}; x-request-id=${xreq:-∅}"
@@ -184,6 +198,7 @@ jobs:
           path: |
             headers.txt
             eu2_list.json
+          retention-days: 7
 
       # ---------- EU2: teams ----------
       - name: /make.teams — list teams
@@ -192,8 +207,12 @@ jobs:
         continue-on-error: true
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        shell: bash
         run: |
-          url="${EU_BASE}/teams?organizationId=${ORG_ID}&limit=10"
+          set -euo pipefail
+          base="${EU_BASE:-}"; [ -z "$base" ] && base="https://eu2.make.com/api/v2"
+          org="${ORG_ID:-}"
+          url="${base}/teams?organizationId=${org}&limit=10"
           curl -sS -D headers_teams.txt -o eu2_teams.json \
             -H "Accept: application/json" \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url" || true
@@ -201,9 +220,11 @@ jobs:
 
       - name: Reply /make.teams
         if: startsWith(steps.parse.outputs.cmd, '/make.teams')
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -s teams_top.txt ]; then
-            LINES=$(cat teams_top.txt | sed ':a;N;$!ba;s/\n/\\n/g')
+            LINES=$(sed ':a;N;$!ba;s/\n/\\n/g' teams_top.txt)
             MSG="make.teams ✅ (top):\n${LINES}"
           else
             MSG="make.teams ⚠️ no teams"
@@ -222,6 +243,7 @@ jobs:
             eu2_teams.json
             headers_teams.txt
             teams_top.txt
+          retention-days: 7
 
       # ---------- EU2: scenarios ----------
       - name: /make.scenarios — list EU2
@@ -230,8 +252,12 @@ jobs:
         continue-on-error: true
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        shell: bash
         run: |
-          url="${EU_BASE}/scenarios?organizationId=${ORG_ID}&limit=10"
+          set -euo pipefail
+          base="${EU_BASE:-}"; [ -z "$base" ] && base="https://eu2.make.com/api/v2"
+          org="${ORG_ID:-}"
+          url="${base}/scenarios?organizationId=${org}&limit=10"
           curl -sS -D headers_scenarios.txt -o eu2_scenarios.json \
             -H "Accept: application/json" \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url"
@@ -239,9 +265,11 @@ jobs:
 
       - name: Reply /make.scenarios
         if: startsWith(steps.parse.outputs.cmd, '/make.scenarios')
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -s scenarios_top.txt ]; then
-            LINES=$(cat scenarios_top.txt | sed ':a;N;$!ba;s/\n/\\n/g')
+            LINES=$(sed ':a;N;$!ba;s/\n/\\n/g' scenarios_top.txt)
             MSG="make.scenarios ✅ (top):\n${LINES}"
           else
             MSG="make.scenarios ⚠️ no items"
@@ -260,6 +288,7 @@ jobs:
             eu2_scenarios.json
             headers_scenarios.txt
             scenarios_top.txt
+          retention-days: 7
 
       # ---------- EU2: create/start/run ----------
       - name: /make.scenario.create — minimal scenario
@@ -267,13 +296,15 @@ jobs:
         id: sc_create
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        shell: bash
         run: |
           set -euo pipefail
           team_id="$(printf '%s' "${{ steps.parse.outputs.arg }}" | awk '{print $1}')"
           if ! printf '%s' "$team_id" | grep -Eq '^[0-9]+$'; then
             echo "MSG=make.scenario.create ⚠️ invalid team id" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          url="${EU_BASE}/scenarios"
+          base="${EU_BASE:-}"; [ -z "$base" ] && base="https://eu2.make.com/api/v2"
+          url="${base}/scenarios"
           blueprint='{"name":"nc2-empty","flow":[{"module":"tools.sleep","parameters":{"milliseconds":1}}]}'
           scheduling='{"type":"indefinitely","interval":900}'
           payload=$(jq -n --arg blueprint "$blueprint" --arg scheduling "$scheduling" --argjson teamId $team_id '{blueprint:$blueprint, scheduling:$scheduling, teamId:$teamId, confirmed:true}')
@@ -292,7 +323,9 @@ jobs:
 
       - name: Reply /make.scenario.create
         if: startsWith(steps.parse.outputs.cmd, '/make.scenario.create')
+        shell: bash
         run: |
+          set -euo pipefail
           MSG="${{ steps.sc_create.outputs.MSG }}"
           MSG="$MSG"$'\n'"run: ${RUN_URL}"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
@@ -308,23 +341,29 @@ jobs:
             eu2_sc_create_req.json
             eu2_sc_create.json
             headers_sc_create.txt
+          retention-days: 7
 
       - name: /make.start — activate scenario
         if: startsWith(steps.parse.outputs.cmd, '/make.start')
         id: sc_start
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        shell: bash
         run: |
+          set -euo pipefail
           sid="$(printf '%s' "${{ steps.parse.outputs.arg }}" | awk '{print $1}')"
           if ! printf '%s' "$sid" | grep -Eq '^[0-9]+$'; then echo "MSG=make.start ⚠️ invalid id" >> "$GITHUB_OUTPUT"; exit 0; fi
-          url="${EU_BASE}/scenarios/${sid}/start"
+          base="${EU_BASE:-}"; [ -z "$base" ] && base="https://eu2.make.com/api/v2"
+          url="${base}/scenarios/${sid}/start"
           code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Token ${MAKE_API_TOKEN}" "$url" || echo "000")
           if [ "$code" = "200" ]; then echo "MSG=make.start ✅ id=${sid}" >> "$GITHUB_OUTPUT"; else echo "MSG=make.start ⚠️ http=${code}" >> "$GITHUB_OUTPUT"; fi
 
       - name: Reply /make.start
         if: startsWith(steps.parse.outputs.cmd, '/make.start')
+        shell: bash
         run: |
+          set -euo pipefail
           MSG="${{ steps.sc_start.outputs.MSG }}"
           MSG="$MSG"$'\n'"run: ${RUN_URL}"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
@@ -337,6 +376,7 @@ jobs:
         continue-on-error: true
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+        shell: bash
         run: |
           set -euo pipefail
           raw="${{ steps.parse.outputs.arg }}"
@@ -348,7 +388,8 @@ jobs:
           else
             body=$(jq -n --argjson responsive "$wait" '{responsive:$responsive}')
             printf '%s' "$body" > eu2_run_req.json
-            url="${EU_BASE}/scenarios/${scen_id}/run"
+            base="${EU_BASE:-}"; [ -z "$base" ] && base="https://eu2.make.com/api/v2"
+            url="${base}/scenarios/${scen_id}/run"
             curl -sS -D headers_run.txt -o eu2_run_resp.json -X POST \
               -H "Accept: application/json" \
               -H "Content-Type: application/json" \
@@ -366,7 +407,9 @@ jobs:
 
       - name: Reply /make.run
         if: startsWith(steps.parse.outputs.cmd, '/make.run')
+        shell: bash
         run: |
+          set -euo pipefail
           MSG="$(cat run_msg.txt 2>/dev/null || echo 'make.run ⚠️ internal')"
           MSG="$MSG"$'\n'"run: ${RUN_URL}"
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
@@ -382,6 +425,7 @@ jobs:
             eu2_run_req.json
             eu2_run_resp.json
             headers_run.txt
+          retention-days: 7
 
       - name: Upload chat event (always)
         if: ${{ always() }}
@@ -391,3 +435,4 @@ jobs:
           path: |
             event.json
             event.pretty.json
+          retention-days: 7
