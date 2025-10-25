@@ -1,24 +1,41 @@
-name: ops.edit (PR-only via GitHub App)
+name: Ops Edit (PR-only via GitHub App)
 
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [ops.edit]
 
-# משאירים את GITHUB_TOKEN לקריאה בלבד — כל הכתיבה נעשית עם טוקן ההתקנה של ה-App
+# משאירים את GITHUB_TOKEN לקריאה בלבד — הכתיבה נעשית עם טוקן התקנה של ה-App
 permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: ops-edit-pr-only
+  cancel-in-progress: true
+
 jobs:
   pr_only:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
     steps:
+      - name: Save event (for artifacts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$GITHUB_EVENT_PATH" event.json
+          jq -r '.' event.json > event.pretty.json || true
+
       - name: Validate PRIVATE_KEY format (no output of secrets)
+        shell: bash
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: |
           set -euo pipefail
+          [ -n "${PRIVATE_KEY:-}" ] || { echo "Missing PRIVATE_KEY"; exit 1; }
           printf '%s' "$PRIVATE_KEY" > key.pem
           # ייכשל אם המפתח לא PEM תקין; לא מדפיס את המפתח
           openssl pkey -in key.pem -noout >/dev/null
@@ -28,10 +45,11 @@ jobs:
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}            # מספר ה-App (לא installation)
-          private-key: ${{ secrets.PRIVATE_KEY }}  # ה-PEM הרב-שורה מה-GitHub App
+          private-key: ${{ secrets.PRIVATE_KEY }}  # PEM רב-שורה של ה-App
 
       - name: Create branch, add file, open PR (curl only)
         id: pr
+        shell: bash
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}   # טוקן התקנה של ה-App
           API: https://api.github.com
@@ -39,7 +57,7 @@ jobs:
           set -euo pipefail
           REPO="${GITHUB_REPOSITORY}"
 
-          # 1) קבלת ענף ברירת המחדל
+          # 1) ענף ברירת מחדל
           BASE=$(
             curl -sS \
               -H "Authorization: Bearer $GH_TOKEN" \
@@ -59,7 +77,7 @@ jobs:
           )
           test -n "$BASE_SHA" -a "$BASE_SHA" != "null"
 
-          # 3) יצירת ענף חדש
+          # 3) יצירת ענף חדש (אידמפוטנטי)
           TS=$(date -u +%Y%m%dT%H%M%SZ)
           BR="ops/$TS"
           curl -sS -X POST \
@@ -70,7 +88,7 @@ jobs:
             -d "{\"ref\":\"refs/heads/$BR\",\"sha\":\"$BASE_SHA\"}" \
             || echo "note: branch may exist already"
 
-          # 4) הוספת קובץ לדוגמה
+          # 4) הוספת קובץ הוכחה
           FILE=".chatops/runs/$TS.txt"
           CONTENT=$(printf "PR proof via App Installation at %s\n" "$TS" | base64 -w 0)
           curl -sS -X PUT \
@@ -92,4 +110,25 @@ jobs:
           URL=$(echo "$RESP" | jq -r '.html_url')
           test -n "$URL" -a "$URL" != "null"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "PR: $URL"
+          {
+            echo "### ops.edit (PR-only) — result"
+            echo "- PR: $URL"
+            echo "- run: ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=PR Opened::$URL"
+
+      - name: Echo PR URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PR URL=${{ steps.pr.outputs.url }}"
+
+      - name: Upload event artifact (always)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops_edit_pr_only_event
+          path: |
+            event.json
+            event.pretty.json
+          retention-days: 7
