@@ -1,21 +1,64 @@
-name: layer_d_ops_edit
+name: Layer D Ops Edit
 
 on:
   repository_dispatch:
     types: [ops.edit]
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "File path to create/update"
+        required: false
+        type: string
+      content_b64:
+        description: "Base64-encoded file content"
+        required: false
+        type: string
+      base:
+        description: "Base branch (defaults to repo default)"
+        required: false
+        type: string
+      branch:
+        description: "Target branch name"
+        required: false
+        type: string
+      commit_message:
+        description: "Commit message"
+        required: false
+        type: string
+      pr_title:
+        description: "PR title"
+        required: false
+        type: string
+      pr_body:
+        description: "PR body"
+        required: false
+        type: string
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: ops-edit
+  cancel-in-progress: true
+
 jobs:
   edit-and-pr:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Save event payload (for artifacts)
+        run: |
+          cp "$GITHUB_EVENT_PATH" event.json
+          jq -r '.' event.json > event.pretty.json || true
 
       - name: App token (GitHub App)
         id: app-token
@@ -25,25 +68,92 @@ jobs:
           private-key: ${{ secrets.CHATOPS_APP_PEM }}
           installation-id: ${{ secrets.CHATOPS_INSTALLATION_ID }}
 
+      - name: Resolve inputs (dispatch + manual)
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          get() { jq -r "$1 // empty" event.json; }
+          path="$(get '.client_payload.path')"
+          [ -z "$path" ] && path="${{ inputs.path }}"
+          content_b64="$(get '.client_payload.content_b64')"
+          [ -z "$content_b64" ] && content_b64="${{ inputs.content_b64 }}"
+          base="$(get '.client_payload.base')"
+          [ -z "$base" ] && base="${{ inputs.base }}"
+          branch="$(get '.client_payload.branch')"
+          [ -z "$branch" ] && branch="${{ inputs.branch }}"
+          commit_message="$(get '.client_payload.commit_message')"
+          [ -z "$commit_message" ] && commit_message="${{ inputs.commit_message }}"
+          pr_title="$(get '.client_payload.pr_title')"
+          [ -z "$pr_title" ] && pr_title="${{ inputs.pr_title }}"
+          pr_body="$(get '.client_payload.pr_body')"
+          [ -z "$pr_body" ] && pr_body="${{ inputs.pr_body }}"
+
+          # sanitize path (strip leading slashes; disallow ..)
+          path="${path#/}"
+          if printf '%s' "$path" | grep -q '\.\.'; then
+            echo "Path must not contain '..'"; exit 1
+          fi
+
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "content_b64=$content_b64" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "commit_message=$commit_message" >> "$GITHUB_OUTPUT"
+          echo "pr_title=$pr_title" >> "$GITHUB_OUTPUT"
+          echo "pr_body=$pr_body" >> "$GITHUB_OUTPUT"
+
+      - name: Validate required fields
+        shell: bash
+        env:
+          CONTENT: ${{ steps.resolve.outputs.content_b64 }}
+        run: |
+          set -euo pipefail
+          [ -z "${{ steps.resolve.outputs.path }}" ] && { echo "Missing path"; exit 1; }
+          [ -z "$CONTENT" ] && { echo "Missing content_b64"; exit 1; }
+          python - <<'PY'
+import base64, os, sys
+b=os.environ["CONTENT"].strip()
+try:
+  d=base64.b64decode(b, validate=True)
+except Exception as e:
+  print("Invalid base64:", e); sys.exit(1)
+print("OK", len(d))
+PY
+
       - name: Ops Edit (branch, file, PR)
         id: ops-edit
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const {owner, repo} = context.repo;
+            const { owner, repo } = context.repo;
             const p = context.payload.client_payload || {};
-            const base = p.base || 'main';
-            const branch = p.branch || `chatops/ops-edit-${Date.now()}`;
-            const path = p.path;
-            const content_b64 = p.content_b64;
-            const message = p.commit_message || `ops.edit: ${path}`;
-            const pr_title = p.pr_title || `ops.edit: ${path}`;
+            const inp = context.payload.inputs || {};
+            const ev = {
+              base: p.base || inp.base,
+              branch: p.branch || inp.branch,
+              path: (p.path || inp.path || "").replace(/^\/+/, ""),
+              content_b64: p.content_b64 || inp.content_b64,
+              message: p.commit_message || inp.commit_message || `ops.edit: ${p.path || inp.path}`,
+              pr_title: p.pr_title || inp.pr_title || `ops.edit: ${p.path || inp.path}`,
+              pr_body: (p.pr_body || inp.pr_body || "") + `\n\n(run: ${process.env.RUN_URL})`
+            };
 
-            if (!path || !content_b64) {
+            if (!ev.path || !ev.content_b64) {
               core.setFailed('Missing required fields: path, content_b64');
               return;
             }
+
+            // default base = repo default branch
+            let base = ev.base;
+            if (!base) {
+              const repoInfo = await github.rest.repos.get({ owner, repo });
+              base = repoInfo.data.default_branch;
+            }
+
+            // create branch name if not provided
+            const branch = ev.branch || `chatops/ops-edit-${Date.now()}`;
 
             // get base sha
             const baseRef = await github.rest.git.getRef({ owner, repo, ref: `heads/${base}` });
@@ -59,7 +169,7 @@ jobs:
             // create or update file on branch
             let sha;
             try {
-              const current = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+              const current = await github.rest.repos.getContent({ owner, repo, path: ev.path, ref: branch });
               if (Array.isArray(current.data)) { core.setFailed('Path is a directory'); return; }
               sha = current.data.sha;
             } catch (e) {
@@ -67,22 +177,35 @@ jobs:
             }
 
             await github.rest.repos.createOrUpdateFileContents({
-              owner, repo, path, message, content: content_b64, branch,
+              owner, repo, path: ev.path, message: ev.message, content: ev.content_b64, branch,
               ...(sha ? { sha } : {})
             });
 
-            // open PR (idempotent-ish)
+            // open PR (reuse if already open)
             const prs = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, state: 'open' });
             let pr;
             if (prs.data.length) {
               pr = prs.data[0];
             } else {
-              pr = (await github.rest.pulls.create({ owner, repo, title: pr_title, head: branch, base })).data;
+              pr = (await github.rest.pulls.create({ owner, repo, title: ev.pr_title, head: branch, base, body: ev.pr_body })).data;
             }
 
             core.info(`branch=${branch}`);
             core.info(`pr_url=${pr.html_url}`);
+            core.setOutput('branch', branch);
             core.setOutput('pr_url', pr.html_url);
 
       - name: Echo PR URL
-        run: echo "PR URL=${{ steps.ops-edit.outputs.pr_url }}"
+        run: |
+          echo "PR URL=${{ steps.ops-edit.outputs.pr_url }}"
+          echo "BRANCH=${{ steps.ops-edit.outputs.branch }}"
+
+      - name: Upload event artifact (always)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops_edit_event
+          path: |
+            event.json
+            event.pretty.json
+          retention-days: 7
