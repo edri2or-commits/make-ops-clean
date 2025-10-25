@@ -2,9 +2,18 @@
   "$schema": ".chatops/registry.schema.v1.json",
   "version": "1.0",
   "routes": {
-    "ping": { "summary": "בדיקת חיים", "dod": "proof.text==\"pong\"" },
-    "pr.open": { "summary": "פתיחת PR", "dod": "includes(proof.html_url, \"/pull/\")" },
-    "drive.find": { "summary": "חיפוש קבצים בדרייב", "dod": "len(proof.files) >= 0" },
+    "ping": {
+      "summary": "בדיקת חיים",
+      "dod": "proof.text==\"pong\""
+    },
+    "pr.open": {
+      "summary": "פתיחת PR",
+      "dod": "includes(proof.html_url, \"/pull/\")"
+    },
+    "drive.find": {
+      "summary": "חיפוש קבצים בדרייב",
+      "dod": "len(proof.files) >= 1"
+    },
     "init.b": {
       "summary": "להפעיל את Scenario B ולחבר webhook לטלגרם",
       "inputs": { "scenario_id": 7745337, "telegram_bot": "SALAMTUKBOT" },
@@ -16,8 +25,16 @@
       ],
       "proof_contract": {
         "required_fields": [
-          "observed_at","ok","latency_ms","route","source","idempotency_key",
-          "proof.scenario_id","proof.scenario_status","proof.telegram_webhook_url","proof.telegram_pending_update_count"
+          "observed_at",
+          "ok",
+          "latency_ms",
+          "route",
+          "source",
+          "idempotency_key",
+          "proof.scenario_id",
+          "proof.scenario_status",
+          "proof.telegram_webhook_url",
+          "proof.telegram_pending_update_count"
         ]
       },
       "dod": "proof.scenario_status==\"active\" && proof.telegram_webhook_url~\"https://\" && proof.telegram_pending_update_count >= 0"
