@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": ".chatops/registry.schema.v1.json",
+  "title": "ChatOps Registry v1",
+  "type": "object",
+  "required": ["version", "routes", "proof_template"],
+  "additionalProperties": false,
+
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+
+    "routes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/route" }
+    },
+
+    "proof_template": {
+      "type": "object",
+      "required": [
+        "observed_at",
+        "ok",
+        "latency_ms",
+        "route",
+        "source",
+        "idempotency_key",
+        "inputs",
+        "proof"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "observed_at": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "latency_ms": { "type": "number" },
+        "route": { "type": "string" },
+        "source": { "type": "string" },
+        "idempotency_key": { "type": "string" },
+        "inputs": { "type": "object" },
+        "proof": { "type": "object" }
+      }
+    }
+  },
+
+  "$defs": {
+    "route": {
+      "type": "object",
+      "required": ["summary", "dod"],
+      "additionalProperties": true,
+      "properties": {
+        "summary": { "type": "string" },
+        "dod": { "type": "string" },
+        "inputs": { "type": "object" },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "proof_contract": {
+          "type": "object",
+          "required": ["required_fields"],
+          "additionalProperties": false,
+          "properties": {
+            "required_fields": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
