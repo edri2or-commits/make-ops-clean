@@ -1,51 +1,77 @@
-name: token sanity check
+name: Token Sanity Check (Make + Telegram)
+
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
+concurrency:
+  group: token-sanity-check
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Save event (for artifacts)
+        run: |
+          cp "$GITHUB_EVENT_PATH" event.json
+          jq -r '.' event.json > event.pretty.json || true
 
       - name: Make token check (HTTP code only)
         id: make
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
-          MAKE_BASE: ${{ vars.MAKE_BASE }}
-          SCENARIO_ID: ${{ vars.SCENARIO_ID }}
+          ZONE: ${{ vars.MAKE_BASE }}               # למשל: eu2
+          SCENARIO_ID: ${{ vars.MAKE_SCENARIO_ID }} # למשל: 7598259
+        shell: bash
         run: |
-          : "${MAKE_BASE:=https://eu2.make.com}"
-          : "${SCENARIO_ID:=unknown}"
-          URL="${MAKE_BASE%/}/api/v2/scenarios/${SCENARIO_ID}"
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Token ${MAKE_API_TOKEN}" "$URL" || echo "000")
-          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          zone="${ZONE:-eu2}"
+          sid="${SCENARIO_ID:-unknown}"
+          api="https://${zone}.make.com/api/v2"
+          url="${api}/scenarios/${sid}"
+          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "Accept: application/json" \
+            -H "Authorization: Token ${MAKE_API_TOKEN}" \
+            "$url" || echo "000")
+          echo "code=${code}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Make token check"
+            echo "- url: ${url}"
+            echo "- http: ${code}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Telegram token check (ok only)
+      - name: Telegram webhook check (url not empty)
         id: tg
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        shell: bash
         run: |
-          python3 - <<'PY' | tee -a "$GITHUB_OUTPUT"
-import os, json, urllib.request
-tok = os.getenv("TELEGRAM_BOT_TOKEN","")
-ok = False
-if tok:
-    try:
-        with urllib.request.urlopen(f"https://api.telegram.org/bot{tok}/getMe") as r:
-            data = json.load(r)
-            ok = bool(data.get("ok", False))
-    except Exception:
-        ok = False
-print(f"ok={str(ok).lower()}")
-PY
+          set -euo pipefail
+          ok=false
+          wh_url=""
+          if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
+            resp=$(curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" || true)
+            wh_url=$(printf '%s' "$resp" | jq -r '.result.url // ""')
+            if [ -n "$wh_url" ]; then ok=true; fi
+          fi
+          echo "ok=${ok}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Telegram check"
+            echo "- webhook_url: ${wh_url:-∅}"
+            echo "- ok (url != empty): ${ok}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Write report
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p token_check_report
           cat > token_check_report/report.json <<JSON
           {
@@ -54,10 +80,20 @@ PY
           }
           JSON
           cat token_check_report/report.json
+          {
+            echo "### Token sanity report"
+            echo "- make_http_code: \`${{ steps.make.outputs.code }}\`"
+            echo "- telegram_ok: \`${{ steps.tg.outputs.ok }}\`"
+            echo "- run: ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: token_check_report
-          path: token_check_report
+          path: |
+            token_check_report
+            event.json
+            event.pretty.json
           if-no-files-found: error
+          retention-days: 7
