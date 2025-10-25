@@ -6,15 +6,46 @@ on:
       text:
         description: "Optional text to echo"
         required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: manual-dispatch
+  cancel-in-progress: true
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - name: Show inputs
+      - name: Save event (for artifacts)
         run: |
+          cp "$GITHUB_EVENT_PATH" event.json
+          jq -r '.' event.json > event.pretty.json || true
+
+      - name: Show inputs
+        shell: bash
+        run: |
+          set -euo pipefail
           echo "inputs.text=${{ github.event.inputs.text }}"
+          echo "RUN=${RUN_URL}"
+          {
+            echo "### Manual Dispatch Smoke"
+            echo "- inputs.text: \`${{ github.event.inputs.text }}\`"
+            echo "- run: ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
           echo "::notice title=Smoke::OK (workflow_dispatch visible and runnable)"
+
+      - name: Upload event artifact (always)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual_dispatch_event
+          path: |
+            event.json
+            event.pretty.json
+          retention-days: 7
