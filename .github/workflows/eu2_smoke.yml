@@ -6,55 +6,61 @@ on:
 permissions:
   contents: read
 
+# קונפיג לא-סודי מתוך Variables
 env:
-  EU_BASE: https://eu2.make.com/api/v2
-  ENDPOINT: /scenarios?organizationId=5226765&limit=1
+  API_BASE: https://${{ vars.MAKE_BASE }}.make.com/api/v2
+  ORG_ID: ${{ vars.MAKE_ORG_ID }}      # אופציונלי; אם ריק ניסע בלי organizationId
   EXPECTED: "200"
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Preflight — token length (no print)
+      - name: Preflight — token present (no print)
         shell: bash
         run: |
           set -euo pipefail
           tok="${{ secrets.MAKE_API_TOKEN }}"
-          if [ -z "$tok" ]; then
+          if [ -z "${tok}" ]; then
             echo "No MAKE_API_TOKEN"; exit 1
           fi
           len=$(printf '%s' "$tok" | wc -c | tr -d ' ')
-          echo "RUN=NC-2 | STEP=preflight | RESULT=pass | METRICS=token_len:$len" >> "$GITHUB_STEP_SUMMARY"
+          echo "RUN=EU2_SMOKE | STEP=preflight | RESULT=pass | token_len=${len}" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Prove runner egress IP (not client device)
+      - name: Runner egress IP
         shell: bash
         run: |
           set -euo pipefail
-          curl -s https://ifconfig.me > ip.txt
-          echo "RUN=NC-2 | STEP=egress_ip | RESULT=$(cat ip.txt)" >> "$GITHUB_STEP_SUMMARY"
+          curl -sS https://ifconfig.me > ip.txt
+          echo "RUN=EU2_SMOKE | STEP=egress_ip | ip=$(cat ip.txt)" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Smoke GET EU2
+      - name: Smoke GET /scenarios
         id: get
         shell: bash
+        env:
+          API_BASE: ${{ env.API_BASE }}
+          ORG_ID: ${{ env.ORG_ID }}
+          EXPECTED: ${{ env.EXPECTED }}
         run: |
           set -euo pipefail
           : "${GITHUB_STEP_SUMMARY:=/dev/null}"
           : "${GITHUB_OUTPUT:=/tmp/gh_out}"
-          EU_BASE="${EU_BASE:-https://eu2.make.com/api/v2}"
-          ENDPOINT="${ENDPOINT:-/scenarios?organizationId=5226765&limit=1}"
-          EXPECTED="${EXPECTED:-200}"
-          URL="${EU_BASE}${ENDPOINT}"
+
+          QS="limit=1"
+          if [ -n "${ORG_ID:-}" ]; then QS="organizationId=${ORG_ID}&${QS}"; fi
+          URL="${API_BASE}/scenarios?${QS}"
 
           code=$(curl -sS -D headers.txt -o body.json -w "%{http_code}" \
             -H "Accept: application/json" \
-            -H "Authorization: Token ${{ secrets.MAKE_API_TOKEN }}" "$URL" || true)
+            -H "Authorization: Token ${{ secrets.MAKE_API_TOKEN }}" \
+            "$URL" || true)
 
-          echo "code=$code" >> "$GITHUB_OUTPUT" || true
+          echo "code=${code}" >> "$GITHUB_OUTPUT" || true
 
           {
-            echo "RUN=NC-2 | STEP=http_get | RESULT=$code"
-            echo "URL=$URL"
-            echo "Expected=$EXPECTED"
+            echo "RUN=EU2_SMOKE | STEP=http_get | RESULT=${code}"
+            echo "URL=${URL}"
+            echo "Expected=${EXPECTED}"
             grep -i '^Date:' headers.txt  || true
             grep -i '^X-Request-Id:' headers.txt || true
             grep -i '^WWW-Authenticate:' headers.txt || true
@@ -63,7 +69,7 @@ jobs:
       - name: Assert expected status
         shell: bash
         run: |
-          [ "${{ steps.get.outputs.code }}" = "$EXPECTED" ] || {
+          [ "${{ steps.get.outputs.code }}" = "${{ env.EXPECTED }}" ] || {
             echo "Unexpected: ${{ steps.get.outputs.code }}"; exit 1;
           }
 
