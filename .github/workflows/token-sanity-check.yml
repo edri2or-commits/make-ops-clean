@@ -9,19 +9,20 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Make token check (HTTP code only)
         id: make
         env:
           MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
-          MAKE_BASE: ${{ env.MAKE_BASE }}
-          SCENARIO_ID: ${{ env.SCENARIO_ID }}
+          MAKE_BASE: ${{ vars.MAKE_BASE }}
+          SCENARIO_ID: ${{ vars.SCENARIO_ID }}
         run: |
           : "${MAKE_BASE:=https://eu2.make.com}"
           : "${SCENARIO_ID:=unknown}"
-          URL="${MAKE_BASE}/api/v2/scenarios/${SCENARIO_ID}"
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${MAKE_API_TOKEN}" "$URL" || echo "000")
+          URL="${MAKE_BASE%/}/api/v2/scenarios/${SCENARIO_ID}"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Token ${MAKE_API_TOKEN}" "$URL" || echo "000")
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
 
       - name: Telegram token check (ok only)
@@ -29,22 +30,33 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          RESP=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" || true)
-          OK=$(echo "$RESP" | jq -r '.ok // false')
-          echo "ok=$OK" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY' | tee -a "$GITHUB_OUTPUT"
+import os, json, urllib.request
+tok = os.getenv("TELEGRAM_BOT_TOKEN","")
+ok = False
+if tok:
+    try:
+        with urllib.request.urlopen(f"https://api.telegram.org/bot{tok}/getMe") as r:
+            data = json.load(r)
+            ok = bool(data.get("ok", False))
+    except Exception:
+        ok = False
+print(f"ok={str(ok).lower()}")
+PY
 
       - name: Write report
         run: |
           mkdir -p token_check_report
-          cat > token_check_report/report.json <<EOF
+          cat > token_check_report/report.json <<JSON
           {
             "make_http_code": "${{ steps.make.outputs.code }}",
             "telegram_ok": "${{ steps.tg.outputs.ok }}"
           }
-          EOF
+          JSON
           cat token_check_report/report.json
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: token_check_report
           path: token_check_report
