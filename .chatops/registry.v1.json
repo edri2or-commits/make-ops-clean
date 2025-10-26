@@ -21,7 +21,7 @@
         "telegram_bot": "SALAMTUKBOT"
       },
       "actions": [
-        "make.scenario.ensureActive(inputs.scenario_id)",
+        "make.scenario.ensureActive(inputs.scenario_id) -> scenario_status",
         "make.hook.ensureAttached(inputs.scenario_id) -> hook_url",
         "telegram.setWebhook(bot=inputs.telegram_bot, url=hook_url)",
         "telegram.getWebhookInfo() -> tgi"
@@ -40,7 +40,7 @@
           "proof.telegram_pending_update_count"
         ]
       },
-      "dod": "proof.scenario_status==\"active\" && proof.telegra...ok_url~\"https://\" && proof.telegram_pending_update_count >= 0"
+      "dod": "proof.scenario_status==\"active\" && includes(proof.telegram_webhook_url, \"https://\") && proof.telegram_pending_update_count >= 0"
     }
   },
   "proof_template": {
