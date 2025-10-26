@@ -1,71 +1,83 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": ".chatops/registry.schema.v1.json",
-  "title": "ChatOps Registry v1",
+  "$id": "https://example.com/chatops/registry.schema.v1.json",
+  "title": "ChatOps Registry Schema v1",
   "type": "object",
-  "required": ["version", "routes", "proof_template"],
-  "additionalProperties": false,
-
+  "required": ["$schema", "version", "routes", "proof_template"],
   "properties": {
-    "version": { "type": "string", "const": "1.0" },
-
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
     "routes": {
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": { "$ref": "#/$defs/route" }
+      "additionalProperties": {
+        "type": "object",
+        "required": ["summary"],
+        "properties": {
+          "summary": { "type": "string" },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "number" },
+                { "type": "boolean" }
+              ]
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "proof_contract": {
+            "type": "object",
+            "properties": {
+              "required_fields": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false
+          },
+          "dod": {
+            "type": "string",
+            "description": "Boolean expression evaluated on the proof object"
+          }
+        },
+        "additionalProperties": false
+      }
     },
-
     "proof_template": {
       "type": "object",
-      "required": [
-        "observed_at",
-        "ok",
-        "latency_ms",
-        "route",
-        "source",
-        "idempotency_key",
-        "inputs",
-        "proof"
-      ],
-      "additionalProperties": true,
+      "required": ["observed_at", "ok", "route", "source", "idempotency_key", "inputs", "proof"],
       "properties": {
-        "observed_at": { "type": "string" },
+        "observed_at": { "type": "string", "description": "RFC3339Z timestamp" },
         "ok": { "type": "boolean" },
         "latency_ms": { "type": "number" },
         "route": { "type": "string" },
         "source": { "type": "string" },
         "idempotency_key": { "type": "string" },
-        "inputs": { "type": "object" },
-        "proof": { "type": "object" }
-      }
+        "inputs": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          }
+        },
+        "proof": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
     }
   },
-
-  "$defs": {
-    "route": {
-      "type": "object",
-      "required": ["summary", "dod"],
-      "additionalProperties": true,
-      "properties": {
-        "summary": { "type": "string" },
-        "dod": { "type": "string" },
-        "inputs": { "type": "object" },
-        "actions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "proof_contract": {
-          "type": "object",
-          "required": ["required_fields"],
-          "additionalProperties": false,
-          "properties": {
-            "required_fields": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        }
-      }
-    }
-  }
+  "additionalProperties": false
 }
