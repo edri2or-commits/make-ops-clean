@@ -1,5 +1,11 @@
 # Decision Log — index (Latest first, RFC3339Z)
 
+## 2025-10-27T00:00:00Z — RESEARCH: Listener Envelope
+findings=Watch=webhook ; exclusivity(getUpdates↔webhook) ; rebind=last_write_wins ; criterion=getWebhookInfo.url≠""
+verdict=safe_to_proceed_with_window
+proof=Make Telegram docs (instant webhook) ; Telegram Bot API (getWebhookInfo/url, getUpdates exclusivity) ; Make community (last-write-wins)
+status=approved
+
 ## 2025-10-27T00:00:00Z — Locks TTL policy
 proof: .chatops/locks.config.v1.json @ main (commit=b8bb495, verified)
 idempotency_key_template="tg:${update_id}:${chat_id}"
