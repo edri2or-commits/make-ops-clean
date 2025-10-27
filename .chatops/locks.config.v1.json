@@ -1,0 +1,10 @@
+{
+  "$schema": "https://example.local/schemas/locks.config.v1.json",
+  "version": "1.0",
+  "idempotency_key_template": "tg:${update_id}:${chat_id}",
+  "lock_ttl_minutes": 90,
+  "store_ttl_hours": 48,
+  "notes": "Locks to prevent duplicate chat-ops runs; store TTL for de-dup window.",
+  "updated_at": "2025-10-27T00:00:00Z",
+  "approved_by": "owner"
+}
