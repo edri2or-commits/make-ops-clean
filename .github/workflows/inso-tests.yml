@@ -1,0 +1,31 @@
+name: Insomnia Inso CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      working_dir:
+        description: 'Working dir or Insomnia export path (.insomnia folder or export.json)'
+        required: false
+        default: '.'
+
+jobs:
+  inso:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Inso
+        uses: kong/setup-inso@v2
+        with:
+          inso-version: 11.6.0
+
+      - name: Lint (if spec present)
+        run: |
+          set +e
+          inso lint spec --ci -w "${{ inputs.working_dir }}"
+
+      - name: Run unit tests (if tests present)
+        continue-on-error: true
+        run: |
+          set +e
+          inso run test --ci -w "${{ inputs.working_dir }}"
