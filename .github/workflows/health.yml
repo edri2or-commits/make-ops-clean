@@ -1,0 +1,103 @@
+name: Repo Health & Integrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      make_base_url:
+        description: 'Make API base URL (eu1.make.com/us1.make.com etc), without scheme'
+        required: true
+        default: 'eu1.make.com'
+      check_telegram:
+        description: 'Run Telegram getMe if TELEGRAM_BOT_TOKEN secret exists'
+        type: choice
+        options: [auto, force, skip]
+        default: 'auto'
+  schedule:
+    - cron: '15 3 * * 1'
+  push:
+    paths:
+      - '.github/workflows/health.yml'
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repo info
+        id: repo
+        run: |
+          echo "owner=${GITHUB_REPOSITORY%%/*}" >> $GITHUB_OUTPUT
+          echo "repo=${GITHUB_REPOSITORY##*/}" >> $GITHUB_OUTPUT
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Create status dir
+        run: mkdir -p status
+
+      - name: List repository secrets (names + timestamps)
+        env:
+          OWNER: ${{ steps.repo.outputs.owner }}
+          REPO:  ${{ steps.repo.outputs.repo }}
+          PAT:   ${{ secrets.GH_PAT_SECRETS_READ }}
+        run: |
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $PAT" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${OWNER}/${REPO}/actions/secrets?per_page=100" \
+            > status/repo_secrets.json
+          jq '{total:.total_count, secrets: [.secrets[] | {name, created_at, updated_at}] }' \
+            status/repo_secrets.json > status/repo_secrets_min.json
+
+      - name: List workflows & latest runs
+        env:
+          OWNER: ${{ steps.repo.outputs.owner }}
+          REPO:  ${{ steps.repo.outputs.repo }}
+          PAT:   ${{ secrets.GH_PAT_SECRETS_READ }}
+        run: |
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $PAT" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows?per_page=100" \
+            > status/workflows.json
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $PAT" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${OWNER}/${REPO}/actions/runs?per_page=20" \
+            > status/workflow_runs.json
+
+      - name: Check Telegram bot (optional)
+        if: ${{ (inputs.check_telegram == 'force') || (inputs.check_telegram == 'auto' && secrets.TELEGRAM_BOT_TOKEN != '') }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          set +e
+          curl -fsSL "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" \
+            -o status/telegram_getMe.json || echo '{"ok":false}' > status/telegram_getMe.json
+          echo "done"
+
+      - name: Check Make API (optional)
+        env:
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          MAKE_BASE: ${{ inputs.make_base_url }}
+        run: |
+          set +e
+          if [ -n "$MAKE_API_TOKEN" ]; then
+            curl -fsSL \
+              -H "Authorization: Token ${MAKE_API_TOKEN}" \
+              "https://${MAKE_BASE}/api/v2/users/me" \
+              -o status/make_users_me.json || echo '{}' > status/make_users_me.json
+          else
+            echo '{}' > status/make_users_me.json
+          fi
+          echo "done"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-status
+          path: status/
+          if-no-files-found: error
