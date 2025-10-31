@@ -1,65 +1,59 @@
-  # Workflow to append index and fetch Make blueprints - updated branch
+# Workflow to append index and fetch Make blueprints using Workload Identity Federation (OIDC)
 
-
-name: Append Index and Make Blueprints
+name: Append Index and Make Blueprints (OIDC)
 
 on:
   workflow_dispatch:
 
-env:
-  SHEET_ID: ${{ vars.SHEET_ID }}
-  TAB: ${{ vars.TAB }}
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   append_index:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        run: sudo apt-get update -y && sudo apt-get install -y jq
-      - name: Get Google OAuth access token
-        id: auth
-        env:
-          CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+          token_format: access_token
+          scopes: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file"
+
+      - name: Append to Index
         run: |
-          token_response=$(curl -s -X POST https://oauth2.googleapis.com/token \
-            -d client_id="$CLIENT_ID" \
-            -d client_secret="$CLIENT_SECRET" \
-            -d refresh_token="$REFRESH_TOKEN" \
-            -d grant_type=refresh_token)
-          access_token=$(echo "$token_response" | jq -r '.access_token')
-          echo "::add-mask::$access_token"
-          echo "access_token=$access_token" >> $GITHUB_OUTPUT
-      - name: Append canary rows to Google Sheet
-        env:
-          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-        run: |
-          now=$(date -Iseconds)
-          row_json=$(jq -n --arg now "$now" '{values:[["ci-canary-json","json","ci",$now],["ci-canary-csv","csv","ci",$now]]}')
-          curl -s -X POST \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
+          set -e
+          NOW=$(date -Iseconds)
+          DATA="{\"values\":[[\"canary\",\"append\",\"CI\",\"$NOW\",\"OK\",\"\"]]}"
+          CODE=$(curl -s -o resp.json -w "%{http_code}" -X POST \
+            "https://sheets.googleapis.com/v4/spreadsheets/${{ secrets.SHEET_ID }}/values/${{ secrets.TAB }}!A:Z:append?valueInputOption=USER_ENTERED" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
             -H "Content-Type: application/json" \
-            -d "$row_json" \
-            "https://sheets.googleapis.com/v4/spreadsheets/${{ env.SHEET_ID }}/values/${{ env.TAB }}!A1:append?valueInputOption=USER_ENTERED" \
-            | tee /tmp/append_response.json
-      - name: Upload append response
+            -d "$DATA")
+          echo "HTTP=$CODE"
+          cat resp.json
+          test "$CODE" = "200"
+
+      - name: Upload response
         uses: actions/upload-artifact@v4
         with:
           name: append-response
-          path: /tmp/append_response.json
+          path: resp.json
 
   make_blueprints:
+    if: ${{ secrets.MAKE_API_KEY != '' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch Make blueprints
+      - name: Fetch Make Blueprints
         env:
-          MAKE_API_KEY: ${{ secrets.MAKE_API_KEY }}
+          API_KEY: ${{ secrets.MAKE_API_KEY }}
         run: |
-          mkdir -p tmp
-          curl -s -H "Authorization: Token $MAKE_API_KEY" "https://api.make.com/v2/blueprints" -o tmp/blueprints.json
+          echo "Pulling blueprints with token present..."
+          curl -H "Authorization: Bearer $API_KEY" https://api.make.com/v1/blueprints -o blueprints.json
+
       - name: Upload blueprints
         uses: actions/upload-artifact@v4
         with:
-          name: make_blueprints
-          path: tmp/blueprints.json
+          name: make-blueprints
+          path: blueprints.json
