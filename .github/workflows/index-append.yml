@@ -1,62 +1,57 @@
-name: Append Index and Make Blueprints
-
-on:
-  workflow_dispatch:
-
-env:
-  SHEET_ID: ${{ vars.SHEET_ID }}
-  TAB: ${{ vars.TAB }}
+name: Append Index & Fetch Make Blueprint
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  append_index:
+  run:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        run: sudo apt-get update -y && sudo apt-get install -y jq
-      - name: Get Google OAuth access token
-        id: auth
-        env:
-          CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-        run: |
-          token_response=$(curl -s -X POST https://oauth2.googleapis.com/token \
-            -d client_id="$CLIENT_ID" \
-            -d client_secret="$CLIENT_SECRET" \
-            -d refresh_token="$REFRESH_TOKEN" \
-            -d grant_type=refresh_token)
-          access_token=$(echo "$token_response" | jq -r '.access_token')
-          echo "::add-mask::$access_token"
-          echo "access_token=$access_token" >> $GITHUB_OUTPUT
-      - name: Append canary rows to Google Sheet
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          access_token_scopes: |
+            https://www.googleapis.com/auth/spreadsheets
+            https://www.googleapis.com/auth/drive.file
+
+      - name: Append to Google Sheet
+        id: append
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          SHEET_ID: ${{ vars.SHEET_ID }}
+          SHEET_TAB: ${{ vars.SHEET_TAB }}
         run: |
-          now=$(date -Iseconds)
-          row_json=$(jq -n --arg now "$now" '{values:[["ci-canary-json","json","ci",$now],["ci-canary-csv","csv","ci",$now]]}')
-          curl -s -X POST \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
+          printf '{"values":[["canary","%s","%s","%s"]]}\n' "${GITHUB_RUN_ID}" "${GITHUB_SHA}" "$(date -u +%FT%TZ)" > req.json
+          code=$(curl -sS -o resp.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "$row_json" \
-            "https://sheets.googleapis.com/v4/spreadsheets/${{ env.SHEET_ID }}/values/${{ env.TAB }}!A1:append?valueInputOption=USER_ENTERED" \
-            | tee /tmp/append_response.json
-      - name: Upload append response
-        uses: actions/upload-artifact@v4
-        with:
-          name: append-response
-          path: /tmp/append_response.json
+            "https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_TAB}!A1:append?valueInputOption=RAW" \
+            --data @req.json)
+          echo "HTTP_CODE=${code}" >> $GITHUB_OUTPUT
+          test "$code" = "200"
 
-  make_blueprints:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fetch Make blueprints
-        env:
-          MAKE_API_KEY: ${{ secrets.MAKE_API_KEY }}
-        run: |
-          mkdir -p tmp
-          curl -s -H "Authorization: Token $MAKE_API_KEY" "https://api.make.com/v2/blueprints" -o tmp/blueprints.json
-      - name: Upload blueprints
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: make_blueprints
-          path: tmp/blueprints.json
+          name: sheet-append-response
+          path: resp.json
+
+      - name: Fetch Make Scenario Blueprint
+        env:
+          MAKE_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          MAKE_ZONE:  ${{ vars.MAKE_ZONE }}
+          SCENARIO:   ${{ vars.MAKE_SCENARIO_ID }}
+        run: |
+          curl -sS -H "Authorization: Token ${MAKE_TOKEN}" -H "Accept: application/json" \
+            "https://${MAKE_ZONE}.make.com/api/v2/scenarios/${SCENARIO}/blueprint" \
+            -o make-blueprint.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: make-blueprint
+          path: make-blueprint.json
