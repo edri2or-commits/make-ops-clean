@@ -1,0 +1,4 @@
+- vars: WIF_PROVIDER_PATH, GCP_SA_EMAIL, SHEET_ID, SHEET_TAB, MAKE_ZONE, MAKE_SCENARIO_ID.
+- secrets: MAKE_API_TOKEN בלבד.
+- permissions: id-token: write קיים.
+- Run → צפו ל-HTTP 200 ב-step append + artifacts: resp.json, make-blueprint.json.

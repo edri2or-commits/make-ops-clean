@@ -1,0 +1,57 @@
+name: Append Index & Fetch Make Blueprint
+on: workflow_dispatch
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          access_token_scopes: |
+            https://www.googleapis.com/auth/spreadsheets
+            https://www.googleapis.com/auth/drive.file
+
+      - name: Append to Google Sheet
+        id: append
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          SHEET_ID: ${{ vars.SHEET_ID }}
+          SHEET_TAB: ${{ vars.SHEET_TAB }}
+        run: |
+          printf '{"values":[["canary","%s","%s","%s"]]}\n' "${GITHUB_RUN_ID}" "${GITHUB_SHA}" "$(date -u +%FT%TZ)" > req.json
+          code=$(curl -sS -o resp.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_TAB}!A1:append?valueInputOption=RAW" \
+            --data @req.json)
+          echo "HTTP_CODE=${code}" >> $GITHUB_OUTPUT
+          test "$code" = "200"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sheet-append-response
+          path: resp.json
+
+      - name: Fetch Make Scenario Blueprint
+        env:
+          MAKE_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          MAKE_ZONE:  ${{ vars.MAKE_ZONE }}
+          SCENARIO:   ${{ vars.MAKE_SCENARIO_ID }}
+        run: |
+          curl -sS -H "Authorization: ${MAKE_TOKEN}" -H "Accept: application/json" \
+            "https://${MAKE_ZONE}.make.com/api/v2/scenarios/${SCENARIO}/blueprint" \
+            -o make-blueprint.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: make-blueprint
+          path: make-blueprint.json
