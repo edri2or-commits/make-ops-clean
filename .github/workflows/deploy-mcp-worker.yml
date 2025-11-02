@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'mcp/server/**'
+      - 'mcp/server/*/'
       - '.github/workflows/deploy-mcp-worker.yml'
   workflow_dispatch:
 
-name:
+jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
