@@ -1,26 +1,10 @@
 # Decision Log — index (Latest first, RFC3339Z)
 
-## 2025-10-27T00:00:00Z — RESEARCH: Listener Envelope
-findings=Watch=webhook ; exclusivity(getUpdates↔webhook) ; rebind=last_write_wins ; criterion=getWebhookInfo.url≠""
-verdict=safe_to_proceed_with_window
-proof=Make Telegram docs (instant webhook) ; Telegram Bot API (getWebhookInfo/url, getUpdates exclusivity) ; Make community (last-write-wins)
+## 2025-11-02T04:06:30Z — L2 Controlled-Write: demo edit
+proof: PR=https://github.com/edri2or-commits/make-ops-clean/pull/30 ; file=https://github.com/edri2or-commits/make-ops-clean/blob/main/ops/demo.txt (sha=557db03de997c86a4a028e1ebd3a1ceb225be238) ; run=https://github.com/edri2or-commits/make-ops-clean/actions/runs/19007046319
+commit=fd4a40196df405fa5719b932e5662eaf4f111221 ; content_b64=SGVsbG8gV29ybGQ+
+result: DoD met (PR merged + file_on_main + run_success)
 status=approved
+note: iPhone-only control: YES (use Actions – Run workflow links)
 
-## 2025-10-27T00:00:00Z — Locks TTL policy
-proof: .chatops/locks.config.v1.json @ main (commit=b8bb495, verified)
-idempotency_key_template="tg:${update_id}:${chat_id}"
-lock_ttl_minutes=90
-store_ttl_hours=48
-status=approved
-
-## 2025-10-24T00:00:00Z — init-b bridge
-proof: run=18785058322 ; artifact=4364863684 ; commit=8e3247f
-result: DoD met (run+artifact+json_head)
-gate: integrations-proof-only-until-tokens
-status=approved
-
-## 2025-10-24T00:00:00Z — integrations gate
-proof: artifact=token_check_report/report.json
-status=OPEN (fix required)
-observed: make_http_code=401 ; telegram_ok=true
-action: update Make token/scopes/region and re-run token-sanity-check ; run=[TBD]
+",
