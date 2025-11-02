@@ -1,37 +1,34 @@
-make-ops-clean — Chat-Ops Proof
+# Ops Status
 
-PFIX-001 — ✅ עבר (2025-10-19). מטרה: להוכיח ש-Chat-Ops מגיב לאירוע repository_dispatch מסוג chat.run ומייצר ריצה. תוצאה: PASS — GitHub החזיר 204 ונוצרה ריצה.
+[![Append Index (UTC hourly)](https://github.com/edri2or-commits/make-ops-clean/actions/workflows/index-append.yml/badge.svg?branch=main)](https://github.com/edri2or-commits/make-ops-clean/actions/workflows/index-append.yml)
 
-נתונים:
-- Event: repository_dispatch
-- action: chat.run
-- client_payload.text: /ping
-- HTTP: 204
-- Run URL: https://github.com/edri2or-commits/make-ops-clean/actions/runs/18630257494
+## OPS QUICK ACTIONS
+- Manual Run: https://github.com/edri2or-commits/make-ops-clean/actions/workflows/index-append-manual.yml
+- Scheduled Runs: https://github.com/edri2or-commits/make-ops-clean/actions/workflows/index-append.yml?query=event%3Aschedule
+- Evidence Index – Index: https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit#gid=0
+- Evidence Index – L2: https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit#gid=301368480
 
-DoD (met):
-- בקשת API ל-/dispatches החזירה 204
-- נוצרה ריצה עם קישור תקף (Run URL)
-- ב-event.json נוכח client_payload.text="/ping"
+<details><summary>OPS CHAT BLOCK (copy/paste)</summary>
 
-Evidence (event.json excerpt):
-"action": "chat.run",
-"client_payload": { "text": "/ping" }
+```md
+# OPS CHAT BLOCK — Pin me
 
-Repro (לשליחה ידנית):
-POST https://api.github.com/repos/<owner>/<repo>/dispatches
-Authorization: token <PAT or App installation token>
-Accept: application/vnd.github+json
-{
-  "event_type": "chat.run",
-  "client_payload": { "text": "/ping" }
-}
+## ▶️ Run ידני
+https://github.com/edri2or-commits/make-ops-clean/actions/workflows/index-append-manual.yml
+(לחץ/י “Run workflow”, Branch: main)
 
-Timeline:
-2025-10-19 | PFIX-001: repository_dispatch (chat.run) "/ping" → 204 → run | https://github.com/edri2or-commits/make-ops-clean/actions/runs/18630257494
+## ⏱️ ריצות (שעתי)
+https://github.com/edri2or-commits/make-ops-clean/actions/workflows/index-append.yml
 
-Decision: PFIX-001 מאמת את ערוץ ה-Chat-Ops; ניתן להשתמש בו לטריגרים נוספים (/gh.run, /gh.dispatch).
-Guardrail: כתיבה ב-GitHub רק עם App Installation Token; GITHUB_TOKEN נשאר לקריאה.
+## 📄 גיליון Index
+https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit
 
-Decision Log (index line):
-PFIX-001 | repository_dispatch(chat.run) "/ping" | http:204 | run:18630257494 | status:PASS
+## ✅ אימות מהיר (אחרי Run)
+1) פתח/י את הריצה האחרונה → “Artifacts” → הורד/י sheet-append-response.zip → פתח/י resp.json  
+   בדוק/י: “updatedRange”, “updatedRows”.
+2) או גלול/י ל-Run Summary וחפש/י שורה בסגנון:  
+   `updatedRange=Index!A?:D? updatedRows=1 updatedColumns=4 updatedCells=4`
+
+## ℹ️ טיפ
+- Schedule רץ לפי UTC.
+- אפשר גם בצ’אט: “ops run index-append” / “ops artifacts last”.
