@@ -3,7 +3,11 @@ name: Cancel Test
 on:
   workflow_dispatch:
 
-jobs: 
+permissions:
+  issues: write
+  contents: read
+
+jobs:
   fail_fast:
     runs-on: ubuntu-latest
     steps:
@@ -16,7 +20,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const title = `[Guard] Cancel Test failed at ${new Date().toISOString()}`;
+            const title = `[Guard] Cancel Test failed at ${new Date()}` ;
             const body = `Run failed. See log: ${context.run.html_url}`;
             const repo = context.repo;
-            await github.rest.issues.create({ owner: repo.owner, repo: repo.repo, title, body, labels: ['guard','auto'] });
+            await github.rest.issues.create({ owner: repo.owner, repo: repo.repo, title, body, labels: ['guard', 'auto'] }); 
