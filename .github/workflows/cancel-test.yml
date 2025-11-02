@@ -1,0 +1,7 @@
+name: Cancel Test
+on: { workflow_dispatch: {} }
+jobs:
+  fail_fast:
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
