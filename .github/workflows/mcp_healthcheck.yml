@@ -1,0 +1,16 @@
+name: MCP Healthcheck
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/mcp_healthcheck.yml"
+      - "mcp/**"
+
+jobs:
+  ok:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Echo OK
+        run: echo OK
