@@ -2,7 +2,6 @@ name: Guard: Open issue on failure (index-append)
 
 on:
   workflow_run:
-    workflows: ["Append Index (UTC hourly)", "Append Index (Manual)", "Cancel Test"]
     types: [completed]
 
 permissions:
@@ -12,15 +11,15 @@ permissions:
 
 jobs:
   open_issue_on_failure:
-    if: ${ ${github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'} }
+    if: ${ {github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.name != 'Guard: Open issue on failure (index-append)' }
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       - name: Open issue on failure
         uses: actions/github-script@v7
         with:
           script: |
             const run = context.payload.workflow_run;
-            const title = `[Guard] index-append failure: run #${run.run_number} (${run.conclusion})`;
+            const title = `[Guard] ${run.name} failure: run #${run.run_number} (${run.conclusion})`;
             const body = [
               `Run: ${run.html_url}`,
               `Workflow: ${run.name}`,
