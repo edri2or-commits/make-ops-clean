@@ -1,21 +1,13 @@
 {
   "version": 1,
-  "updated_at": "2025-11-02T01:25:00Z",
+  "updated_at": "2025-11-02T01:30:00Z",
   "current_mode": "L4",
-  "layers_status": {
-    "L1": "locked",
-    "L2": "locked",
-    "L3": "locked",
-    "L4": "active"
-  },
+  "layers_status": { "L1": "locked", "L2": "locked", "L3": "locked", "L4": "active" },
   "assets": {
-    "repo": "edrisor-commits/make-ops-clean",
-    "workflows": {
-      "index_append": "index-append.yml",
-      "manual": "index-append-manual.yml"
-    },
+    "repo": "edri2or-commits/make-ops-clean",
+    "workflows": { "index_append": "index-append.yml", "manual": "index-append-manual.yml" },
     "sheets": {
-      "spreadsheet_id": "1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxfPh5omEM0",
+      "spreadsheet_id": "1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0",
       "tabs": { "index": 0, "l2": 301368480 }
     },
     "readme_badge": true
