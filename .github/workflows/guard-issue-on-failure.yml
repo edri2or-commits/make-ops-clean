@@ -1,1 +1,39 @@
-name: Guard: Open issue on failure (...Base64 collapsed in previous tool output...)
+name: Guard: Open issue on failure (index-append)
+
+on:
+  workflow_run:
+    workflows: ["Append Index (UTC hourly)", "Append Index (Manual)", "Cancel Test"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  open_issue_on_failure:
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open issue on failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const title = `[Guard] index-append failure: run #${run.run_number} (${run.conclusion})`;
+            const body = [
+              `Run: ${run.html_url}`,
+              `Workflow: ${run.name}`,
+              `Event: ${run.event}`,
+              `Conclusion: ${run.conclusion}`,
+              `Started: ${run.run_started_at}`,
+              `Updated: ${run.updated_at}`
+            ].join('\n');
+            const repo = context.repo;
+            await github.rest.issues.create({
+              owner: repo.owner,
+              repo: repo.repo,
+              title,
+              body,
+              labels: ['guard','auto']
+            });
