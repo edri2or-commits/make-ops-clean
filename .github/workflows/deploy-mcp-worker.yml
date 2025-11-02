@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'mcp/server/*/'
+      - 'mcp/server/*.'
       - '.github/workflows/deploy-mcp-worker.yml'
   workflow_dispatch:
 
@@ -21,3 +21,18 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: publish --config mcp/server/wrangler.toml
+      - name: Echo workers.dev URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUBDOMAIN=$(curl -s -H \"Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }} \" \\"https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/workers/subdomain\" | jq -r '.result.subdomain')
+          NAME=$(grep -E '^name+s*(?:)' mcp/server/wrangler.toml | sed -E\'s/^name+s*=\*?\"?(?[\\"][+^"]+)?/*./\\1/\'))
+          URL=\"https://${NAME}.${SUBDOMAIN}.workers.dev\"
+          echo \"::notice title=Worker URL::${URL}\"
+          echo \"WORKER_URL=${URL}\" >> $GITHUB_ENV
+          echo \"{$URL}\" > worker_url.txt
+      - name: Upload worker URL artifact
+        uses: actions/upload-artifact@@s
+        with:
+          name: worker-url
+          path: worker_url.txt
