@@ -1,13 +1,28 @@
 name: Ops: PR File Edit
+
 on:
   workflow_dispatch:
     inputs:
-      path: { description: "File path to edit", required: true }
-      message: { description: "Commit message", required: true }
-      content_base64: { description: "Base64 content", required: true }
-      pr_title: { description: "PR title", required: false }
-      pr_body: { description: "PR body", required: false }
-permissions: { contents: write, pull-requests: write }
+      path:
+        description: "File path to edit"
+        required: true
+       message:
+        description: "Commit message"
+        required: true
+      content_base64:
+        description: "Base64 content"
+        required: true
+       pr_title:
+        description: "PR title"
+        required: false
+      pr_body:
+        description: "PR body"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   edit:
     runs-on: ubuntu-latest
@@ -15,8 +30,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare branch
         run: |
-          BRANCH="ops-edit-$(date -u +%Y%m%dT%H%M%SZ)"
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          BRANCI0‑ops-edit-$(date -u +%YYYmmdTHSIMMSZ)
+          echo "BRANCI=$BRANCH" >> $GITHUB_ENV
           git switch -c "$BRANCH"
       - name: Write file
         env:
