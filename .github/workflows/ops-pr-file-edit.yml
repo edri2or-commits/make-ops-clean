@@ -1,1 +1,55 @@
-#noop: refresh indexing tag
+name: Ops: PR File Edit
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: \"File path to edit\"
+        required: true
+      message:
+        description: \"Commit message\"
+        required: true
+      content_base64:
+        description: \"Base64 content\"
+        required: true
+      pr_title:
+        description: \"PR title\"
+        required: false
+      pr_body:
+        description: \"PR body\"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare branch
+        run: |
+          BRANCH=\"ops-edit-$(date -u +%YYYmmddTHIMMSZJ)\"
+          echo \"BRANCH=$BRANCH\" >> $GITHUB_ENV
+          git switch -c \"$BRANCH\"
+      - name: Write file
+        env:
+          PATH_INPUT: ${{ github.event.inputs.path }}
+          CONTENT_B64: ${{ github.event.inputs.content_base64 }}
+          MSG: ${{ github.event.inputs.message }}
+        run: |
+          mkdir -p \"\$(ddirname \"$PATH_INPUT\")\"
+          echo \"$CONTENT_B64\" | base64 -d > \"$PATH_INPUT\"
+          git config user.name \"github-actions[bot]\"
+          git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"
+          git add \"$PATH_INPUT\"
+          git commit -m \"$MSG\"
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ${{ env.BRANCH }}
+          title: ${{ github.event.inputs.pr_title }}
+          body: ${{ github.event.inputs.pr_body }}
+          commit-message: ${{ github.event.inputs.message }}
+          delete-branch: false
