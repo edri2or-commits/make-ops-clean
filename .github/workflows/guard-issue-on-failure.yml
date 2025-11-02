@@ -1,28 +1,30 @@
-name: Guard: Open issue on failure (index-append)
-
+name: Guard: Open issue on failure
 on:
   workflow_run:
-    workflows: ["Cancel Test","Append Index (Manual)","Append Index (UTC hourly)"]
+    workflows:
+      - Cancel Test
+      - Append Index (Manual)
+      - Append Index (UTC hourly)
     types: [completed]
-
 permissions:
   actions: read
   contents: read
   issues: write
-
 jobs:
   open_issue_on_failure:
-    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.name != 'Guard: Open issue on failure (index-append)'}
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' }}
     runs-on: ubuntu-latest
-    steps: 
-      - name: Summary event
-        run: echo '${{ toJson( github.event ) }}' >> $GITHUBSTEP_SUMMARY
+    steps:
+      - name: Write summary
+        run: |
+          echo
+            Run: ${{ github.event.workflow_run.html_url }} >> $GITHUBSTEP_SUMMARY
       - name: Open issue on failure
         uses: actions/github-script@v7
         with:
           script: |
             const run = context.payload.workflow_run;
-            const title = `[Guard] ${run.name} failure: run #${run.run_number} (${run.conclusion})`;
+            const title = `[guard][auto] ${run.name} failed: #${run.run_number} (${run.conclusion})`
             const body = [
               `Run: ${run.html_url}`,
               `Workflow: ${run.name}`,
@@ -31,11 +33,10 @@ jobs:
               `Started: ${run.run_started_at}`,
               `Updated: ${run.updated_at}`
             ].join('\n\n');
-            const repo = context.repo;
             await github.rest.issues.create({
-              owner: repo.owner,
-              repo: repo.repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               title,
               body,
-              labels: ['guard','auto']
+              labels: ['guard', 'auto']
             });
