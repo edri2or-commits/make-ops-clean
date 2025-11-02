@@ -12,9 +12,9 @@ permissions:
 
 jobs:
   open_issue_on_failure:
-    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' }}
+    if: ${ ${github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'} }
     runs-on: ubuntu-latest
-    steps:
+    steps: 
       - name: Open issue on failure
         uses: actions/github-script@v7
         with:
