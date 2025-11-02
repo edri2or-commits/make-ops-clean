@@ -1,0 +1,14 @@
+{
+  "append index": {
+    "action": "dispatch_workflow",
+    "workflow_file": "index-append-manual.yml",
+    "ref": "main"
+  },
+  "hello file": {
+    "action": "pr_write",
+    "path": "ops/voice.txt",
+    "content_b64": "SGVsbG8gVm9kbWviYnB2NHRlbG8yOgN",
+    "message": "voice: hello file",
+    "pr_title": "voice: hello file",
+    "pr_body": "Created via ops-voice"}
+}
