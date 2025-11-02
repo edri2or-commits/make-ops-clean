@@ -1,0 +1,23 @@
+name: Deploy MCP Worker
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mcp/server/**'
+      - '.github/workflows/deploy-mcp-worker.yml'
+  workflow_dispatch:
+
+name:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: publish --config mcp/server/wrangler.toml
