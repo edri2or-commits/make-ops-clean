@@ -1,8 +1,9 @@
 {
   "version": 1,
-  "updated_at": "2025-11-02T01:30:00Z",
+  "updated_at": "2025-11-02T02:05:00Z",
   "current_mode": "L4",
   "layers_status": { "L1": "locked", "L2": "locked", "L3": "locked", "L4": "active" },
+  "enforce_layered_flow": true,
   "assets": {
     "repo": "edri2or-commits/make-ops-clean",
     "workflows": { "index_append": "index-append.yml", "manual": "index-append-manual.yml" },
