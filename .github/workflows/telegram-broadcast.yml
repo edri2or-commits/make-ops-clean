@@ -1,0 +1,30 @@
+name: Telegram Broadcast
+on:
+  workflow_dispatch:
+    inputs:
+      chat_id: { description: Chat ID, required: true }
+      text: { description: Text, required: true }
+permissions: {}
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - id: gate
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
+            echo "::notice ::blocked=missing TELEGRAM_BOT_TOKEN"
+            echo '{}' > proof.json
+            echo "ok=false" >> $GITHUB_OUTPUT
+          else
+            echo "ok=true" >> $GITHUB_OUTPUT
+          fi
+      - if: steps.gate.outputs.ok == 'true'
+        run: |
+          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+          RESP=$(curl -sS -X POST "$API" -H "Content-Type: application/json" -d "{"chat_id":"${{ github.event.inputs.chat_id }}","text":"${{ github.event.inputs.text }}"}")
+          MID=$(printf '%s' "$RESP" | jq -r '.result.message_id // empty')
+          echo "{"chat_id":"${{ github.event.inputs.chat_id }}","message_id":"$MID","run_url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}" > proof.json
+      - uses: actions/upload-artifact@v4
+        with: { name: proof, path: proof.json }
