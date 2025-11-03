@@ -1,3 +1,4 @@
+
 name: MCP Open Issue
 on:
   workflow_dispatch:
@@ -12,7 +13,7 @@ on:
 permissions:
   issues: write
   contents: read
-mobs:
+jobs:
   open:
     runs-on: ubuntu-latest
     steps:
@@ -29,7 +30,7 @@ mobs:
             core.notice(`issue_url=${issue.data.html_url}`);
       - name: Write proof.json
         run: |
-          printf '%s' '{"issue_url":"'${{steps.create.outputs.issue_url}}',"run_url":"${{ github.server_url }}/{{ github.repository }}/actions/runs/{{ github.run_id }}"}'> proof.json
+          jq -n --arg issue_url "${{ steps.create.outputs.issue_url }}" --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" '{issue_url:$issue_url, run_url:$run_url}' > proof.json
       - name: Upload proof
         uses: actions/upload-artifact@v4
         with:
