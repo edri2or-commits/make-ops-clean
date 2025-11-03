@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'mcp/server/*.Ÿ
+      - 'mcp/server/**'
       - '.github/workflows/deploy-mcp-worker.yml'
   workflow_dispatch:
 
@@ -13,26 +13,32 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Publish worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: publish --config mcp/server/wrangler.toml
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Echo workers.dev URL
         shell: bash
         run: |
           set -euo pipefail
+          SUBDOMAIN=$(curl -sS -H \"Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }} \" \\"https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/workers/subdomain\" | jq -r '.result.subdomain')
           SUBDOMAIN=$(curl -sS -H  \"Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }} \" \\"https://api.cloudflare.com/client/v4/accounts/${{ secrets.CF_ACCOUNT_ID }}/workers/subdomain\" | jq -r '.result.subdomain')
           NAME=$(grep -E '^name+s*(?:)' mcp/server/wrangler.toml | sed -E\'s/^name+s*=\*?\"?(?[\\"][+^"]+)?/*./\\1/\'))
-          URL=\"https://${NAME}.${SUBDOMAIN}.workers.dev\"
-          echo \"::notice title=Worker URL::${URL}\"
-          echo \"WORKER_URL=${URL}\" >> $GITHUB_ENV
-          echo \"{$URL}\" > worker_url.txt
+          NAME=$(grep -E '^name+s*(?:)' mcp/server/wrangler.toml | sed -E\'s/^name+s*=\*?\"?(?[\\"][+^"]+)?/*./\\1/\'))
+          UVL=\"https://${NAME}.${SUBDOMAIN}.workers.dev\"
+          echo \"WORKER_URL=${URL}\"
+          echo \"${URL}\" > worker_url.txt
+
       - name: Upload worker URL artifact
         uses: actions/upload-artifact@v4
         with:
