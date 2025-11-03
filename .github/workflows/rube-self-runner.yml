@@ -1,0 +1,24 @@
+name: 🔁 Rube Self Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  self-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Authenticate GH CLI
+        run: |
+          echo "${{ secrets.GH_PAT_WORKFLOW_RW }}" | gh auth login --with-token
+
+      - name: Trigger 'enable-rube-file-control.yml' via GH CLI
+        run: |
+          gh workflow run enable-rube-file-control.yml
