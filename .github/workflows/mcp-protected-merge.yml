@@ -1,3 +1,4 @@
+
 name: MCP Protected Merge
 on:
   workflow_dispatch:
@@ -26,9 +27,9 @@ jobs:
             }
             const state = pr.data.mergeable_state;
             core.notice(`mergeable_state=${state}`);
-            if (!['clean', 'has_hooks'].includes(state)) {
+            if (!['clean','has_hooks'].includes(state)) {
               core.setOutput('merged', 'false');
-              core.setOutput('reason', `mergeable_state=${state}a);
+              core.setOutput('reason', `mergeable_state=${state}`);
               core.notice(`blocked=${state}`);
               return;
             }
@@ -38,10 +39,11 @@ jobs:
             core.notice(`merge_commit=${m.data.sha}`);
       - name: Write proof.json
         run: |
-          if [ "${{ steps.check.outputs.merged}}" = "true" ]; then
-            jq -n --arg run_url "${{ github.server_url }}/{{ github.repository }}/actions/runs/{{ github.run_id }}" --arg sha "${{ steps.check.outputs.sha }}" {merge_sha:$
-            } else
-            jq -n --arg run_url "${{ github.server_url }}/{{ github.repository }}/actions/runs/{{ github.run_id }}" --arg reason "${{ steps.check.outputs.reason }}"
+          if [ "${{ steps.check.outputs.merged }}" = "true" ]; then
+            jq -n --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --arg sha "${{ steps.check.outputs.sha }}" '{merged:true, merge_sha:$sha, run_url:$run_url}' > proof.json
+          else
+            jq -n --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --arg reason "${{ steps.check.outputs.reason }}" '{merged:false, reason:$reason, run_url:$run_url}' > proof.json
+          fi
       - name: Upload proof
         uses: actions/upload-artifact@v4
         with:
