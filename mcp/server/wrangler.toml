@@ -1,5 +1,5 @@
 name = "make-ops-clean-mcp"
-main = "mcp/server/worker/src/index.ts"
-compatibility_date = "2024-10-21"
+main = "worker/src/index.ts"
+compatibility_date = \"2024-10-21\"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
