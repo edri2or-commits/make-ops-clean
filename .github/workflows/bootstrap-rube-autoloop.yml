@@ -1,0 +1,31 @@
+name: Enable Rube File Control
+
+on:
+  workflow_dispatch:  # מאפשר הרצה ידנית
+
+jobs:
+  rube-file-control:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: List commands directory
+        run: |
+          echo "🔁 Scanning 'commands/' directory:"
+          ls -l commands || echo "No commands directory found."
+
+      - name: Run command files (if any)
+        run: |
+          for file in commands/*.sh; do
+            if [ -f "$file" ]; then
+              echo "▶️ Executing: $file"
+              bash "$file"
+            else
+              echo "⚠️ No command scripts found."
+              break
+            fi
+          done
+
+      - name: Finish and unlock loop
+        run: echo "✅ Rube self-control system enabled."
