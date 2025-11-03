@@ -1,0 +1,19 @@
+name: 🔁 Rube Remote Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_file:
+        description: "Name of the file to run"
+        required: true
+
+jobs:
+  run-any:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Trigger target workflow
+        run: |
+          echo "🔁 Would trigger workflow file: ${{ github.event.inputs.target_file }}"
