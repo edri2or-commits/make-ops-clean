@@ -1,0 +1,11 @@
+name: Rube Bootstrap
+
+on:
+  workflow_dispatch:
+
+jobs:
+  say-hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo message
+        run: echo "✅ Rube Bootstrap Workflow is active!"
