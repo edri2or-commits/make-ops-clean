@@ -1,0 +1,49 @@
+name: MCP Protected Merge
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to merge
+        required: true
+permissions:
+  pull-requests: write
+  contents: write
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check & merge
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const num = Number(core.getInput('pr_number'));
+            let pr = await github.rest.pulls.get({owner, repo, pull_number: num});
+            for (let i = 0; i < 5 && (!pr.data.mergeable_state || pr.data.mergeable_state === 'unknown'); i++) {
+              await new Promise(r => setTimeout(r, 2000));
+              pr = await github.rest.pulls.get({owner, repo, pull_number: num});
+            }
+            const state = pr.data.mergeable_state;
+            core.notice(`mergeable_state=${state}`);
+            if (!['clean', 'has_hooks'].includes(state)) {
+              core.setOutput('merged', 'false');
+              core.setOutput('reason', `mergeable_state=${state}a);
+              core.notice(`blocked=${state}`);
+              return;
+            }
+            const m = await github.rest.pulls.merge({owner, repo, pull_number: num, merge_method: 'squash'});
+            core.setOutput('merged', String(m.data.merged));
+            core.setOutput('sha', m.data.sha || '');
+            core.notice(`merge_commit=${m.data.sha}`);
+      - name: Write proof.json
+        run: |
+          if [ "${{ steps.check.outputs.merged}}" = "true" ]; then
+            jq -n --arg run_url "${{ github.server_url }}/{{ github.repository }}/actions/runs/{{ github.run_id }}" --arg sha "${{ steps.check.outputs.sha }}" {merge_sha:$
+            } else
+            jq -n --arg run_url "${{ github.server_url }}/{{ github.repository }}/actions/runs/{{ github.run_id }}" --arg reason "${{ steps.check.outputs.reason }}"
+      - name: Upload proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof
+          path: proof.json

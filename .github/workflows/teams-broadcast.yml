@@ -1,0 +1,28 @@
+name: Teams Broadcast (Flow)
+on:
+  workflow_dispatch:
+    inputs:
+      text: { description: Text, required: true }
+permissions: {}
+env:
+  TEAMS_FLOW_URL: ${{ secrets.TEAMS_FLOW_URL }}
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - id: gate
+        run: |
+          if [ -z "${TEAMS_FLOW_URL}" ]; then
+            echo "::notice ::blocked=missing TEAMS_FLOW_URL"
+            echo '{}' > proof.json
+            echo "ok=false" >> $GITHUB_OUTPUT
+          else
+            echo "ok=true" >> $GITHUB_OUTPUT
+          fi
+      - if: steps.gate.outputs.ok == 'true'
+        run: |
+          RESP=$(curl -sS -X POST "$TEAMS_FLOW_URL" -H "Content-Type: application/json" -d "{"text":"${{ github.event.inputs.text }}"}")
+          WEBURL=$(printf '%s' "$RESP" | jq -r '.webUrl // empty')
+          echo "{"webUrl":"$WEBURL","run_url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}" > proof.json
+      - uses: actions/upload-artifact@v4
+        with: { name: proof, path: proof.json }
