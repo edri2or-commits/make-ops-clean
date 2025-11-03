@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'mcp/server/*.'
+      - 'mcp/server/*.Ÿ
       - '.github/workflows/deploy-mcp-worker.yml'
   workflow_dispatch:
 
@@ -34,7 +34,7 @@ jobs:
           echo \"WORKER_URL=${URL}\" >> $GITHUB_ENV
           echo \"{$URL}\" > worker_url.txt
       - name: Upload worker URL artifact
-        uses: actions/upload-artifact@@s
+        uses: actions/upload-artifact@v4
         with:
           name: worker-url
           path: worker_url.txt
