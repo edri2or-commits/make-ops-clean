@@ -3,26 +3,27 @@ on:
   schedule:
     - cron: '* * * * *'
 
-name: Rube Orchestrator
+name: Rube Self Orchestrator
 
-defaults: 
+defaults:
   github_reference: main
   config_file: rube-meta.json
   script:rube: rube-runner.py
 
-job:
+jobs:
   run:
-    name: Ran rube controller
+    name: run-rube
+    runs-on: ubuntu-latest
     env:
-      RUBE_TOKEN: {{ secrets.rube_token }}
-      GIT_REFERENCE: {{ github_reference }}
-      CONFIG_FILE: {{ config_file }}
-      SCRIPT_FILE: {{ script:rube }}
-      steps:
-        - name: Ran rube-runner.py with config
-          run: rube-runner.py
-          env:
-            RUBE_TOKEN: {{ secrets.rube_token }}
-            GIT_REFERENCE: {{ github_reference }}
-            CONFIG_FILE: {{ config_file }}
-            SCRIPT_FILE: {{ script:rube }}
+      RUBE_TOKEN: ${{ secrets.rube_token }}
+      GIT_REFERENCE: ${{ github_reference }}
+      CONFIG_FILE: ${{ config_file }}
+      SCRIPT_FILE: ${{ script:rube }}
+    steps: 
+      - name: Run rube-runner.py
+        run: python ${{ env.SCRIPT_FILE }}
+        env:
+          RUBE_TOKEN: ${{ secrets.rube_token }}
+          GIT_REFERENCE: ${{ github_reference }}
+          CONFIG_FILE: ${{ config_file }}
+          SCRIPT_FILE: ${{ script:rube }}
