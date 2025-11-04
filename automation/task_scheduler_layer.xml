@@ -1,0 +1,6 @@
+<task>
+  <trigger>Claude.Execute</trigger>
+  <settings>
+    <recurrence>daily</recurrence>
+  </settings>
+</task>
