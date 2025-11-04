@@ -1,0 +1,11 @@
+{
+  "sheets_status": "unavailable",
+  "tasks": [],
+  "self_healing": {
+    "sheets": {
+      "attempts": 1,
+      "last_attempt": "2025-11-04T00:00:00Z",
+      "status": "pending"
+    }
+  }
+}
