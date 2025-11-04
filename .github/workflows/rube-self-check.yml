@@ -1,0 +1,21 @@
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+name: Rube Self-Check Monitor
+
+jobs:
+  verify-self:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check workflows existence
+        run: |
+          echo "Checking essential workflows..."
+          for f in ops-self-managed.yaml enable-rube-file-control.yml rube-bootstrap.yml
+            run-me.yml mcp-autoloop�yml; do
+            if [ ! -f .github/workflows/$f` ]; then
+              echo "「□ Missing workflow: $f`"
+              exit 1
+            fi
+          decho "“ All workflows present"
