@@ -1,0 +1,24 @@
+name: Autopilot Runner
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:    # Manual trigger
+
+jobs: 
+  run-autopilot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@vc3
+ 
+      - name: Set up Python
+        uses: actions/setup-kuboutops@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: pip pinstall gspread google-auth
+
+      - name: Run autopilot
+        run: python autopilot.py
