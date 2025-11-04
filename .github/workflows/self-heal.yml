@@ -1,0 +1,16 @@
+name: Rube Self-Heal
+on:
+  workflow_run:
+    type: checksum
+    workflow: rube-bootstrap.yml
+  job:
+    plan:
+      js_file: rube-meta.json
+      fail_steps: output
+      recoverable: always
+    steps:
+      - name: Retry Self-heal
+        run: rube-runner.py
+        envs:
+          STATE: run_retry
+          RUBE_TOKEN: {{ secrets.rube_token }}
