@@ -1,0 +1,19 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '* * * * *'
+
+name: Rube Fresh Run
+defaults:
+  github_reference: main
+  config_file: rube-meta.json
+  script:rube: rube-runner.py
+
+in:
+  run:
+    name: Rtan Rube
+    env:
+      RUBE_TOKEN: {{ secrets.rube_token }}
+      GIT_REFERENGE: {{ github_reference }}
+      CONFIG_FILE: {{ config_file }}
+      SCRIPT_FILE: {{ script:rube }}
