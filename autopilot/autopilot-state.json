@@ -1,9 +1,1 @@
-{
-  "version": 1,
-  "status": "idle",
-  "last_bootstrap_iso": null,
-  "last_run_iso": null,
-  "retries": 0,
-  "context": {},
-  "locks": {}
-}
+{"version": 1, "status": "idle", "last_bootstrap_iso": null, "last_run_iso": null, "retries": 0, "logs": [], "context": {}, "locks": {}}
