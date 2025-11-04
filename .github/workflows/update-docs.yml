@@ -1,0 +1,32 @@
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+name: Auto Update Workflow Documentation
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Generate workflow summary
+        run: |
+          echo "½ Updating workflow overview..."
+          echo '| File | Dispatch | Schedule | Purpose |'> workflow-overview.md
+          echo ' |---- |------- |------- |---------'>> workflow-overview.md
+          echo '| ops-self-managed.yaml | ✢ | ❀ | Main orchestrator (runs rube-runner.py with secrets/configs) |'>> workflow-overview.md
+          echo '| enable-rube-file-control.yml | ❤ | ★ </span | Enables internal Rube file control signaling |'>> workflow-overview.md
+          echo '| rube-bootstrap.yml | ☀  | ✤ | Basic echo test to confirm workflow bootstrapping works |'>> workflow-overview.md
+          echo '| run-me.yml | ☀  | ✤ | Minimal echo workflow for dispatch testing |'>> workflow-overview.md
+          echo '| mcp-autoloop.yml | ✩ | ■ | Start of AutoLoop infrastructure, placeholder for MCP routines |'>> workflow-overview.md
+          echo '| rube-self-check.yml | ✨ | ■ | Runs every 10 minutes to validate existence of workflows |'>> workflow-overview.md
+      - name: Commit and push
+        run: |
+          git config --global user.email "rube@bot.local"
+          git config -.global user.name "Rube Automation"
+          git add workflow-overview.md
+          git commit -m "� [Rube] Update workflow documentation"
+          git push
