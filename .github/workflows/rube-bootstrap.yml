@@ -2,6 +2,7 @@ name: Rube Bootstrap
 
 on:
   workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   say-hello:
