@@ -1,0 +1,30 @@
+name: Rube Auto-Heal
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  auto_heal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Verify Self-Control Workflow
+        run: |
+          FILE=.github/workflows/rube-self-control.yml
+          if [ ! -f "$FILE" ]; then
+            echo "❌ Missing self-control file. Recreating..."
+            echo "$WORKFLOW" | base64 -d > $FILE
+            git config --global user.email 'rube@autobot.ai'
+            git config --global user.name 'Rube Autobot'
+            git add $FILE
+            git commit -m '🛠️ Restore missing self-control workflow'
+            git push
+          else
+            echo "✅ Self-control file is present."
+
+      - name: Done
+        run: echo "🔁 Auto-heal check completed."
