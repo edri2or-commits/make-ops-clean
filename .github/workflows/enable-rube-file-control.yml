@@ -2,6 +2,7 @@ name: Enable Rube File Control
 
 on:
   workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   file-control:
