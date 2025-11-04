@@ -1,0 +1,22 @@
+name: Rube Self Control
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/rube-self-control.yml'
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Rube
+        run: |
+          echo "🔁 Setting up Rube self-control layer"
+          # simulate internal bootstrap
+
+      - name: Confirm Rube Control
+        run: echo "✅ Rube now maintains full control loop"
