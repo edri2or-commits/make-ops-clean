@@ -1,0 +1,12 @@
+on:
+  workflow_dispatch:
+    branches: [main]
+
+name: Test Run Workflow
+
+jobs:
+  run:
+    name: run-test
+    runs: echo
+    environment:
+      TEST_VAL1: "Hello, World!"
