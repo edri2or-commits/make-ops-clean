@@ -1,0 +1,11 @@
+on:
+  workflow_dispatch:
+
+name: Run Me Minimal
+
+jobs:
+  say-hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo run-me
+        run: echo "… run-me workflow dispatched successfully"
