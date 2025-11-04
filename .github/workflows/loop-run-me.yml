@@ -1,0 +1,17 @@
+name: Loop run-me hourly
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  rerun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger run-me
+        uses: peter-evans/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: edri2or-commits/make-ops-clean
+          workflow: run-me.yml
+          ref: main
