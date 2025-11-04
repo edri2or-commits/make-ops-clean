@@ -1,29 +1,28 @@
-one: workflow_dispatch
-name: Rube Orchestrator
-
 on:
+  workflow_dispatch:
   schedule:
-    - cron: * * * * * *
-    - type: workflow_dispatch
+    - cron: '* * * * *'
+
+name: Rube Orchestrator
 
 defaults: 
   github_reference: main
   config_file: rube-meta.json
   script:rube: rube-runner.py
 
-jiob:
+job:
   run:
     name: Ran rube controller
     env:
       RUBE_TOKEN: {{ secrets.rube_token }}
-      GT_REFERENGE: {{ github_reference }}
+      GIT_REFERENCE: {{ github_reference }}
       CONFIG_FILE: {{ config_file }}
       SCRIPT_FILE: {{ script:rube }}
-     steps:
+      steps:
         - name: Ran rube-runner.py with config
           run: rube-runner.py
           env:
             RUBE_TOKEN: {{ secrets.rube_token }}
-            GT_REFERENGE: {{ github_reference }}
+            GIT_REFERENCE: {{ github_reference }}
             CONFIG_FILE: {{ config_file }}
             SCRIPT_FILE: {{ script:rube }}
