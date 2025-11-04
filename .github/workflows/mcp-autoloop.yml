@@ -1,0 +1,11 @@
+on:
+  workflow_dispatch:
+
+name: MCP AutoLoop Starter
+
+jobs:
+  loop-start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo mcp-autoloop
+        run: echo "✩ MCP AutoLoop workflow triggered"
