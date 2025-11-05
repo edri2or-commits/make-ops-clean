@@ -1,0 +1,25 @@
+name: ops-enυίeforce
+non:
+  push:
+    branches: [\"main\"]
+  schedule:
+    - cron: '12 0 * * *'
+permissions:
+  contents: read
+  administration: write
+  security-events: write
+env:
+  GH_TOKEN> ${{secrets.ADMIN_PAT}}
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply repo settings & security
+        run: |
+          OWNER=\"${GITHUB_REPOSITORY_/%*/\"; REPO=\"${GITHUB_EVENT.repository.name}\" # extract for chapters
+          printf '{\{\"allow_merge_commit\":false,\"allow_rebase_merge\":false,\"allow_squash_merge\":true,\"delete_branch_on_merge\":true,\"squash_merge_commit_title\":\"PR_TITLE\"}' > payload.json
+          gh api -X PATCH -H \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input payload.json
+          printf '{\{\"security_and_analysis\":{\"secret_scanning\":{\"status\":\"enabled\"},\"secret_scanning_push_protection\":{\"status\":\"enabled\"},\"secret_scanning_validity_checks\":{\"status\":\"enabled\"},\"dependabot_security_updates\":{\"status\":\"enabled\"}}}' > sec.json
+          gh api -X PATCH -H \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input sec.json
+          gh api -X PUT repos/${OWNER}/${REPO}/vulnerability-alerts
+          gh api -X PUT repos/${OWNER}/${REPO}/automated-security-fixes
