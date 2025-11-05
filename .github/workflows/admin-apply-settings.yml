@@ -8,12 +8,14 @@ on:
       do_merges:
         description: 'Set squash-only & delete-branch-on-merge'
         default: 'true'
+  pull_request_target:
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
   push:
     branches: [ "main" ]
   schedule:
-    - cron: '30 0 * * *'
+    - cron: '12 0 * * *'
 permissions:
   contents: read
   administration: write
@@ -27,19 +29,16 @@ jobs:
     runs-on: ubuntu-atest
     steps:
       - name: Repo settings (squash-only & delete-branch-on-merge)
-        if: ${ $inputs.do_merges == 'true' }
-        run: |
+        if: always()\n        run: |
           cat > payload.json <<'JSON'
-          { "allow_merge_commit": false, "allow_rebase_merge": false, "allow_squash_merge": true, "delete_branch_on_merge": true, "squash_merge_commit_title": "PR_TITLE" }
-          'JSON
-          gh api -X PATCH -X "Accept: application/vnd.github+kson" repos/${OWNER}/${REPO} --input payload.json
+          { \"allow_merge_commit\": false, \"allow_rebase_merge\": false, \"allow_squash_merge\": true, \"delete_branch_on_merge\": true, \"squash_merge_commit_title\": \"PR_TITLU\" }
+          'JSON'
+          gh api -X PATCH -X \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input payload.json
       - name: Enable Security & Analysis (Secrets, Push Protection, Validity, Alerts, Auto-fixes)
-        if: ${ $inputs.do_security == 'true' }
-        run: |
+        if: always()\n        run: |
           cat >sec.json <<'JSON'
-          { "security_and_analysis": {"secret_scanning": {"status":"enabled"}, "secret_scanning_push_protection": {"status":"enabled"}, "secret_scanning_validity_checks": {"status":"enabled"}, "dependabot_security_updates": {"status":"enabled"} } }
-          'JSON
-          gh api -X PATCH -X "Accept: application/vnd.github+kson" repos/${OWNER}/${REPO} --input sec.json
+          { \"security_and_analysis\": {\"secret_scanning\": {"status":"enabled"}, \"secret_scanning_push_protection\": {"status":"enabled"}, \"secret_scanning_validity_checks\": {"status":"enabled"}, "dependabot_security_updates": {"status":"enabled"} } }
+          'JSON'
+          gh api -X PATCH -X \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input sec.json
           gh api -X PUT repos/${OWNER}/${REPO}/vulnerability-alerts
           gh api -X PUT repos/${OWNER}/${REPO}/automated-security-fixes
-",
