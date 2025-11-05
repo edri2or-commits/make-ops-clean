@@ -1,0 +1,31 @@
+name: Echo Artifacts (fresh)
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Echo message"
+        required: false
+        default: "hello-from-dispatch"
+  push:
+    paths:
+      - .github/echo-artifacts.trigger   # fallback trigger (file-based)
+permissions:
+  contents: read
+jobs:
+  emit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create output
+        run: |
+          echo "${{ github.repository }} :: ${{ inputs.message }}" > out.txt
+      - name: Verify output exists
+        run: |
+          ls -l
+          test -s out.txt
+      - id: upload
+        name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: echo-out
+          path: out.txt
+          if-no-files-found: error
