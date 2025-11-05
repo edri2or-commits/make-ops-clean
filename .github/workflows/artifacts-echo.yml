@@ -1,0 +1,24 @@
+name: Artifacts echo (dispatch)
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Echo message"
+        required: false
+        default: "hello-from-dispatch"
+permissions:
+  contents: read
+  actions: read
+  id-token: none
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create output
+        run: |
+          echo "${{ github.repository }} :: ${{ inputs.message }}" > output.txt
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: echo-out
+          path: output.txt
