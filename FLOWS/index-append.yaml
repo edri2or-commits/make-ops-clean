@@ -1,0 +1,17 @@
+name: index-append
+env: DEV
+tags: [ops, index]
+trigger: github:workflow_dispatch  # schedule lives in existing workflows
+actions:
+  - type: github
+    op: workflow:index-append-manual.yml
+    with:
+      inputs: {}
+secrets:
+  - GOOGLE_SHEETS_CREDENTIALS@secrets/dev   # placeholder mapping only
+sla: "<120s"
+fallback: "log->issue:manual_step"
+owner: you
+observability:
+  log: "files:./logs/index-append.log"
+  alert_channel: "telegram:#ops-alerts"
