@@ -6,11 +6,8 @@ on:
         description: "Echo message"
         required: false
         default: "hello-from-dispatch"
-  push:
-    paths:
-      - .github/echo-artifacts.trigger   # fallback trigger (file-based)
-permissions:
-  contents: read
+  repository_dispatch:
+    types: [echo_test]
 jobs:
   emit:
     runs-on: ubuntu-latest
