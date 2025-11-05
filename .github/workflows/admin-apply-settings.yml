@@ -1,44 +1,37 @@
 name: admin-apply-settings
 on:
   workflow_dispatch:
-    inputs:
-      do_security:
-        description: 'Enable Secret Scanning + Push Protection + Validity + Alerts + Auto-fixes'
-        default: 'true'
-      do_merges:
-        description: 'Set squash-only & delete-branch-on-merge'
-        default: 'true'
-  pull_request_target:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+    paths: [ ".github/workflows/admin-apply-settings.yml" ]
   schedule:
-    - cron: '12 0 * * *'
+    - cron: "0 1 * * *"
+  pull_request_target:
+    branches: [ main ]
 permissions:
-  contents: read
-  administration: write
-  security-events: write
-env:
-  GH_TOKEN: ${{ secrets.ADMIN_PAT }}
-  OWNER: ${{ github.repository_owner }}
-  REPO:  {{ github.event.repository.name }}
+  contents: write
+  pull-requests: write
+  actions: read
 jobs:
-  apply:
-    runs-on: ubuntu-atest
+  enforce:
+    runs-on: ubuntu-latest
     steps:
-      - name: Repo settings (squash-only & delete-branch-on-merge)
-        if: always()\n        run: |
-          cat > payload.json <<'JSON'
-          { \"allow_merge_commit\": false, \"allow_rebase_merge\": false, \"allow_squash_merge\": true, \"delete_branch_on_merge\": true, \"squash_merge_commit_title\": \"PR_TITLU\" }
-          'JSON'
-          gh api -X PATCH -X \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input payload.json
-      - name: Enable Security & Analysis (Secrets, Push Protection, Validity, Alerts, Auto-fixes)
-        if: always()\n        run: |
-          cat >sec.json <<'JSON'
-          { \"security_and_analysis\": {\"secret_scanning\": {"status":"enabled"}, \"secret_scanning_push_protection\": {"status":"enabled"}, \"secret_scanning_validity_checks\": {"status":"enabled"}, "dependabot_security_updates": {"status":"enabled"} } }
-          'JSON'
-          gh api -X PATCH -X \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input sec.json
-          gh api -X PUT repos/${OWNER}/${REPO}/vulnerability-alerts
-          gh api -X PUT repos/${OWNER}/${REPO}/automated-security-fixes
+      - name: Enable security flags
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_PAT }}
+        run: |
+          set -euo pipefail
+          payload='{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"},"secret_scanning_validity_checks":{"status":"enabled"},"secret_scanning_non_provider_patterns":{"status":"enabled"},"dependabot_security_updates":{"status":"enabled"}}}'
+          echo "$payload" | gh api -X PATCH repos/$GITHUB_REPOSITORY \
+            -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --input -
+      - name: Verify security flags
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_PAT }}
+        run: |
+          set -euo pipefail
+          gh api repos/$GITHUB_REPOSITORY --jq '.security_and_analysis |
+            [ .secret_scanning.status,
+              .secret_scanning_push_protection.status,
+              .secret_scanning_validity_checks.status,
+              .secret_scanning_non_provider_patterns.status,
+              .dependabot_security_updates.status ] | all(.=="enabled")' | grep -q true
