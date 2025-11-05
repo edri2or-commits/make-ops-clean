@@ -8,8 +8,6 @@ on:
         default: "hello-from-dispatch"
 permissions:
   contents: read
-  actions: read
-  id-token: none
 jobs:
   echo:
     runs-on: ubuntu-latest
@@ -17,8 +15,17 @@ jobs:
       - name: Create output
         run: |
           echo "${{ github.repository }} :: ${{ inputs.message }}" > output.txt
-      - name: Upload artifact
+      - name: Verify output exists
+        run: |
+          ls -l
+          test -s output.txt
+      - id: upload
+        name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: echo-out
           path: output.txt
+          if-no-files-found: error
+      - name: Summarize
+        run: |
+          echo "artifact-id=${{ steps.upload.outputs.artifact-id }}" >> $GITHUB_STEP_SUMMARY
