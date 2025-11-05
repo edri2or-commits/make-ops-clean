@@ -1,0 +1,25 @@
+name: Echo Artifacts (minimal-proof)
+on:
+  workflow_dispatch: {}
+  push:
+    paths: 
+      - .github/echo-min.trigger
+permissions:
+  contents: read
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create output
+        run: |
+          printf "%s :: %s\n" "${GITHUB_REPOSITORY}" "$(date -u +UTC)" > out.txt
+      - name: Verify output exists
+        run: |
+          ls -l out.txt
+          test -s out.txt
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: echo-out
+          path: out.txt
+          if-no-files-found: error
