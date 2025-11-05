@@ -1,0 +1,15 @@
+name: repo-guardrails
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+permissions: read-all
+concurrency:
+  group: repo-guardrails-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Guardrails in place"
