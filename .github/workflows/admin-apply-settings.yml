@@ -5,28 +5,4 @@ on:
       do_security:
         description: 'Enable Secret Scanning + Push Protection + Validity + Alerts + Auto-fixes'\n        default: 'true'
       do_merges:
-        description: 'Set squash-only & delete-branch-on-merge'\n        default: 'true'\n  push:\n    branches: [ "main" ]
-permissions:
-  contents: read
-  administration: write
-  security-events: write
-env:
-  OWNER: ${$ github.repository_owner }\n  REPO:  ${{ github.event.repository.name }}\n  GH_TOKEN: ${ $ github.token } \njobs:
-  apply:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Repo settings (squash-only & delete-branch-on-merge)
-        if: ${$ inputs.do_merges == 'true' }
-        run: |
-          cat > payload.json <<'JSON'
-          { \"allow_merge_commit\": false, \"allow_rebase_merge\": false, \"allow_squash_merge\": true, \"delete_branch_on_merge\": true, \"squash_merge_commit_title\": \"PR_TITLU\" }
-          'JSON
-          gh api -X PATCH -H \"Accept: application/vnd.github+json\" repos/${OWNER}/${REPO} --input payload.json
-      - name: Enable Security & Analysis (Secrets, Push Protection, Validity, Alerts, Auto-fixes)\n        if: ${$ inputs.do_security == 'true' }
-        run: |
-          cat >sec.json <<'JSON'
-          { \"security_and_analysis\": {"secret_scanning": {"status":"enabled"}, "secret_scanning_push_protection": {"status":"enabled"}, "secret_scanning_validity_checks": {"status":"enabled"}, "dependabot_security_updates": {"status":"enabled"} } }
-          'JSON
-          gh api -X PATCH -H \"Accept: application/vnd.github+kson\" repos/${OWNER}/${REPO} --input sec.json
-          gh api -X PUT repos/${OWNER}/${REPO}/vulnerability-alerts
-          gh api -X PUT repos/${OWNER}/${REPO}/automated-security-fixes
+        description: 'Set squash-only & delete-branch-on-merge'\n        default: 'true'\n  push:\n    branches: [ \"main\" ]\permissions:\n  contents: read\n  administration: write\n  security-events: write\env:\n  OWNER: ${{ github.repository_owner }}\n  REPO: ${{ github.event.repository.name }}\n  GH_TOKEN: ${ github.token }}\njobs:\n  apply:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Repo settings (squash-only & delete-branch-on-merge)\n        if: always()\n        run: | t\n          cat > payload.json <<'JSON'\n          { \"allow_merge_commit\": false, \"allow_rebase_merge\": false, \"allow_squash_merge\": true, \"delete_branch_on_merge\": true, \"squash_merge_commit_title\": \"PR_TITLU\" }\n          'JSON\n          gh api -X PATCH -H \"Accept: application/vnd.github+json\" repos/${OWNER}/${REPO} --input payload.json\n      - name: Enable Security & Analysis (Secrets, Push Protection, Validity, Alerts, Auto-fixes)\n        if: always()\n        run: | t\n          cat >sec.json <<'JSON'\n          { \"security_and_analysis\": {"secret_scanning": {"status":"enabled"}, "secret_scanning_push_protection": {"status":"enabled"}, "secret_scanning_validity_checks": {"status":"enabled"}, "dependabot_security_updates": {"status":"enabled"} } }\n          'JSON\n          gh api -X PATCH -H \"Accept: application/vnd.github+json\" repos/${OWNER}/${REPO} --input sec.json\n          gh api -X PUT repos/${OWNER}/${REPO}/vulnerability-alerts\n          gh api -X PUT repos/${OWNER}/${REPO}/automated-security-fixes\n
