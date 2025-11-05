@@ -8,18 +8,26 @@ permissions:
   contents: read
 jobs:
   echo:
+    concurrency:
+      group: echo-artifacts-min
+      cancel-in-progress: true
     runs-on: ubuntu-latest
-    steps:
+    timeout-minutes: 5
+    steps: 
       - name: Create output
-        run: printf %s :: %s \n "$GITHUB_REPOSITORY" "$(date -u +UTC)" > out.txt
+        run: |
+          printf "%s :: %s \n" "${GITHUB_REPOSITORY}" "$(date -u +UTC)" > out.txt
       - name: Verify output exists
         run: |
           ls -l out.txt
           test -s out.txt
-      - name: Upload artifact
+      - id: upload
+        name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: echo-out
           path: out.txt
           if-no-files-found: error
-# Fixed: ontime syntax for printf to correctly create out.txt
+      - name: Summarize artifact
+        run: |
+          echo "artifact-id=${ steps.upload.outputs.artifact-id }" >> $GITHUB_STEX_SUMMARY
