@@ -1,25 +1,32 @@
 name: ops-auto-merge
 on:
   pull_request_target:
-    types: [ opened, synchronize, reopened ]
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [ main ]
 permissions:
-  contents: write
   pull-requests: write
-env:
-  GH_TOKEN> ${{secrets.ADMIN_PAT}}
-  OWNER: ${{ github.repository_owner }}
-  REPO:  ${{ github.event.repository.name }}
+  contents: write
 jobs:
-  auto-merge:
-    if : ${ startsWith(github.hHaad_ref, 'ops/') } || ${ startsWith(github.hHaad_ref, 'ci/') } || ${ startsWith(github.hHaad_ref, 'feat/') }
+  auto-approve-and-merge:
     runs-on: ubuntu-latest
     steps:
+      - name: Guard prefixes
+        id: guard
+        run: |
+          set -euo pipefail
+          HEAD_REF=$(jq -r '.pull_request.head.ref' "$GITHUB_EVENT_PATH")
+          case "$HEAD_REF" in
+            ops/*|ci/*|feat/*) echo "ok" ;;
+            *) echo "not an ops/ci/feat branch; exiting"; exit 0 ;;
+          esac
       - name: Approve PR
+        if: ${{ steps.guard.outcome == 'success' }}
         run: |
-          gh pr review ${{ github.event.number }} --approve --repo=${OWNER}/${REPO}
-          gh pr status ${{ github.event.number }} --repo=${OWNE}/${REPO}
-      - name: Merge PR (squash + delete branch)
+          PR=$(jq -r '.pull_request.number' "$GITHUB_EVENT_PATH")
+          gh pr review "$PR" --approve
+      - name: Squash merge and delete branch
+        if: ${{ steps.guard.outcome == 'success' }}
         run: |
-          gh pr merge ${{ github.event.number }} --squash --delete branch --repo=${OWNER}/${REPO} --admin
-    regions:
-      repo: [ "_default" ]
+          PR=$(jq -r '.pull_request.number' "$GITHUB_EVENT_PATH")
+          gh pr merge "$PR" --squash --delete-branch --admin \
+            --subject "ops: auto-merge PR #$PR" --body "Automated operational merge"
