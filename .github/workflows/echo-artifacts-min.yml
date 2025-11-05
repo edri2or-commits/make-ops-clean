@@ -11,8 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create output
-        run: |
-          printf "%s :: %s\n" "${GITHUB_REPOSITORY}" "$(date -u +UTC)" > out.txt
+        run: printf %s :: %s \n "$GITHUB_REPOSITORY" "$(date -u +UTC)" > out.txt
       - name: Verify output exists
         run: |
           ls -l out.txt
@@ -23,3 +22,4 @@ jobs:
           name: echo-out
           path: out.txt
           if-no-files-found: error
+# Fixed: ontime syntax for printf to correctly create out.txt
