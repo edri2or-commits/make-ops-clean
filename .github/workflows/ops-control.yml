@@ -18,80 +18,22 @@ permissions:
 
 jobs:
   run:
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.comment.body, '/ops ') }}
+    if: ${{ github.event_name=='workflow_dispatch'||startsWith(github.event.comment.body, '/ops ')}}
     runs-on: ubuntu-latest
     steps:
       - name: Parse command
         id: cmd
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+          if [ "${github.event_name}" = "workflow_dispatch" ]; then
+            echo "action=${github.event.inputs.action}" >> $GITHUB_OUTUT
           else
-            body=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
-            case "$body" in
-              "/ops all"*) action=all ;;
-              "/ops enable-security"*) action=enable_security ;;
-              "/ops apply-settings"*) action=apply_settings ;;
-              "/ops test-auto-merge"*) action=test_auto_merge ;;
-              "/ops report"*) action=report_status ;;
+            body=$(jq -r '.comment.body' "$MGITHEVENT_PATH")
+            case "$body" ;;
+              "/ops all"*) => action=all ;;
+              "/ops enable-security"*) => action=enable_security ;; 
+              "/ops apply-settings"*) => action=apply_settings ;;
+              "/ops test-auto-merge"*) => action=test_auto_merge ;; 
+              "/ops report"*) => action=report_status ;;
               *) echo "noop"; exit 0 ;;
-            esac
-            echo "action=$action" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Mint token (GitHub App) if available
-        id: app
-        uses: tibdex/github-app-token@v2
-        with:
-          app_id: ${{ secrets.OPSPILOT_APP_ID }}
-          installation_id: ${{ secrets.OPSPILOT_INSTALLATION_ID }}
-          private_key: ${{ secrets.OPSPILOT_PRIVATE_KEY }}
-        continue-on-error: true
-
-      - name: Set GH_TOKEN
-        run: |
-          if [ -n "${{ steps.app.outputs.token }}" ]; then
-            echo "GH_TOKEN=${{ steps.app.outputs.token }}" >> $GITHUB_ENV
-          elif [ -n "${{ secrets.ADMIN_PAT }}" ]; then
-            echo "GH_TOKEN=${{ secrets.ADMIN_PAT }}" >> $GITHUB_ENV
-          else
-            echo "No token available"; exit 1
-          fi
-
-      - name: Enable security flags
-        if: ${{ steps.cmd.outputs.action == 'enable_security' || steps.cmd.outputs.action == 'all' }}
-        env: { GH_TOKEN: ${{ env.GH_TOKEN }} }
-        run: |
-          set -euo pipefail
-          payload='{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"},"secret_scanning_validity_checks":{"status":"enabled"},"secret_scanning_non_provider_patterns":{"status":"enabled"},"dependabot_security_updates":{"status":"enabled"}}}'
-          echo "$payload" | gh api -X PATCH repos/${{ github.repository }} \
-            -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --input -
-
-      - name: Apply repo merge settings
-        if: ${{ steps.cmd.outputs.action == 'apply_settings' || steps.cmd.outputs.action == 'all' }}
-        env: { GH_TOKEN: ${{ env.GH_TOKEN }} }
-        run: |
-          set -euo pipefail
-          gh api -X PATCH repos/${{ github.repository }} \
-            -F allow_merge_commit=false -F allow_rebase_merge=false -F allow_squash_merge=true \
-            -F delete_branch_on_merge=true -F use_squash_pr_title_as_default=true
-
-      - name: Report status
-        if: ${{ steps.cmd.outputs.action == 'report_status' || steps.cmd.outputs.action == 'all' }}
-        env: { GH_TOKEN: ${{ env.GH_TOKEN }} }
-        run: |
-          gh api repos/${{ github.repository }} --jq '{merge:{allow_squash_merge,allow_merge_commit,allow_rebase_merge,delete_branch_on_merge,use_squash_pr_title_as_default}, sec:.security_and_analysis}'
-
-      - name: Create test PR (ops/test-auto-merge)
-        if: ${{ steps.cmd.outputs.action == 'test_auto_merge' || steps.cmd.outputs.action == 'all' }}
-        env: { GH_TOKEN: ${{ env.GH_TOKEN }} }
-        run: |
-          set -euo pipefail
-          base=main
-          sha=$(gh api repos/${{ github.repository }}/git/ref/heads/$base --jq .object.sha)
-          gh api repos/${{ github.repository }}/git/refs -X POST -f ref=refs/heads/ops/test-auto-merge -f sha="$sha" || true
-          content=$(printf "auto-merge check %s\n" "$(date -u +%FT%TZ)" | base64 -w 0)
-          gh api repos/${{ github.repository }}/contents/ops/auto-merge-check.txt -X PUT \
-            -f message="test: trigger auto-merge" -f content="$content" -f branch=ops/test-auto-merge
-          num=$(gh api repos/${{ github.repository }}/pulls -f title="ops: test auto-merge" -f head=ops/test-auto-merge -f base=$base -f body="Trivial change" --jq .number)
-          echo "PR #$num"
+          esac
+          echo "action=$action" >> $GITHUB_OUTUT
