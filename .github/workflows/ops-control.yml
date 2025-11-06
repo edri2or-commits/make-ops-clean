@@ -1,3 +1,4 @@
+
 name: ops-control
 on:
   workflow_dispatch:
@@ -16,24 +17,25 @@ permissions:
   actions: write
   issues: write
 
-jobs:
+jobs: 
   run:
-    if: ${{ github.event_name=='workflow_dispatch'||startsWith(github.event.comment.body, '/ops ')}}
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.comment.body, '/ops ') }}
     runs-on: ubuntu-latest
     steps:
       - name: Parse command
         id: cmd
         run: |
-          if [ "${github.event_name}" = "workflow_dispatch" ]; then
-            echo "action=${github.event.inputs.action}" >> $GITHUB_OUTUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUT
           else
-            body=$(jq -r '.comment.body' "$MGITHEVENT_PATH")
-            case "$body" ;;
-              "/ops all"*) => action=all ;;
-              "/ops enable-security"*) => action=enable_security ;; 
-              "/ops apply-settings"*) => action=apply_settings ;;
-              "/ops test-auto-merge"*) => action=test_auto_merge ;; 
-              "/ops report"*) => action=report_status ;;
-              *) echo "noop"; exit 0 ;;
-          esac
-          echo "action=$action" >> $GITHUB_OUTUT
+            body=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
+            case "$body" in
+              "/ops all"*) ; action=all;;
+              "/ops enable-security"*) ; action=enable_security;;
+              "/ops apply-settings"*); action=apply_settings;;
+              "/ops test-auto-merge"*); action=test_auto_merge;;
+              "/ops report"*); action=report_status;;
+              *); echo "noop"; exit 0;;
+            esac
+            echo "action=$action" >> $GITHUB_OUTT
+          end
