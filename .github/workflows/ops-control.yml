@@ -19,7 +19,7 @@ permissions:
 
 jobs: 
   run:
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.comment.body, '/ops ') }}
+    if: "${ github.event_name == 'workflow_dispatch' || startsWith(github.event.comment.body, '/ops ') }"
     runs-on: ubuntu-latest
     steps:
       - name: Parse command
