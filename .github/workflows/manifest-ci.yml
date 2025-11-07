@@ -1,0 +1,34 @@
+name: manifest-ci
+on:
+  pull_request:
+    paths:
+      - 'platform/manifest/**'
+  workflow_dispatch:
+
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install deps
+        run: pip install jsonschema pyyaml
+      - name: Validate JSON schema
+        run: |
+          python - << 'PY'
+import json, sys, yaml, jsonschema, pathlib
+schema = json.loads(pathlib.Path('platform/manifest/manifest.schema.json').read_text())
+doc = yaml.safe_load(pathlib.Path('platform/manifest/manifest.example.yaml').read_text())
+jsonschema.validate(instance=doc, schema=schema)
+print("Schema OK")
+PY
+      - name: No secrets in files
+        run: |
+          ! grep -R - E "(api_key|secret|BEGIN PRIVATE KEY)" platform/manifest || (echo "secrets found"; exit 1)
+      - name: Vault/GH refs existence (dry)
+        run: |
+          grep -E "vault://|gh://secrets/" platform/manifest/manifest.example.yaml || (echo "no refs"; exit 1)
