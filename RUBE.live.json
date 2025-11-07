@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2025-11-07T00:00:00Z",
+  "rules": {
+    "must_read_before_action": true,
+    "must_check_executions": true,
+    "must_respect_failures": true
+  },
+  "secrets": [],
+  "tokens": [],
+  "workflows": [],
+  "executions": [],
+  "errors": [],
+  "history": [],
+  "dependencies": [],
+  "org_access": {},
+  "critical_diffs": [],
+  "integrations": [],
+  "triggers": [],
+  "validations": [],
+  "contextual_checks": [],
+  "compatible_agents": [
+    "rube-agent >= 1.0.0",
+    "gpt-agent >= 4.0.0"
+  ]
+}
