@@ -1,0 +1,46 @@
+name: manifest-ci
+on:
+  pull_request:
+    paths:
+      - 'platform/manifest/**'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install deps
+        run: pip install jsonschema pyyaml
+      - name: Validate manifest.example.yaml against manifest.schema.json
+        run: |
+          python - << 'PY'
+          import json, yaml, pathlib, jsonschema
+          s = json.loads(pathlib.Path('platform/manifest/manifest.schema.json').read_text())
+          d = yaml.safe_load(pathlib.Path('platform/manifest/manifest.example.yaml').read_text())
+          jsonschema.validate(d, s); print("manifest ✅")
+          PY
+      - name: Validate capability_registry.yaml against capability_registry.schema.json
+        run: |
+          python - << 'PY'
+          import json, yaml, pathlib, jsonschema
+          s = json.loads(pathlib.Path('platform/manifest/capability_registry.schema.json').read_text())
+          d = yaml.safe_load(pathlib.Path('platform/manifest/capability_registry.yaml').read_text())
+          jsonschema.validate(d, s); print("capability_registry ✅")
+          PY
+      - name: Validate policy_gate.yaml against policy_gate.schema.json
+        run: |
+          python - << 'PY'
+          import json, yaml, pathlib, jsonschema
+          s = json.loads(pathlib.Path('platform/manifest/policy_gate.schema.json').read_text())
+          d = yaml.safe_load(pathlib.Path('platform/manifest/policy_gate.yaml').read_text())
+          jsonschema.validate(d, s); print("policy_gate ✅")
+          PY
+      - name: No secrets in files
+        run: |
+          !` grep -R - E "(api_key|secret|BEGIN PRIVATE KEY)" platform/manifest || (echo "secrets found"; exit 1)
+      - name: Vault/GH refs existence (dry)
+        run: |
+          grep -E "vault://|gh://secrets/" platform/manifest/manifest.example.yaml || (echo "no refs"; exit 1)
