@@ -1,0 +1,55 @@
+version: 1
+environments:
+  prod:
+    github:
+      app_ref_or_token_ref: "gh://secrets/GH_TOKEN_LEGACY"   # לא נוגעים עכשיו; legacy
+      notes: "יעד מיגרציה ל-GitHub App בהמשך"
+    google:
+      project_ref: "vault://org/gcp/prod/project_id"
+      service_account_ref: "vault://org/gcp/prod/sa_key_json"
+      allowed_domains: ["console.cloud.google.com", "drive.google.com"]
+      allowed_endpoints: ["https://www.googleapis.com/drive/v3", "https://cloudresourcemanager.googleapis.com/v1"]
+    local:
+      workdir_allowlist: ["/home/mcp/ops", "/home/mcp/work"]
+      allowed_install_sources:
+        - { url: "https://packages.myorg.com", checksum_required: true }
+policies:
+  approvals:
+    require_chat_approval_for:
+      - "install_with_elevation"
+      - "iam_change"
+      - "external_share"
+  download:
+    require_checksum: true
+    require_signature: true
+  rate_limits:
+    intents_per_minute: 10
+integrations:
+  telegram:
+    status: "parked"
+    secrets:
+      bot_token_ref: "gh://secrets/TELEGRAM_BOT_TOKEN"
+      chat_id_ref: "gh://secrets/TELEGRAM_CHAT_ID"
+  make:
+    status: "future"
+rotation_policy:
+  default_days: 90
+intents:
+  - id: gh.pr.create
+    utterances: ["פתח PR", "create pull request"]
+    produces: ["github.pr"]
+  - id: google.project.info
+    utterances: ["מה ה-ID של הפרויקט", "get gcp project id"]
+    produces: ["google.project.info"]
+  - id: local.install
+    utterances: ["התקן חבילה", "install package"]
+    produces: ["local.install.plan"]
+  - id: iam_change
+    utterances: ["שנה הרשאות", "modify IAM"]
+    produces: ["iam.change.plan"]
+  - id: repo_delete
+    utterances: ["מחק רפו", "delete repository"]
+    produces: []
+  - id: force_push
+    utterances: ["פוש בכוח", "force push"]
+    produces: []
