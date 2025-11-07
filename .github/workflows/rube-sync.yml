@@ -1,0 +1,28 @@
+
+name: Sync RUBE.live.json with repo changes
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  update-rube:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Update RUBE.live.json
+        run: |
+          python .github/scripts/update_rube_live.py
+
+      - name: Commit changes
+        run: |
+          git config --global user.name 'rube-agent'
+          git config --global user.email 'bot@rube.app'
+          git add RUBE.live.json
+          git commit m 'Auto-update RUBE.live.json [bot]''| echo "No changes"
+          git push
