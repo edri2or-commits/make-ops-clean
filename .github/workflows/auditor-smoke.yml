@@ -1,5 +1,7 @@
 name: auditor-smoke
 on: [workflow_dispatch, push]
+permissions:
+  contents: read
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -11,5 +13,3 @@ jobs:
         with:
           name: auditor-logs
           path: .
-permissions:
-  contents: read
