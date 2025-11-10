@@ -2,7 +2,7 @@ name: Execute on Approval
 
 # Triggered by repository_dispatch with event_type: merge_approved
 # Purpose: Auto-merge approved PRs via Telegram gate
-# Security: Kill-switch, secrets verification, no secret printing
+# Security: Kill-switch, secrets verification, no PAT required
 
 on:
   repository_dispatch:
@@ -54,10 +54,6 @@ jobs:
             MISSING="${MISSING}TELEGRAM_CHAT_ID "
           fi
           
-          if [ -z "${{ secrets.GITHUB_PAT }}" ]; then
-            MISSING="${MISSING}GITHUB_PAT "
-          fi
-          
           if [ -z "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
             MISSING="${MISSING}MAKE_WEBHOOK_URL "
           fi
@@ -84,7 +80,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Parse Payload
         id: payload
@@ -108,7 +104,7 @@ jobs:
       
       - name: Verify PR Exists
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
           
@@ -128,7 +124,7 @@ jobs:
       
       - name: Run Pre-Merge Validation
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
           
@@ -150,7 +146,7 @@ jobs:
       
       - name: Merge PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
           APPROVED_BY="${{ steps.payload.outputs.approved_by }}"
@@ -207,7 +203,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-          token: ${{ secrets.GITHUB_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Configure Git
         run: |
