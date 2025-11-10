@@ -1,12 +1,18 @@
 name: Execute on Approval
 
-# Triggered by repository_dispatch with event_type: merge_approved
-# Purpose: Auto-merge approved PRs via Telegram gate
+# Triggered by repository_dispatch (prod) or workflow_dispatch (bootstrap)
+# Purpose: Auto-merge approved PRs via Telegram gate or manual dispatch
 # Security: Kill-switch, secrets verification, no PAT required
 
 on:
   repository_dispatch:
     types: [merge_approved]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR to merge'
+        required: true
+        type: number
 
 permissions:
   contents: write
@@ -82,31 +88,55 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Parse Payload
-        id: payload
+      - name: Resolve PR Number
+        id: resolve
         run: |
+          # Determine PR number based on trigger type
           PR_NUMBER="${{ github.event.client_payload.pr_number }}"
-          APPROVED_BY="${{ github.event.client_payload.approved_by }}"
-          APPROVED_AT="${{ github.event.client_payload.approved_at }}"
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            echo "📌 Using workflow_dispatch input: PR #$PR_NUMBER"
+          else
+            echo "📌 Using repository_dispatch payload: PR #$PR_NUMBER"
+          fi
           
           if [ -z "$PR_NUMBER" ]; then
-            echo "❌ Missing pr_number in payload"
+            echo "❌ Missing pr_number"
             exit 1
           fi
           
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "approved_by=${APPROVED_BY:-telegram-bot}" >> $GITHUB_OUTPUT
+          echo "✅ Resolved PR Number: $PR_NUMBER"
+      
+      - name: Parse Payload
+        id: payload
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          APPROVED_BY="${{ github.event.client_payload.approved_by }}"
+          APPROVED_AT="${{ github.event.client_payload.approved_at }}"
+          
+          # For workflow_dispatch, use github.actor as approver
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APPROVED_BY="${{ github.actor }}"
+            APPROVED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+          
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "approved_by=${APPROVED_BY:-unknown}" >> $GITHUB_OUTPUT
           echo "approved_at=${APPROVED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" >> $GITHUB_OUTPUT
           
           echo "📋 PR Number: $PR_NUMBER"
-          echo "👤 Approved by: ${APPROVED_BY:-telegram-bot}"
+          echo "👤 Approved by: ${APPROVED_BY:-unknown}"
           echo "🕐 Approved at: ${APPROVED_AT:-now}"
+          echo "🔔 Trigger: ${{ github.event_name }}"
       
       - name: Verify PR Exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          PR_NUMBER="$PR_NUMBER"
           
           echo "🔍 Verifying PR #$PR_NUMBER exists..."
           if ! gh pr view "$PR_NUMBER" --json number,state,headRefName; then
@@ -126,7 +156,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          PR_NUMBER="$PR_NUMBER"
           
           # Get PR branch name
           BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
@@ -149,7 +179,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          PR_NUMBER="$PR_NUMBER"
           APPROVED_BY="${{ steps.payload.outputs.approved_by }}"
           
           echo "🔀 Merging PR #$PR_NUMBER..."
@@ -159,7 +189,7 @@ jobs:
             --squash \
             --delete-branch \
             --subject "Merge PR #$PR_NUMBER (approved by $APPROVED_BY)" \
-            --body "Automated merge via Telegram approval gate"
+            --body "Automated merge via ${{ github.event_name }}"
           
           echo "✅ PR #$PR_NUMBER merged successfully"
           echo "merged=true" >> $GITHUB_OUTPUT
@@ -180,8 +210,9 @@ jobs:
       - name: Notify Telegram (post-merge)
         if: success() && steps.merge.outputs.merged == 'true'
         run: |
-          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          PR_NUMBER="$PR_NUMBER"
           COMMIT_SHA="${{ steps.commit.outputs.sha }}"
+          TRIGGER="${{ github.event_name }}"
           
           echo "📢 Sending success notification to Telegram..."
           
@@ -189,7 +220,7 @@ jobs:
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "text=✅ Merged PR #${PR_NUMBER} to main (approved via Telegram)%0A%0ACommit: ${COMMIT_SHA:0:7}%0AStatus: Success" \
+            -d "text=✅ Merged PR #${PR_NUMBER} to main%0A%0ACommit: ${COMMIT_SHA:0:7}%0ATrigger: ${TRIGGER}%0AStatus: Success" \
             -d "disable_web_page_preview=true"
           
           echo "✅ Telegram notification sent"
@@ -197,7 +228,7 @@ jobs:
       - name: Notify Completion
         if: always()
         run: |
-          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          PR_NUMBER="$PR_NUMBER"
           COMMIT_SHA="${{ steps.commit.outputs.sha }}"
           STATUS="${{ job.status }}"
           
@@ -205,6 +236,7 @@ jobs:
           echo "PR: #$PR_NUMBER"
           echo "Commit: $COMMIT_SHA"
           echo "Status: $STATUS"
+          echo "Trigger: ${{ github.event_name }}"
 
   rollback:
     name: Rollback on Failure
@@ -241,7 +273,7 @@ jobs:
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "text=🚨 Rollback executed due to merge failure%0A%0AStatus: Failed%0AAction: Last commit reverted" \
+            -d "text=🚨 Rollback executed due to merge failure%0A%0ATrigger: ${{ github.event_name }}%0AStatus: Failed%0AAction: Last commit reverted" \
             -d "disable_web_page_preview=true"
           
           echo "✅ Rollback notification sent to Telegram"
