@@ -1,8 +1,8 @@
 name: Execute on Approval
 
 # Triggered by repository_dispatch with event_type: merge_approved
-# Purpose: Auto-merge approved branches via Telegram gate
-# Security: Verifies secrets before execution, no secret printing
+# Purpose: Auto-merge approved PRs via Telegram gate
+# Security: Kill-switch, secrets verification, no secret printing
 
 on:
   repository_dispatch:
@@ -18,8 +18,29 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       secrets_valid: ${{ steps.check.outputs.valid }}
+      exec_enabled: ${{ steps.killswitch.outputs.enabled }}
+    
     steps:
-      - name: Check secrets presence
+      - name: Kill Switch Check
+        id: killswitch
+        run: |
+          # Kill switch: Check EXEC_ENABLED variable (default: true)
+          EXEC_ENABLED="${{ vars.EXEC_ENABLED }}"
+          
+          if [ -z "$EXEC_ENABLED" ]; then
+            EXEC_ENABLED="true"
+          fi
+          
+          if [ "$EXEC_ENABLED" != "true" ]; then
+            echo "🛑 Kill switch activated: EXEC_ENABLED=$EXEC_ENABLED"
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            exit 78
+          else
+            echo "✅ Execution enabled"
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check Secrets Presence
         id: check
         run: |
           # Verify secrets exist (without printing values)
@@ -54,82 +75,135 @@ jobs:
     name: Execute Approved Merge
     runs-on: ubuntu-latest
     needs: verify-secrets
-    if: needs.verify-secrets.outputs.secrets_valid == 'true'
+    if: |
+      needs.verify-secrets.outputs.secrets_valid == 'true' &&
+      needs.verify-secrets.outputs.exec_enabled == 'true'
     
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_PAT }}
       
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      
-      - name: Parse payload
+      - name: Parse Payload
         id: payload
         run: |
-          echo "task_id=${{ github.event.client_payload.task_id }}" >> $GITHUB_OUTPUT
-          echo "branch=${{ github.event.client_payload.branch_to_merge }}" >> $GITHUB_OUTPUT
-          echo "approved_by=${{ github.event.client_payload.approved_by }}" >> $GITHUB_OUTPUT
-          echo "approved_at=${{ github.event.client_payload.approved_at }}" >> $GITHUB_OUTPUT
-      
-      - name: Verify branch exists
-        run: |
-          BRANCH="${{ steps.payload.outputs.branch }}"
-          if ! git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
-            echo "❌ Branch $BRANCH does not exist"
+          PR_NUMBER="${{ github.event.client_payload.pr_number }}"
+          APPROVED_BY="${{ github.event.client_payload.approved_by }}"
+          APPROVED_AT="${{ github.event.client_payload.approved_at }}"
+          
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ Missing pr_number in payload"
             exit 1
           fi
-          echo "✅ Branch $BRANCH exists"
-      
-      - name: Fetch and merge branch
-        run: |
-          BRANCH="${{ steps.payload.outputs.branch }}"
-          echo "🔄 Fetching branch: $BRANCH"
-          git fetch origin "$BRANCH"
           
-          echo "🔄 Merging $BRANCH into main"
-          git merge "origin/$BRANCH" --no-ff -m "Merge $BRANCH (approved by ${{ steps.payload.outputs.approved_by }})"
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "approved_by=${APPROVED_BY:-telegram-bot}" >> $GITHUB_OUTPUT
+          echo "approved_at=${APPROVED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" >> $GITHUB_OUTPUT
+          
+          echo "📋 PR Number: $PR_NUMBER"
+          echo "👤 Approved by: ${APPROVED_BY:-telegram-bot}"
+          echo "🕐 Approved at: ${APPROVED_AT:-now}"
       
-      - name: Run validation script
+      - name: Verify PR Exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_PAT }}
         run: |
+          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          
+          echo "🔍 Verifying PR #$PR_NUMBER exists..."
+          if ! gh pr view "$PR_NUMBER" --json number,state,headRefName; then
+            echo "❌ PR #$PR_NUMBER not found"
+            exit 1
+          fi
+          
+          PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
+          if [ "$PR_STATE" != "OPEN" ]; then
+            echo "❌ PR #$PR_NUMBER is not open (state: $PR_STATE)"
+            exit 1
+          fi
+          
+          echo "✅ PR #$PR_NUMBER is open and ready"
+      
+      - name: Run Pre-Merge Validation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_PAT }}
+        run: |
+          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          
+          # Get PR branch name
+          BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+          echo "📦 Branch: $BRANCH"
+          
+          # Checkout PR branch for validation
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          
+          # Run validation script if exists
           if [ -f .github/scripts/apply-changes.sh ]; then
             echo "🔍 Running validation..."
-            bash .github/scripts/apply-changes.sh "${{ steps.payload.outputs.task_id }}"
+            bash .github/scripts/apply-changes.sh "PR-$PR_NUMBER"
           else
             echo "⚠️  No validation script found, skipping"
           fi
       
-      - name: Push to main
+      - name: Merge PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_PAT }}
         run: |
-          echo "⬆️  Pushing to main"
-          git push origin main
+          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          APPROVED_BY="${{ steps.payload.outputs.approved_by }}"
+          
+          echo "🔀 Merging PR #$PR_NUMBER..."
+          
+          # Merge with squash and delete branch
+          gh pr merge "$PR_NUMBER" \
+            --squash \
+            --delete-branch \
+            --subject "Merge PR #$PR_NUMBER (approved by $APPROVED_BY)" \
+            --body "Automated merge via Telegram approval gate"
+          
+          echo "✅ PR #$PR_NUMBER merged successfully"
       
-      - name: Get commit SHA
+      - name: Get Merge Commit SHA
         id: commit
         run: |
-          SHA=$(git rev-parse HEAD)
+          # Wait a moment for merge to complete
+          sleep 2
+          
+          # Get latest commit on main
+          git fetch origin main
+          SHA=$(git rev-parse origin/main)
+          
           echo "sha=$SHA" >> $GITHUB_OUTPUT
-          echo "✅ Committed: $SHA"
+          echo "✅ Merge commit: $SHA"
       
-      - name: Notify completion (optional)
+      - name: Notify Completion
         if: always()
         run: |
+          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          COMMIT_SHA="${{ steps.commit.outputs.sha }}"
+          STATUS="${{ job.status }}"
+          
+          echo "📢 Execution completed"
+          echo "PR: #$PR_NUMBER"
+          echo "Commit: $COMMIT_SHA"
+          echo "Status: $STATUS"
+          
           # Future: Send webhook to Make → Telegram notification
-          echo "📢 Task ${{ steps.payload.outputs.task_id }} completed"
-          echo "Commit: ${{ steps.commit.outputs.sha }}"
-          echo "Status: ${{ job.status }}"
+          # curl -X POST "${{ secrets.MAKE_WEBHOOK_URL }}" \
+          #   -H "Content-Type: application/json" \
+          #   -d "{\"pr\":$PR_NUMBER,\"commit\":\"$COMMIT_SHA\",\"status\":\"$STATUS\"}"
 
   rollback:
     name: Rollback on Failure
     runs-on: ubuntu-latest
     needs: execute
     if: failure()
+    
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -140,9 +214,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
       
-      - name: Revert last commit
+      - name: Revert Last Commit
         run: |
-          echo "🔙 Rolling back last commit"
+          echo "🔙 Rolling back last commit on main"
+          git fetch origin main
+          git checkout main
           git revert HEAD --no-edit
           git push origin main
           echo "✅ Rollback complete"
+      
+      - name: Notify Rollback
+        if: always()
+        run: |
+          echo "🚨 Rollback executed due to merge failure"
+          # Future: Send alert to Telegram
