@@ -1,0 +1,148 @@
+name: Execute on Approval
+
+# Triggered by repository_dispatch with event_type: merge_approved
+# Purpose: Auto-merge approved branches via Telegram gate
+# Security: Verifies secrets before execution, no secret printing
+
+on:
+  repository_dispatch:
+    types: [merge_approved]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-secrets:
+    name: Verify Required Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      secrets_valid: ${{ steps.check.outputs.valid }}
+    steps:
+      - name: Check secrets presence
+        id: check
+        run: |
+          # Verify secrets exist (without printing values)
+          MISSING=""
+          
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            MISSING="${MISSING}TELEGRAM_BOT_TOKEN "
+          fi
+          
+          if [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            MISSING="${MISSING}TELEGRAM_CHAT_ID "
+          fi
+          
+          if [ -z "${{ secrets.GITHUB_PAT }}" ]; then
+            MISSING="${MISSING}GITHUB_PAT "
+          fi
+          
+          if [ -z "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
+            MISSING="${MISSING}MAKE_WEBHOOK_URL "
+          fi
+          
+          if [ -n "$MISSING" ]; then
+            echo "❌ Missing secrets: $MISSING"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All required secrets present"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          fi
+
+  execute:
+    name: Execute Approved Merge
+    runs-on: ubuntu-latest
+    needs: verify-secrets
+    if: needs.verify-secrets.outputs.secrets_valid == 'true'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_PAT }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Parse payload
+        id: payload
+        run: |
+          echo "task_id=${{ github.event.client_payload.task_id }}" >> $GITHUB_OUTPUT
+          echo "branch=${{ github.event.client_payload.branch_to_merge }}" >> $GITHUB_OUTPUT
+          echo "approved_by=${{ github.event.client_payload.approved_by }}" >> $GITHUB_OUTPUT
+          echo "approved_at=${{ github.event.client_payload.approved_at }}" >> $GITHUB_OUTPUT
+      
+      - name: Verify branch exists
+        run: |
+          BRANCH="${{ steps.payload.outputs.branch }}"
+          if ! git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "❌ Branch $BRANCH does not exist"
+            exit 1
+          fi
+          echo "✅ Branch $BRANCH exists"
+      
+      - name: Fetch and merge branch
+        run: |
+          BRANCH="${{ steps.payload.outputs.branch }}"
+          echo "🔄 Fetching branch: $BRANCH"
+          git fetch origin "$BRANCH"
+          
+          echo "🔄 Merging $BRANCH into main"
+          git merge "origin/$BRANCH" --no-ff -m "Merge $BRANCH (approved by ${{ steps.payload.outputs.approved_by }})"
+      
+      - name: Run validation script
+        run: |
+          if [ -f .github/scripts/apply-changes.sh ]; then
+            echo "🔍 Running validation..."
+            bash .github/scripts/apply-changes.sh "${{ steps.payload.outputs.task_id }}"
+          else
+            echo "⚠️  No validation script found, skipping"
+          fi
+      
+      - name: Push to main
+        run: |
+          echo "⬆️  Pushing to main"
+          git push origin main
+      
+      - name: Get commit SHA
+        id: commit
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "✅ Committed: $SHA"
+      
+      - name: Notify completion (optional)
+        if: always()
+        run: |
+          # Future: Send webhook to Make → Telegram notification
+          echo "📢 Task ${{ steps.payload.outputs.task_id }} completed"
+          echo "Commit: ${{ steps.commit.outputs.sha }}"
+          echo "Status: ${{ job.status }}"
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: execute
+    if: failure()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_PAT }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Revert last commit
+        run: |
+          echo "🔙 Rolling back last commit"
+          git revert HEAD --no-edit
+          git push origin main
+          echo "✅ Rollback complete"
