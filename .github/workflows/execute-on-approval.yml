@@ -145,6 +145,7 @@ jobs:
           fi
       
       - name: Merge PR
+        id: merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -161,6 +162,7 @@ jobs:
             --body "Automated merge via Telegram approval gate"
           
           echo "✅ PR #$PR_NUMBER merged successfully"
+          echo "merged=true" >> $GITHUB_OUTPUT
       
       - name: Get Merge Commit SHA
         id: commit
@@ -175,6 +177,23 @@ jobs:
           echo "sha=$SHA" >> $GITHUB_OUTPUT
           echo "✅ Merge commit: $SHA"
       
+      - name: Notify Telegram (post-merge)
+        if: success() && steps.merge.outputs.merged == 'true'
+        run: |
+          PR_NUMBER="${{ steps.payload.outputs.pr_number }}"
+          COMMIT_SHA="${{ steps.commit.outputs.sha }}"
+          
+          echo "📢 Sending success notification to Telegram..."
+          
+          # Send Telegram notification
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=✅ Merged PR #${PR_NUMBER} to main (approved via Telegram)%0A%0ACommit: ${COMMIT_SHA:0:7}%0AStatus: Success" \
+            -d "disable_web_page_preview=true"
+          
+          echo "✅ Telegram notification sent"
+      
       - name: Notify Completion
         if: always()
         run: |
@@ -186,11 +205,6 @@ jobs:
           echo "PR: #$PR_NUMBER"
           echo "Commit: $COMMIT_SHA"
           echo "Status: $STATUS"
-          
-          # Future: Send webhook to Make → Telegram notification
-          # curl -X POST "${{ secrets.MAKE_WEBHOOK_URL }}" \
-          #   -H "Content-Type: application/json" \
-          #   -d "{\"pr\":$PR_NUMBER,\"commit\":\"$COMMIT_SHA\",\"status\":\"$STATUS\"}"
 
   rollback:
     name: Rollback on Failure
@@ -219,8 +233,15 @@ jobs:
           git push origin main
           echo "✅ Rollback complete"
       
-      - name: Notify Rollback
+      - name: Notify Rollback to Telegram
         if: always()
         run: |
-          echo "🚨 Rollback executed due to merge failure"
-          # Future: Send alert to Telegram
+          echo "📢 Sending rollback notification to Telegram..."
+          
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=🚨 Rollback executed due to merge failure%0A%0AStatus: Failed%0AAction: Last commit reverted" \
+            -d "disable_web_page_preview=true"
+          
+          echo "✅ Rollback notification sent to Telegram"
