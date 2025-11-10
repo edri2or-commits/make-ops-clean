@@ -1,0 +1,167 @@
+name: Telegram Gate Dispatcher
+
+# Purpose: Receive repository_dispatch from Make.com Telegram Gate
+# Location: Default branch (required for repository_dispatch to trigger)
+# Logic: Minimal wrapper - delegates to execute-on-approval.yml logic
+# Security: Kill-switch, secrets verification, no PAT required
+
+on:
+  repository_dispatch:
+    types: [merge_approved]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-and-dispatch:
+    name: Verify and Execute Merge
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Kill Switch Check
+        id: killswitch
+        run: |
+          # Kill switch: Check EXEC_ENABLED variable (default: true)
+          EXEC_ENABLED="${{ vars.EXEC_ENABLED }}"
+          
+          if [ -z "$EXEC_ENABLED" ]; then
+            EXEC_ENABLED="true"
+          fi
+          
+          if [ "$EXEC_ENABLED" != "true" ]; then
+            echo "🛑 Kill switch activated: EXEC_ENABLED=$EXEC_ENABLED"
+            exit 78
+          else
+            echo "✅ Execution enabled"
+          fi
+      
+      - name: Verify Secrets
+        run: |
+          # Verify secrets exist (without printing values)
+          MISSING=""
+          
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            MISSING="${MISSING}TELEGRAM_BOT_TOKEN "
+          fi
+          
+          if [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            MISSING="${MISSING}TELEGRAM_CHAT_ID "
+          fi
+          
+          if [ -n "$MISSING" ]; then
+            echo "❌ Missing secrets: $MISSING"
+            exit 1
+          else
+            echo "✅ All required secrets present"
+          fi
+      
+      - name: Resolve PR Number
+        id: resolve
+        run: |
+          PR_NUMBER="${{ github.event.client_payload.pr_number }}"
+          APPROVAL_ID="${{ github.event.client_payload.approval_id }}"
+          
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ Missing pr_number in payload"
+            exit 1
+          fi
+          
+          # Log approval_id if present (audit trail)
+          if [ -n "$APPROVAL_ID" ]; then
+            echo "🔍 APPROVAL_ID=$APPROVAL_ID"
+          fi
+          
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "✅ Resolved PR Number: $PR_NUMBER"
+      
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Verify PR Exists and is Open
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          
+          echo "🔍 Verifying PR #$PR_NUMBER exists and is open..."
+          if ! gh pr view "$PR_NUMBER" --json number,state,headRefName; then
+            echo "❌ PR #$PR_NUMBER not found"
+            exit 1
+          fi
+          
+          PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
+          if [ "$PR_STATE" != "OPEN" ]; then
+            echo "❌ PR #$PR_NUMBER is not open (state: $PR_STATE)"
+            exit 1
+          fi
+          
+          echo "✅ PR #$PR_NUMBER is open and ready"
+      
+      - name: Merge PR
+        id: merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          APPROVED_BY="${{ github.event.client_payload.approved_by }}"
+          
+          echo "🔀 Merging PR #$PR_NUMBER via Telegram Gate..."
+          
+          # Merge with squash and delete branch
+          gh pr merge "$PR_NUMBER" \
+            --squash \
+            --delete-branch \
+            --subject "Merge PR #$PR_NUMBER (approved by ${APPROVED_BY:-Telegram})" \
+            --body "Automated merge via Telegram Gate (repository_dispatch)"
+          
+          echo "✅ PR #$PR_NUMBER merged successfully"
+          echo "merged=true" >> $GITHUB_OUTPUT
+      
+      - name: Get Merge Commit SHA
+        id: commit
+        run: |
+          # Wait for merge to complete
+          sleep 2
+          
+          # Get latest commit on main
+          git fetch origin main
+          SHA=$(git rev-parse origin/main)
+          
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "✅ Merge commit: $SHA"
+      
+      - name: Notify Telegram (Success)
+        if: success() && steps.merge.outputs.merged == 'true'
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          COMMIT_SHA="${{ steps.commit.outputs.sha }}"
+          
+          echo "📢 Sending success notification to Telegram..."
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=✅ Merged PR #${PR_NUMBER} to main%0A%0ACommit: ${COMMIT_SHA:0:7}%0ATrigger: Telegram Gate (default branch dispatcher)%0AStatus: Success" \
+            -d "disable_web_page_preview=true"
+          
+          echo "✅ Telegram notification sent"
+      
+      - name: Notify Telegram (Failure)
+        if: failure()
+        run: |
+          PR_NUMBER="${PR_NUMBER:-unknown}"
+          
+          echo "📢 Sending failure notification to Telegram..."
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=❌ Failed to merge PR #${PR_NUMBER}%0A%0ATrigger: Telegram Gate%0AStatus: Failed%0A%0ACheck Actions logs for details." \
+            -d "disable_web_page_preview=true"
+          
+          echo "✅ Failure notification sent to Telegram"
