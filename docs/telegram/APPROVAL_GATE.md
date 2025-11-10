@@ -315,10 +315,102 @@ The `approval_id` field enables end-to-end traceability:
 
 ---
 
-## Next Steps
+## Verification (prod)
 
-1. ✅ Configure Telegram webhook with `secret_token`
-2. ✅ Create Make.com scenario using blueprint
-3. ✅ Test with PR #85 (E2E test)
-4. ✅ Monitor GitHub Actions logs for first approval
-5. ✅ Verify Telegram post-merge notification
+### Step 1: Configure Telegram Webhook
+
+Set up Telegram webhook with secret token validation:
+
+```bash
+curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "${MAKE_WEBHOOK_URL}",
+    "secret_token": "${WEBHOOK_SECRET}"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "ok": true,
+  "result": true,
+  "description": "Webhook was set"
+}
+```
+
+**Critical**: Make.com scenario **must** validate the `X-Telegram-Bot-Api-Secret-Token` header matches `${WEBHOOK_SECRET}`. Reject requests without valid token.
+
+---
+
+### Step 2: Production Dispatch Payload
+
+When user clicks ✅ in Telegram, Make.com extracts `callback_query.data.pr` and sends:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github.v3+json" \
+  -H "Content-Type: application/json" \
+  https://api.github.com/repos/edri2or-commits/make-ops-clean/dispatches \
+  -d '{
+    "event_type": "merge_approved",
+    "client_payload": {
+      "pr_number": 85,
+      "approval_id": "tg:${MESSAGE_ID}"
+    }
+  }'
+```
+
+**Mapping Requirements**:
+- `callback_query.data.pr` → `client_payload.pr_number` (Required)
+- `callback_query.id` or `callback_query.message.message_id` → `client_payload.approval_id` (Optional)
+
+**Expected Response**: HTTP 204 No Content (success)
+
+---
+
+### Step 3: User Acknowledgment
+
+After sending dispatch, Make.com acknowledges to Telegram user:
+
+```bash
+curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "callback_query_id": "${CALLBACK_QUERY_ID}",
+    "text": "✅ Approval sent to GitHub Actions"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "ok": true,
+  "result": true
+}
+```
+
+This provides immediate feedback to the user that their approval was received and processed.
+
+---
+
+## Production Checklist
+
+Before going live with Telegram gate:
+
+- [ ] Telegram webhook configured with `secret_token`
+- [ ] Make.com scenario imported from blueprint
+- [ ] Secret header validation enabled in Make.com webhook
+- [ ] Mapping verified: `callback_query.data.pr` → `client_payload.pr_number`
+- [ ] GitHub secrets configured: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAKE_WEBHOOK_URL`
+- [ ] Repository variable `EXEC_ENABLED` set (or defaults to `true`)
+- [ ] Workflow `execute-on-approval.yml` on `main` branch
+- [ ] Test PR created with label `needs-telegram-approval`
+- [ ] answerCallbackQuery configured for user feedback
+
+**After first approval**:
+- [ ] Monitor GitHub Actions run for `repository_dispatch` event
+- [ ] Verify PR merged successfully
+- [ ] Confirm Telegram post-merge notification received
+- [ ] Check `APPROVAL_ID` appears in workflow logs (audit trail)
