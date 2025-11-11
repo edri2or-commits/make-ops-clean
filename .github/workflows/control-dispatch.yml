@@ -1,7 +1,7 @@
 name: control-dispatch
 on:
   schedule:
-    - cron: "* * * * *"  # Accelerated: every minute (temporary)
+    - cron: "*/5 * * * *"  # Restored: every 5 minutes
   repository_dispatch:
     types: [eval_dod]
   workflow_dispatch:
