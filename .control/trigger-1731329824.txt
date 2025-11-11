@@ -1,0 +1,4 @@
+Trigger timestamp: 2025-11-11T11:57:04Z
+Target ref: feature/pr-9-workspace-smoke
+Initiated by: Claude (MCP)
+Purpose: Zero-Touch E2E loop activation

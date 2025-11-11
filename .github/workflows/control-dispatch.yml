@@ -2,6 +2,9 @@ name: control-dispatch
 on:
   schedule:
     - cron: "* * * * *"  # Accelerated: every minute (temporary)
+  push:
+    paths:
+      - '.control/**'  # MCP-native trigger path
   repository_dispatch:
     types: [eval_dod]
   workflow_dispatch:
