@@ -1,7 +1,7 @@
 name: control-dispatch
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "* * * * *"  # Accelerated: every minute (temporary)
   repository_dispatch:
     types: [eval_dod]
   workflow_dispatch:
@@ -13,37 +13,55 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout for lock
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check lock
+        id: check_lock
+        run: |
+          mkdir -p .control/locks
+          if ls .control/locks/dispatch-*.lock 1> /dev/null 2>&1; then
+            echo "🔒 Dispatch lock exists - skipping"
+            echo "locked=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ No lock - proceeding"
+            echo "locked=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Try GitHub App Token
+        if: steps.check_lock.outputs.locked != 'true'
         id: app_token
-        if: vars.GH_APP_ID != '' && secrets.GH_APP_PRIVATE_KEY_PEM != ''
+        continue-on-error: true
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ vars.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY_PEM }}
+          app-id: ${{ vars.GH_APP_ID || '' }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY_PEM || '' }}
           owner: edri2or-commits
           repositories: make-ops-clean
-        continue-on-error: true
 
       - name: Dispatch eval-dod
+        if: steps.check_lock.outputs.locked != 'true'
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token || secrets.PAT_AUTOMATION || secrets.GITHUB_TOKEN }}
         run: |
           REF="${{ inputs.target_ref || github.event.client_payload.target_ref || 'feature/pr-9-workspace-smoke' }}"
-          echo "Dispatching eval-dod.yml on ref: $REF"
+          echo "🎯 Dispatching eval-dod.yml on ref: $REF"
           
           # Determine token source for logging
           if [ -n "${{ steps.app_token.outputs.token }}" ]; then
-            echo "Using: GitHub App token"
+            echo "🔑 Using: GitHub App token"
           elif [ -n "${{ secrets.PAT_AUTOMATION }}" ]; then
-            echo "Using: PAT_AUTOMATION"
+            echo "🔑 Using: PAT_AUTOMATION"
           else
-            echo "Using: GITHUB_TOKEN (may fail for workflow_dispatch)"
+            echo "⚠️  Using: GITHUB_TOKEN (limited dispatch capability)"
           fi
           
           curl -sf -X POST \
@@ -54,3 +72,16 @@ jobs:
             -d "{\"ref\":\"$REF\",\"inputs\":{\"target_ref\":\"$REF\"}}" \
             && echo "✅ Dispatch successful" \
             || echo "❌ Dispatch failed - check token permissions"
+
+      - name: Create dispatch lock
+        if: steps.check_lock.outputs.locked != 'true'
+        run: |
+          TS=$(date +%s)
+          mkdir -p .control/locks
+          touch ".control/locks/dispatch-$TS.lock"
+          echo "Dispatched at: $(date -u)" > ".control/locks/dispatch-$TS.lock"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .control/locks/
+          git commit -m "chore(control): create dispatch lock [auto-revert pending]"
+          git push
