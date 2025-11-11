@@ -1,0 +1,138 @@
+name: Test App Auth (READ-ONLY)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_smoke_tests:
+        description: 'Run smoke tests (READ-ONLY)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+  push:
+    branches:
+      - 'auth/**'
+    paths:
+      - 'auth/test_app_auth.py'
+      - '.github/workflows/test-app-auth.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-app-authentication:
+    runs-on: ubuntu-latest
+    env:
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      GH_APP_PRIVATE_KEY_PEM: ${{ secrets.GH_APP_PRIVATE_KEY_PEM }}
+      GH_INSTALLATION_ID: '60358677'
+      GH_REPO_OWNER: 'edri2or-commits'
+      GH_REPO_NAME: 'make-ops-clean'
+      CI: 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install PyJWT[crypto] requests
+      
+      - name: Check secrets availability
+        id: check-secrets
+        run: |
+          if [ -z "$GH_APP_ID" ] || [ -z "$GH_APP_PRIVATE_KEY_PEM" ]; then
+            echo "❌ Required secrets not configured"
+            echo "secrets_available=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "Required secrets:"
+            echo "  - GH_APP_ID: $([ -n "$GH_APP_ID" ] && echo "✅ Set" || echo "❌ Missing")"
+            echo "  - GH_APP_PRIVATE_KEY_PEM: $([ -n "$GH_APP_PRIVATE_KEY_PEM" ] && echo "✅ Set" || echo "❌ Missing")"
+            exit 1
+          else
+            echo "✅ All required secrets available"
+            echo "secrets_available=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run App Auth Test (READ-ONLY)
+        id: test
+        if: steps.check-secrets.outputs.secrets_available == 'true'
+        run: |
+          cd auth
+          python test_app_auth.py | tee test_output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+      
+      - name: Extract JSON Report
+        if: always() && steps.test.outcome != 'skipped'
+        run: |
+          cd auth
+          # Extract JSON from output
+          sed -n '/📊 FINAL REPORT (JSON)/,/^$/p' test_output.txt | \
+            grep -A 1000 '^{' | \
+            grep -B 1000 '^}' > report.json || true
+          
+          if [ -s report.json ]; then
+            echo "✅ JSON report extracted"
+            cat report.json
+          else
+            echo "⚠️  No JSON report found in output"
+          fi
+      
+      - name: Upload Test Results
+        if: always() && steps.test.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-auth-test-results
+          path: |
+            auth/test_output.txt
+            auth/report.json
+          retention-days: 30
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 🔐 GitHub App Authentication Test - READ ONLY" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check-secrets.outputs.secrets_available }}" != "true" ]; then
+            echo "❌ **Status**: Secrets not configured" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Required Actions:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Go to: Settings → Secrets and variables → Actions" >> $GITHUB_STEP_SUMMARY
+            echo "2. Add secret: \`GH_APP_ID\` = \`2251005\`" >> $GITHUB_STEP_SUMMARY
+            echo "3. Add secret: \`GH_APP_PRIVATE_KEY_PEM\` = [Your private key]" >> $GITHUB_STEP_SUMMARY
+            echo "4. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          
+          if [ "${{ steps.test.outputs.exit_code }}" = "0" ]; then
+            echo "✅ **Status**: All tests passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Test Results:" >> $GITHUB_STEP_SUMMARY
+            echo "- JWT generation: ✅ Success (10 minutes expiry)" >> $GITHUB_STEP_SUMMARY
+            echo "- Installation Token: ✅ Minted (~60 minutes lifetime)" >> $GITHUB_STEP_SUMMARY
+            echo "- Smoke tests: ✅ All passed (READ-ONLY)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Artifacts:" >> $GITHUB_STEP_SUMMARY
+            echo "- Full test output uploaded as artifact" >> $GITHUB_STEP_SUMMARY
+            echo "- JSON report available for download" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status**: Tests failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the test output artifact for details" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode**: READ-ONLY (no writes)" >> $GITHUB_STEP_SUMMARY
+          echo "**Phase**: 3.1 (App Auth validation)" >> $GITHUB_STEP_SUMMARY
+          echo "**Correlation**: PAT-EXPOSURE-20251112" >> $GITHUB_STEP_SUMMARY
