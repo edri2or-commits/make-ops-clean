@@ -1,0 +1,7 @@
+Force execution trigger
+Timestamp: 2025-11-11T12:06:16Z
+Target: feature/pr-9-workspace-smoke
+PR: #88
+Initiator: Claude (MCP)
+Reason: Manual verification of autonomous loop
+Expected: control-dispatch → repository_dispatch → eval-dod
