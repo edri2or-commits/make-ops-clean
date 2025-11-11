@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """
-GitHub App Authentication Test - READ ONLY
+GitHub App Authentication Test - READ ONLY (Cloud-ready)
 Validates JWT generation and Installation Token minting
 NO WRITES - Only GET operations for smoke tests
+
+Supports multiple credential sources:
+- GitHub Actions Secret (GH_APP_PRIVATE_KEY_PEM)
+- Google Secret Manager
+- Environment variable
+- File path (for local testing)
 """
 
 import json
 import time
 import sys
+import os
 from datetime import datetime, timedelta
 
 try:
@@ -20,58 +27,52 @@ except ImportError:
     import jwt
     import requests
 
-# Windows Credential Manager read
-def read_credential_manager(target_name):
-    """Read credential from Windows Credential Manager"""
+def read_private_key():
+    """
+    Read private key from multiple sources (in order of preference):
+    1. Environment variable: GH_APP_PRIVATE_KEY_PEM
+    2. Google Secret Manager (if available)
+    3. File path: GH_APP_PRIVATE_KEY_FILE
+    """
+    # Try environment variable first (GitHub Actions Secret)
+    if 'GH_APP_PRIVATE_KEY_PEM' in os.environ:
+        print("✅ Reading private key from environment variable (GitHub Secret)")
+        key = os.environ['GH_APP_PRIVATE_KEY_PEM']
+        # Handle potential base64 encoding or escaped newlines
+        if '\\n' in key:
+            key = key.replace('\\n', '\n')
+        return key
+    
+    # Try Google Secret Manager
     try:
-        import ctypes
-        from ctypes import wintypes
-        
-        # Load Windows Credential API
-        advapi32 = ctypes.windll.advapi32
-        
-        # Define structures
-        class CREDENTIAL(ctypes.Structure):
-            _fields_ = [
-                ("Flags", wintypes.DWORD),
-                ("Type", wintypes.DWORD),
-                ("TargetName", wintypes.LPWSTR),
-                ("Comment", wintypes.LPWSTR),
-                ("LastWritten", wintypes.FILETIME),
-                ("CredentialBlobSize", wintypes.DWORD),
-                ("CredentialBlob", ctypes.POINTER(wintypes.BYTE)),
-                ("Persist", wintypes.DWORD),
-                ("AttributeCount", wintypes.DWORD),
-                ("Attributes", ctypes.c_void_p),
-                ("TargetAlias", wintypes.LPWSTR),
-                ("UserName", wintypes.LPWSTR),
-            ]
-        
-        # Call CredReadW
-        pcredential = ctypes.POINTER(CREDENTIAL)()
-        
-        result = advapi32.CredReadW(
-            target_name,
-            1,  # CRED_TYPE_GENERIC
-            0,
-            ctypes.byref(pcredential)
-        )
-        
-        if result == 0:
-            return None
-        
-        # Extract credential blob
-        blob_size = pcredential.contents.CredentialBlobSize
-        blob_data = ctypes.string_at(pcredential.contents.CredentialBlob, blob_size)
-        
-        # Free credential
-        advapi32.CredFree(pcredential)
-        
-        return blob_data.decode('utf-8')
-        
+        from google.cloud import secretmanager
+        print("🔍 Attempting to read from Google Secret Manager...")
+        client = secretmanager.SecretManagerServiceClient()
+        project_id = os.environ.get('GCP_PROJECT_ID', 'your-project-id')
+        secret_id = os.environ.get('GH_APP_SECRET_NAME', 'github-app-2251005-private-key')
+        name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        print(f"✅ Reading private key from Google Secret Manager ({secret_id})")
+        return response.payload.data.decode('utf-8')
+    except ImportError:
+        pass  # Google Secret Manager not available
     except Exception as e:
-        print(f"❌ Failed to read from Credential Manager: {e}")
-        return None
+        print(f"⚠️  Google Secret Manager not available: {e}")
+    
+    # Try file path
+    if 'GH_APP_PRIVATE_KEY_FILE' in os.environ:
+        file_path = os.environ['GH_APP_PRIVATE_KEY_FILE']
+        print(f"✅ Reading private key from file: {file_path}")
+        with open(file_path, 'r') as f:
+            return f.read()
+    
+    # No source available
+    print("❌ No private key source found")
+    print("   Set one of:")
+    print("   - GH_APP_PRIVATE_KEY_PEM (environment variable / GitHub Secret)")
+    print("   - GH_APP_PRIVATE_KEY_FILE (path to .pem file)")
+    print("   - Google Secret Manager (with GCP_PROJECT_ID and GH_APP_SECRET_NAME)")
+    return None
 
 def generate_jwt(app_id, private_key_pem, exp_minutes=10):
     """Generate GitHub App JWT"""
@@ -195,32 +196,32 @@ def smoke_test_readonly(token, owner, repo):
     return results
 
 def main():
-    print("🔐 GitHub App Authentication Test - READ ONLY")
+    print("🔐 GitHub App Authentication Test - READ ONLY (Cloud)")
     print("=" * 60)
     
     # Configuration
-    APP_ID = "2251005"
-    INSTALLATION_ID = "60358677"  # edri2or-commits installation
-    OWNER = "edri2or-commits"
-    REPO = "make-ops-clean"
-    CM_TARGET = "github-app-2251005-private-key"
+    APP_ID = os.environ.get('GH_APP_ID', '2251005')
+    INSTALLATION_ID = os.environ.get('GH_INSTALLATION_ID', '60358677')
+    OWNER = os.environ.get('GH_REPO_OWNER', 'edri2or-commits')
+    REPO = os.environ.get('GH_REPO_NAME', 'make-ops-clean')
     
-    # Step 1: Read private key from Credential Manager
-    print(f"\n📋 Step 1: Reading private key from Credential Manager")
-    print(f"   Target: {CM_TARGET}")
+    print(f"\n📋 Configuration:")
+    print(f"   App ID: {APP_ID}")
+    print(f"   Installation ID: {INSTALLATION_ID}")
+    print(f"   Repository: {OWNER}/{REPO}")
     
-    private_key = read_credential_manager(CM_TARGET)
+    # Step 1: Read private key
+    print(f"\n📋 Step 1: Reading private key")
+    
+    private_key = read_private_key()
     
     if not private_key:
-        print(f"❌ Failed to read credential from Windows Credential Manager")
-        print(f"   Ensure key is stored as: {CM_TARGET}")
-        return {"error": "credential_manager_read_failed"}
+        return {"error": "private_key_read_failed"}
     
     print(f"✅ Private key retrieved (length: {len(private_key)} chars)")
     
     # Step 2: Generate JWT
     print(f"\n🔑 Step 2: Generating JWT")
-    print(f"   App ID: {APP_ID}")
     print(f"   Expiry: 10 minutes")
     
     try:
@@ -234,7 +235,6 @@ def main():
     
     # Step 3: Mint Installation Token
     print(f"\n🎫 Step 3: Minting Installation Token")
-    print(f"   Installation ID: {INSTALLATION_ID}")
     
     try:
         install_token, install_info = get_installation_token(jwt_token, INSTALLATION_ID)
@@ -250,8 +250,6 @@ def main():
     
     # Step 4: Smoke tests (READ-ONLY)
     print(f"\n🧪 Step 4: Smoke Tests (READ-ONLY)")
-    print(f"   Repository: {OWNER}/{REPO}")
-    print(f"   Tests: repo_meta, issues, prs, workflows")
     
     smoke_results = smoke_test_readonly(install_token, OWNER, REPO)
     
@@ -286,9 +284,9 @@ def main():
         },
         "smoke_details": smoke_results,
         "killswitch": [
-            "DELETE /installation/token (not implemented - token expires in ~1h)",
-            "Revoke App key via UI: https://github.com/settings/apps",
-            "Rotate App key: Generate new private key"
+            "Token expires automatically in ~1h",
+            "Revoke key: https://github.com/settings/apps",
+            "Rotate key: Generate new private key"
         ],
         "status": "✅ all_tests_passed" if all(
             r['status'] == "✅ ok" for r in smoke_results.values()
@@ -300,10 +298,11 @@ def main():
     print("=" * 60)
     print(json.dumps(report, indent=2))
     
-    # Save to file
-    with open('app_auth_test_results.json', 'w') as f:
-        json.dump(report, f, indent=2)
-    print("\n✅ Results saved to: app_auth_test_results.json")
+    # Save to file if not in CI
+    if os.environ.get('CI') != 'true':
+        with open('app_auth_test_results.json', 'w') as f:
+            json.dump(report, f, indent=2)
+        print("\n✅ Results saved to: app_auth_test_results.json")
     
     return report
 
