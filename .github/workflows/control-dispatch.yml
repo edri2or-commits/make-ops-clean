@@ -36,42 +36,24 @@ jobs:
             echo "locked=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Try GitHub App Token
-        if: steps.check_lock.outputs.locked != 'true'
-        id: app_token
-        continue-on-error: true
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ vars.GH_APP_ID || '' }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY_PEM || '' }}
-          owner: edri2or-commits
-          repositories: make-ops-clean
-
-      - name: Dispatch eval-dod
+      - name: Send repository_dispatch to eval-dod
         if: steps.check_lock.outputs.locked != 'true'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token || secrets.PAT_AUTOMATION || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REF="${{ inputs.target_ref || github.event.client_payload.target_ref || 'feature/pr-9-workspace-smoke' }}"
-          echo "🎯 Dispatching eval-dod.yml on ref: $REF"
-          
-          # Determine token source for logging
-          if [ -n "${{ steps.app_token.outputs.token }}" ]; then
-            echo "🔑 Using: GitHub App token"
-          elif [ -n "${{ secrets.PAT_AUTOMATION }}" ]; then
-            echo "🔑 Using: PAT_AUTOMATION"
-          else
-            echo "⚠️  Using: GITHUB_TOKEN (limited dispatch capability)"
-          fi
+          echo "🎯 Sending repository_dispatch to eval-dod"
+          echo "   Type: run_dod"
+          echo "   Target: $REF"
           
           curl -sf -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/edri2or-commits/make-ops-clean/actions/workflows/eval-dod.yml/dispatches \
-            -d "{\"ref\":\"$REF\",\"inputs\":{\"target_ref\":\"$REF\"}}" \
-            && echo "✅ Dispatch successful" \
-            || echo "❌ Dispatch failed - check token permissions"
+            https://api.github.com/repos/edri2or-commits/make-ops-clean/dispatches \
+            -d "{\"event_type\":\"run_dod\",\"client_payload\":{\"target_ref\":\"$REF\"}}" \
+            && echo "✅ Repository dispatch sent successfully" \
+            || echo "❌ Dispatch failed - check permissions"
 
       - name: Create dispatch lock
         if: steps.check_lock.outputs.locked != 'true'
