@@ -3,6 +3,7 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   repository_dispatch:
+    types: [eval_dod]
   workflow_dispatch:
     inputs:
       target_ref:
@@ -18,15 +19,38 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch eval-dod on target ref
+      - name: Try GitHub App Token
+        id: app_token
+        if: vars.GH_APP_ID != '' && secrets.GH_APP_PRIVATE_KEY_PEM != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY_PEM }}
+          owner: edri2or-commits
+          repositories: make-ops-clean
+        continue-on-error: true
+
+      - name: Dispatch eval-dod
         env:
-          GH_TOKEN: ${{ secrets.PAT_AUTOMATION || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token || secrets.PAT_AUTOMATION || secrets.GITHUB_TOKEN }}
         run: |
           REF="${{ inputs.target_ref || github.event.client_payload.target_ref || 'feature/pr-9-workspace-smoke' }}"
           echo "Dispatching eval-dod.yml on ref: $REF"
+          
+          # Determine token source for logging
+          if [ -n "${{ steps.app_token.outputs.token }}" ]; then
+            echo "Using: GitHub App token"
+          elif [ -n "${{ secrets.PAT_AUTOMATION }}" ]; then
+            echo "Using: PAT_AUTOMATION"
+          else
+            echo "Using: GITHUB_TOKEN (may fail for workflow_dispatch)"
+          fi
+          
           curl -sf -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             https://api.github.com/repos/edri2or-commits/make-ops-clean/actions/workflows/eval-dod.yml/dispatches \
-            -d "{\"ref\":\"$REF\"}" || echo "Dispatch failed (may need PAT_AUTOMATION secret)"
+            -d "{\"ref\":\"$REF\",\"inputs\":{\"target_ref\":\"$REF\"}}" \
+            && echo "✅ Dispatch successful" \
+            || echo "❌ Dispatch failed - check token permissions"
