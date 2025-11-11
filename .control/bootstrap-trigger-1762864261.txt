@@ -1,0 +1,6 @@
+Bootstrap trigger
+Timestamp: 2025-11-11T12:31:01Z
+Purpose: Force bootstrap-wif-autonomous and eval-dod to run
+Expected: Bootstrap workflow will probe WIF, create issue if needed
+Then: control-dispatch will trigger eval-dod which will also create bootstrap issue
+Result: Clear diagnostic of what's missing
