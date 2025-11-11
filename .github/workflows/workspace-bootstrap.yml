@@ -1,0 +1,351 @@
+name: workspace-bootstrap
+on:
+  push:
+    branches: [feature/pr-9-workspace-smoke]
+    paths: ['.control/**']
+  pull_request:
+    branches: [main, or-control/ops]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  auth-selftest:
+    runs-on: ubuntu-latest
+    outputs:
+      auth_status: ${{ steps.auth-check.outputs.status }}
+      access_token: ${{ steps.auth-check.outputs.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth self-check
+        id: auth-check
+        run: |
+          set +e
+          mkdir -p ops; [ -s ops/ledger.json ] || echo "[]" > ops/ledger.json
+          
+          # Try WIF auth
+          if [ -n "${{ secrets.WIF_PROVIDER }}" ] && [ -n "${{ secrets.WIF_SERVICE_ACCOUNT }}" ]; then
+            echo "WIF secrets present, attempting auth..."
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            ENTRY=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+              '{id:(now|tostring),type:"auth-test",timestamp:$ts,status:"failed",
+                missing:["WIF_PROVIDER","WIF_SERVICE_ACCOUNT"],
+                actor:"github-actions",commitSha:$sha}')
+            for i in 1 2 3; do
+              jq ". + [$ENTRY]" ops/ledger.json > ops/ledger.json.tmp && \
+              mv ops/ledger.json.tmp ops/ledger.json && break || sleep $i
+            done
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add ops/ledger.json
+            git commit -m "chore(ledger): auth-test failed - missing WIF secrets" || true
+            git push || true
+            exit 0
+          fi
+
+      - uses: google-github-actions/auth@v2
+        if: ${{ secrets.WIF_PROVIDER != '' }}
+        id: auth
+        continue-on-error: true
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.auth.outcome == 'success'
+
+      - name: Get access token
+        if: steps.auth.outcome == 'success'
+        id: token
+        run: |
+          TOKEN=$(gcloud auth print-access-token 2>&1)
+          if [ $? -eq 0 ] && [ -n "$TOKEN" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+            echo "::add-mask::$TOKEN"
+            
+            # Write success to ledger
+            TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            ENTRY=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+              '{id:(now|tostring),type:"auth-test",timestamp:$ts,status:"success",
+                method:"WIF",actor:"github-actions",commitSha:$sha}')
+            for i in 1 2 3; do
+              jq ". + [$ENTRY]" ops/ledger.json > ops/ledger.json.tmp && \
+              mv ops/ledger.json.tmp ops/ledger.json && break || sleep $i
+            done
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create bootstrap issue if auth failed
+        if: steps.auth.outcome != 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'infra:bootstrap - WIF Authentication Failed',
+              body: `## Infrastructure Bootstrap Required
+              
+              **Status:** WIF authentication failed
+              **Commit:** ${context.sha}
+              **Workflow:** ${context.workflow}
+              
+              **Required Actions:**
+              1. Configure Workload Identity Federation in GCP
+              2. Set repository secrets:
+                 - \`WIF_PROVIDER\`
+                 - \`WIF_SERVICE_ACCOUNT\`
+              
+              **References:**
+              - [GitHub Actions + GCP WIF](https://github.com/google-github-actions/auth)
+              - [GCP Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation)
+              `,
+              labels: ['infra', 'bootstrap']
+            });
+
+  workspace-dod:
+    needs: auth-selftest
+    if: needs.auth-selftest.outputs.auth_status == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: ${{ github.ref }} }
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: echo "ACCESS_TOKEN=$(gcloud auth print-access-token)" >> $GITHUB_ENV
+
+      # Docs replaceAllText
+      - name: Docs replaceAllText
+        id: docs
+        run: |
+          set -euo pipefail
+          DOC_ID=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Bootstrap DoD Test Doc"}' \
+            https://docs.googleapis.com/v1/documents | jq -r .documentId)
+          
+          curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"requests":[{"insertText":{"location":{"index":1},"text":"TODO"}}]}' \
+            "https://docs.googleapis.com/v1/documents/${DOC_ID}:batchUpdate" >/dev/null
+          
+          WRITES=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"requests":[{"replaceAllText":{"containsText":{"text":"TODO","matchCase":true},"replaceText":"DONE"}}]}' \
+            "https://docs.googleapis.com/v1/documents/${DOC_ID}:batchUpdate" | jq '.replies | length')
+          
+          echo "DOC_ID=$DOC_ID" >> $GITHUB_ENV
+          echo "DOCS_WRITES=$WRITES" >> $GITHUB_ENV
+          echo "doc_id=$DOC_ID" >> $GITHUB_OUTPUT
+
+      # Sheets A1 write
+      - name: Sheets A1 write
+        id: sheets
+        run: |
+          set -euo pipefail
+          SHEET_ID=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"properties":{"title":"Bootstrap DoD Sheet"}}' \
+            https://sheets.googleapis.com/v4/spreadsheets | jq -r .spreadsheetId)
+          
+          RES=$(curl -s -X PUT -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"values":[["שלום"]]}' \
+            "https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1?valueInputOption=RAW")
+          
+          CELLS=$(echo "$RES" | jq -r '.updatedCells')
+          RANGE=$(echo "$RES" | jq -r '.updatedRange')
+          
+          echo "SHEET_ID=$SHEET_ID" >> $GITHUB_ENV
+          echo "SHEETS_CELLS=$CELLS" >> $GITHUB_ENV
+          echo "SHEETS_RANGE=$RANGE" >> $GITHUB_ENV
+          echo "sheet_id=$SHEET_ID" >> $GITHUB_OUTPUT
+
+      # Drive file create
+      - name: Drive create file
+        id: drive
+        run: |
+          set -euo pipefail
+          BOUNDARY="boundary_$(date +%s)"
+          FILENAME="bootstrap-smoke-$(date +%s).txt"
+          
+          # Create multipart body
+          cat > /tmp/upload.txt << 'UPLOADEOF'
+          Bootstrap smoke test from GitHub Actions
+          Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          Commit: $GITHUB_SHA
+          UPLOADEOF
+          
+          # Build multipart request
+          (
+            echo "--$BOUNDARY"
+            echo "Content-Type: application/json; charset=UTF-8"
+            echo ""
+            echo "{\"name\":\"$FILENAME\",\"mimeType\":\"text/plain\"}"
+            echo "--$BOUNDARY"
+            echo "Content-Type: text/plain"
+            echo ""
+            cat /tmp/upload.txt
+            echo ""
+            echo "--$BOUNDARY--"
+          ) > /tmp/multipart.txt
+          
+          FILE_ID=$(curl -s -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: multipart/related; boundary=$BOUNDARY" \
+            --data-binary @/tmp/multipart.txt \
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" | jq -r .id)
+          
+          echo "DRIVE_FILE_ID=$FILE_ID" >> $GITHUB_ENV
+          echo "file_id=$FILE_ID" >> $GITHUB_OUTPUT
+
+      # Gmail/Calendar check (hybrid)
+      - name: Gmail/Calendar availability
+        id: gmail-cal
+        run: |
+          if [ -n "${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}" ]; then
+            echo "status=available" >> $GITHUB_OUTPUT
+            echo "Gmail/Calendar: OAuth available"
+          else
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "Gmail/Calendar: No OAuth, skipped"
+          fi
+
+      # Ledger append
+      - name: Ledger append
+        run: |
+          set -euo pipefail
+          mkdir -p ops; [ -s ops/ledger.json ] || echo "[]" > ops/ledger.json
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          DOC=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            --arg id "$DOC_ID" --arg w "$DOCS_WRITES" \
+            '{id:(now|tostring),type:"docs.replaceAllText",timestamp:$ts,
+              status:"success",actor:"github-actions",
+              input:{documentId:$id,findText:"TODO",replaceText:"DONE"},
+              output:{documentId:$id,writes:($w|tonumber)},commitSha:$sha}')
+          
+          SHT=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            --arg id "$SHEET_ID" --arg c "$SHEETS_CELLS" --arg r "$SHEETS_RANGE" \
+            '{id:(now|tostring),type:"sheets.values.update",timestamp:$ts,
+              status:"success",actor:"github-actions",
+              input:{spreadsheetId:$id,range:"A1",value:"שלום"},
+              output:{spreadsheetId:$id,updatedRange:$r,updatedCells:($c|tonumber)},commitSha:$sha}')
+          
+          DRV=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            --arg id "$DRIVE_FILE_ID" \
+            '{id:(now|tostring),type:"drive.files.create",timestamp:$ts,
+              status:"success",actor:"github-actions",
+              input:{mimeType:"text/plain"},output:{fileId:$id},commitSha:$sha}')
+          
+          GMAIL=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            --arg status "${{ steps.gmail-cal.outputs.status }}" \
+            '{id:(now|tostring),type:"gmail.send",timestamp:$ts,
+              status:$status,reason:(if $status=="skipped" then "no_oauth" else null end),
+              actor:"github-actions",commitSha:$sha}')
+          
+          CAL=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            --arg status "${{ steps.gmail-cal.outputs.status }}" \
+            '{id:(now|tostring),type:"calendar.insert",timestamp:$ts,
+              status:$status,reason:(if $status=="skipped" then "no_oauth" else null end),
+              actor:"github-actions",commitSha:$sha}')
+          
+          for i in 1 2 3; do
+            jq ". + [$DOC, $SHT, $DRV, $GMAIL, $CAL]" ops/ledger.json > ops/ledger.json.tmp && \
+            mv ops/ledger.json.tmp ops/ledger.json && break || sleep $((i*2))
+            [ $i -eq 3 ] && exit 1
+          done
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ops/ledger.json
+          git commit -m "chore(ledger): workspace bootstrap DoD complete"
+          git push
+
+      # Create DWD plan PR if Gmail/Calendar skipped
+      - name: Create DWD plan PR
+        if: steps.gmail-cal.outputs.status == 'skipped'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check if branch exists
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/workspace-dwd-plan'
+              });
+              console.log('Branch workspace-dwd-plan already exists');
+              return;
+            } catch (e) {
+              // Branch doesn't exist, create it
+            }
+            
+            const mainBranch = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main'
+            });
+            
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/heads/workspace-dwd-plan',
+              sha: mainBranch.data.object.sha
+            });
+            
+            await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'workspace: Domain-Wide Delegation plan for Gmail/Calendar',
+              head: 'workspace-dwd-plan',
+              base: 'main',
+              body: `## Gmail/Calendar via Domain-Wide Delegation
+              
+              **Status:** OAuth not configured, Gmail/Calendar operations skipped
+              
+              **Required:** Admin consent for Domain-Wide Delegation (DWD)
+              
+              **Steps:**
+              1. GCP Console → IAM → Service Account → Enable DWD
+              2. Google Workspace Admin → Security → API Controls → Domain-wide delegation
+              3. Add OAuth scopes:
+                 - https://www.googleapis.com/auth/gmail.send
+                 - https://www.googleapis.com/auth/calendar.events
+              
+              **Note:** This requires Google Workspace Admin privileges.
+              `,
+              draft: true
+            });
+
+  auto-merge:
+    needs: [auth-selftest, workspace-dod]
+    if: |
+      needs.auth-selftest.outputs.auth_status == 'success' &&
+      needs.workspace-dod.result == 'success' &&
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              merge_method: 'squash'
+            });

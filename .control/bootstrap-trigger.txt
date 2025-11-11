@@ -1,0 +1,2 @@
+Bootstrap trigger at 2025-11-11T02:07:00Z
+Commit: self-bootstrap with full workspace DoD
