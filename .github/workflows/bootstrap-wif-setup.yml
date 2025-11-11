@@ -1,0 +1,229 @@
+name: bootstrap-wif-setup
+on:
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: 'GCP Project ID'
+        required: true
+      repo:
+        description: 'GitHub repository (owner/name)'
+        default: 'edri2or-commits/make-ops-clean'
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  setup-wif:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Display Instructions
+        run: |
+          cat << 'EOF'
+          # ⚠️ Manual Bootstrap Required
+          
+          This workflow cannot auto-create GCP infrastructure without existing credentials.
+          
+          ## Run this script locally (5 minutes):
+          
+          ```bash
+          #!/bin/bash
+          set -euo pipefail
+          
+          # Configuration
+          export REPO="edri2or-commits/make-ops-clean"
+          export BRANCH="feature/pr-9-workspace-smoke"
+          export PROJECT_ID="YOUR_GCP_PROJECT_ID"  # Replace this
+          
+          # Discover
+          export PROJECT_NUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+          export POOL_ID="github-pool"
+          export PROVIDER_ID="github-provider"
+          export SA_NAME="ops-mcp"
+          export SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+          
+          # Create WIF Pool (idempotent)
+          gcloud iam workload-identity-pools describe "$POOL_ID" --location=global --project="$PROJECT_ID" \
+            || gcloud iam workload-identity-pools create "$POOL_ID" --location=global --project="$PROJECT_ID"
+          
+          # Create OIDC Provider (idempotent)
+          gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
+            --location=global --workload-identity-pool="$POOL_ID" --project="$PROJECT_ID" \
+            || gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
+                 --location=global --workload-identity-pool="$POOL_ID" \
+                 --issuer-uri="https://token.actions.githubusercontent.com" \
+                 --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+                 --project="$PROJECT_ID"
+          
+          # Create Service Account (idempotent)
+          gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" >/dev/null 2>&1 \
+            || gcloud iam service-accounts create "$SA_NAME" \
+                 --display-name="Ops MCP GitHub Actions" \
+                 --project="$PROJECT_ID"
+          
+          # Grant WIF permission
+          gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+            --role="roles/iam.workloadIdentityUser" \
+            --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUM}/locations/global/workloadIdentityPools/${POOL_ID}/attribute.repository/${REPO}" \
+            --project="$PROJECT_ID"
+          
+          # Enable APIs
+          gcloud services enable docs.googleapis.com sheets.googleapis.com drive.googleapis.com --project="$PROJECT_ID"
+          
+          # Grant permissions (use roles/editor or customize)
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${SA_EMAIL}" \
+            --role="roles/editor"
+          
+          # Write secrets to GitHub
+          export WIF_PROVIDER="projects/${PROJECT_NUM}/locations/global/workloadIdentityPools/${POOL_ID}/providers/${PROVIDER_ID}"
+          
+          gh secret set WIF_PROVIDER -b"$WIF_PROVIDER" -R "$REPO" --app actions
+          gh secret set WIF_SERVICE_ACCOUNT -b"$SA_EMAIL" -R "$REPO" --app actions
+          
+          echo "✅ WIF Bootstrap complete!"
+          echo "WIF_PROVIDER: $WIF_PROVIDER"
+          echo "WIF_SERVICE_ACCOUNT: $SA_EMAIL"
+          
+          # Trigger the loop
+          gh api -X POST "/repos/${REPO}/dispatches" \
+            -f event_type=run_dod \
+            -f client_payload[target_ref]="$BRANCH"
+          
+          echo "🚀 Loop triggered! Monitor: https://github.com/${REPO}/actions"
+          ```
+          
+          ## What this does:
+          1. Creates Workload Identity Pool + OIDC Provider
+          2. Creates Service Account with WIF binding
+          3. Enables Google Workspace APIs
+          4. Writes secrets to GitHub
+          5. Triggers eval-dod loop
+          
+          ## After running:
+          - Watch https://github.com/edri2or-commits/make-ops-clean/actions
+          - PR #88 will auto-merge when DoD completes
+          
+          EOF
+
+      - name: Create Setup Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const instructions = `# 🔧 WIF Bootstrap Instructions
+            
+            The automated bootstrap workflow has detected that WIF configuration is required.
+            
+            ## Quick Start (5 minutes)
+            
+            Save and run this script locally:
+            
+            \`\`\`bash
+            #!/bin/bash
+            set -euo pipefail
+            
+            # ====== CONFIGURATION ======
+            export REPO="edri2or-commits/make-ops-clean"
+            export BRANCH="feature/pr-9-workspace-smoke"
+            export PROJECT_ID="YOUR_GCP_PROJECT_ID"  # ⚠️ REPLACE THIS
+            
+            # ====== AUTO-DISCOVERY ======
+            export PROJECT_NUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+            export POOL_ID="github-pool"
+            export PROVIDER_ID="github-provider"
+            export SA_NAME="ops-mcp"
+            export SA_EMAIL="\${SA_NAME}@\${PROJECT_ID}.iam.gserviceaccount.com"
+            
+            echo "🔍 Discovered:"
+            echo "  Project: $PROJECT_ID (#$PROJECT_NUM)"
+            echo "  Service Account: $SA_EMAIL"
+            
+            # ====== CREATE WIF INFRASTRUCTURE ======
+            echo "📦 Creating Workload Identity Pool..."
+            gcloud iam workload-identity-pools describe "$POOL_ID" --location=global --project="$PROJECT_ID" 2>/dev/null \\
+              || gcloud iam workload-identity-pools create "$POOL_ID" --location=global --project="$PROJECT_ID"
+            
+            echo "🔐 Creating OIDC Provider..."
+            gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \\
+              --location=global --workload-identity-pool="$POOL_ID" --project="$PROJECT_ID" 2>/dev/null \\
+              || gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \\
+                   --location=global --workload-identity-pool="$POOL_ID" \\
+                   --issuer-uri="https://token.actions.githubusercontent.com" \\
+                   --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \\
+                   --project="$PROJECT_ID"
+            
+            echo "👤 Creating Service Account..."
+            gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" >/dev/null 2>&1 \\
+              || gcloud iam service-accounts create "$SA_NAME" \\
+                   --display-name="Ops MCP GitHub Actions" \\
+                   --project="$PROJECT_ID"
+            
+            echo "🔗 Binding WIF to Service Account..."
+            gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \\
+              --role="roles/iam.workloadIdentityUser" \\
+              --member="principalSet://iam.googleapis.com/projects/\${PROJECT_NUM}/locations/global/workloadIdentityPools/\${POOL_ID}/attribute.repository/\${REPO}" \\
+              --project="$PROJECT_ID"
+            
+            echo "🔌 Enabling Google Workspace APIs..."
+            gcloud services enable docs.googleapis.com sheets.googleapis.com drive.googleapis.com --project="$PROJECT_ID"
+            
+            echo "🎫 Granting Service Account permissions..."
+            gcloud projects add-iam-policy-binding "$PROJECT_ID" \\
+              --member="serviceAccount:\${SA_EMAIL}" \\
+              --role="roles/editor"
+            
+            # ====== WRITE SECRETS TO GITHUB ======
+            echo "🔑 Writing secrets to GitHub..."
+            export WIF_PROVIDER="projects/\${PROJECT_NUM}/locations/global/workloadIdentityPools/\${POOL_ID}/providers/\${PROVIDER_ID}"
+            
+            gh secret set WIF_PROVIDER -b"$WIF_PROVIDER" -R "$REPO" --app actions
+            gh secret set WIF_SERVICE_ACCOUNT -b"$SA_EMAIL" -R "$REPO" --app actions
+            
+            echo ""
+            echo "✅ Bootstrap Complete!"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "WIF_PROVIDER: $WIF_PROVIDER"
+            echo "WIF_SERVICE_ACCOUNT: $SA_EMAIL"
+            echo ""
+            
+            # ====== TRIGGER THE LOOP ======
+            echo "🚀 Triggering autonomous loop..."
+            gh api -X POST "/repos/\${REPO}/dispatches" \\
+              -f event_type=run_dod \\
+              -f client_payload[target_ref]="$BRANCH"
+            
+            echo ""
+            echo "Monitor progress:"
+            echo "  https://github.com/\${REPO}/actions"
+            echo "  https://github.com/\${REPO}/pull/88"
+            \`\`\`
+            
+            ## Prerequisites
+            - \`gcloud\` CLI installed and authenticated
+            - \`gh\` CLI installed and authenticated (with \`repo\` scope)
+            - GCP project with billing enabled
+            
+            ## What Happens Next
+            1. WIF infrastructure created in GCP
+            2. GitHub secrets automatically written
+            3. Autonomous loop triggered
+            4. eval-dod runs DoD on PR #88
+            5. PR #88 auto-merges on success
+            
+            ## Monitor
+            - Actions: https://github.com/edri2or-commits/make-ops-clean/actions
+            - PR #88: https://github.com/edri2or-commits/make-ops-clean/pull/88
+            
+            ---
+            **Status:** Waiting for WIF configuration
+            **Priority:** High (blocks autonomous operations)
+            `;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔧 Bootstrap Required: WIF/SA Configuration',
+              body: instructions,
+              labels: ['infrastructure', 'bootstrap', 'high-priority']
+            });
