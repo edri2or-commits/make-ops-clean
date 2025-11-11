@@ -1,0 +1,32 @@
+name: control-dispatch
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Branch to test"
+        default: "feature/pr-9-workspace-smoke"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch eval-dod on target ref
+        env:
+          GH_TOKEN: ${{ secrets.PAT_AUTOMATION || secrets.GITHUB_TOKEN }}
+        run: |
+          REF="${{ inputs.target_ref || github.event.client_payload.target_ref || 'feature/pr-9-workspace-smoke' }}"
+          echo "Dispatching eval-dod.yml on ref: $REF"
+          curl -sf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/edri2or-commits/make-ops-clean/actions/workflows/eval-dod.yml/dispatches \
+            -d "{\"ref\":\"$REF\"}" || echo "Dispatch failed (may need PAT_AUTOMATION secret)"
