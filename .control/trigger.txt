@@ -1,0 +1,4 @@
+Manual trigger: eval-dod fallback activation
+Timestamp: 2025-11-11T11:18:20Z
+Reason: Scheduler delay > 6 minutes
+Action: Direct execution via marker commit
