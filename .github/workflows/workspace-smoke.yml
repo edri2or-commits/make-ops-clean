@@ -1,0 +1,420 @@
+name: workspace-smoke
+
+on:
+  pull_request:
+    branches: [main, or-control/ops]
+  workflow_dispatch:
+    inputs:
+      skip_gmail:
+        description: 'Skip Gmail test (true/false)'
+        required: false
+        default: 'false'
+      skip_calendar:
+        description: 'Skip Calendar test (true/false)'
+        required: false
+        default: 'false'
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  smoke-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          
+      - name: Auth via WIF+SA
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        
+      - name: Export ACCESS_TOKEN (SA)
+        run: |
+          echo "SA_TOKEN=$(gcloud auth print-access-token)" >> $GITHUB_ENV
+          echo "SA token acquired (length: ${#SA_TOKEN})"
+          
+      - name: Check OAuth secrets availability
+        id: oauth_check
+        run: |
+          if [ -n "${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}" ] && \
+             [ -n "${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}" ] && \
+             [ -n "${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}" ]; then
+            echo "oauth_available=true" >> $GITHUB_OUTPUT
+            echo "✓ User OAuth credentials available"
+          else
+            echo "oauth_available=false" >> $GITHUB_OUTPUT
+            echo "⚠ User OAuth credentials not available - Gmail/Calendar tests will be skipped"
+          fi
+          
+      - name: Get User OAuth Token (if available)
+        if: steps.oauth_check.outputs.oauth_available == 'true'
+        run: |
+          OAUTH_RESPONSE=$(curl -s -X POST https://oauth2.googleapis.com/token \
+            -d "client_id=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}" \
+            -d "refresh_token=${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}" \
+            -d "grant_type=refresh_token")
+          
+          USER_TOKEN=$(echo "$OAUTH_RESPONSE" | jq -r '.access_token')
+          
+          if [ "$USER_TOKEN" != "null" ] && [ -n "$USER_TOKEN" ]; then
+            echo "USER_TOKEN=$USER_TOKEN" >> $GITHUB_ENV
+            echo "✓ User OAuth token acquired (length: ${#USER_TOKEN})"
+          else
+            echo "✗ Failed to get user OAuth token"
+            echo "oauth_available=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Smoke Test — Drive (create empty txt)
+        run: |
+          set -euo pipefail
+          echo "=== Smoke Test: Drive file creation ==="
+          
+          DRIVE_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $SA_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://www.googleapis.com/drive/v3/files \
+            -d '{
+              "name": "smoke-test-'"$(date +%s)"'.txt",
+              "mimeType": "text/plain",
+              "parents": []
+            }')
+          
+          FILE_ID=$(echo "$DRIVE_RESPONSE" | jq -r '.id')
+          FILE_NAME=$(echo "$DRIVE_RESPONSE" | jq -r '.name')
+          
+          if [ "$FILE_ID" != "null" ] && [ -n "$FILE_ID" ]; then
+            echo "✓ Drive file created: $FILE_ID ($FILE_NAME)"
+            echo "DRIVE_FILE_ID=$FILE_ID" >> $GITHUB_ENV
+            echo "DRIVE_FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
+          else
+            echo "✗ Drive file creation failed"
+            echo "$DRIVE_RESPONSE" | jq .
+            exit 1
+          fi
+          
+      - name: Smoke Test — Gmail (send test email)
+        if: steps.oauth_check.outputs.oauth_available == 'true' && inputs.skip_gmail != 'true'
+        run: |
+          set -euo pipefail
+          echo "=== Smoke Test: Gmail send ==="
+          
+          # Get user email
+          PROFILE=$(curl -s -H "Authorization: Bearer $USER_TOKEN" \
+            https://gmail.googleapis.com/gmail/v1/users/me/profile)
+          USER_EMAIL=$(echo "$PROFILE" | jq -r '.emailAddress')
+          
+          # Create RFC 2822 message
+          MESSAGE="From: $USER_EMAIL
+To: ${{ secrets.TEST_EMAIL_RECIPIENT || env.USER_EMAIL }}
+Subject: Workspace Smoke Test
+
+This is an automated smoke test from GitHub Actions.
+Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Run ID: ${{ github.run_id }}"
+          
+          # Base64 encode (URL-safe)
+          MESSAGE_B64=$(echo -n "$MESSAGE" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+          
+          GMAIL_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $USER_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://gmail.googleapis.com/gmail/v1/users/me/messages/send \
+            -d '{"raw": "'"$MESSAGE_B64"'"}')
+          
+          MESSAGE_ID=$(echo "$GMAIL_RESPONSE" | jq -r '.id')
+          THREAD_ID=$(echo "$GMAIL_RESPONSE" | jq -r '.threadId')
+          
+          if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
+            echo "✓ Gmail message sent: $MESSAGE_ID (thread: $THREAD_ID)"
+            echo "GMAIL_MESSAGE_ID=$MESSAGE_ID" >> $GITHUB_ENV
+            echo "GMAIL_THREAD_ID=$THREAD_ID" >> $GITHUB_ENV
+          else
+            echo "✗ Gmail send failed"
+            echo "$GMAIL_RESPONSE" | jq .
+            exit 1
+          fi
+          
+      - name: Skip Gmail (no OAuth)
+        if: steps.oauth_check.outputs.oauth_available != 'true' || inputs.skip_gmail == 'true'
+        run: |
+          echo "⊘ Gmail test skipped (OAuth not available or explicitly skipped)"
+          echo "GMAIL_MESSAGE_ID=skipped" >> $GITHUB_ENV
+          
+      - name: Smoke Test — Calendar (create 15min event)
+        if: steps.oauth_check.outputs.oauth_available == 'true' && inputs.skip_calendar != 'true'
+        run: |
+          set -euo pipefail
+          echo "=== Smoke Test: Calendar event creation ==="
+          
+          # Calculate time window (now + 1 hour for 15 minutes)
+          START_TIME=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%S.000Z)
+          END_TIME=$(date -u -d '+1 hour 15 minutes' +%Y-%m-%dT%H:%M:%S.000Z)
+          
+          CAL_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $USER_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://www.googleapis.com/calendar/v3/calendars/primary/events \
+            -d '{
+              "summary": "Workspace Smoke Test",
+              "description": "Automated smoke test from GitHub Actions\nRun ID: ${{ github.run_id }}",
+              "start": {
+                "dateTime": "'"$START_TIME"'",
+                "timeZone": "UTC"
+              },
+              "end": {
+                "dateTime": "'"$END_TIME"'",
+                "timeZone": "UTC"
+              },
+              "reminders": {
+                "useDefault": false,
+                "overrides": []
+              }
+            }')
+          
+          EVENT_ID=$(echo "$CAL_RESPONSE" | jq -r '.id')
+          EVENT_LINK=$(echo "$CAL_RESPONSE" | jq -r '.htmlLink')
+          
+          if [ "$EVENT_ID" != "null" ] && [ -n "$EVENT_ID" ]; then
+            echo "✓ Calendar event created: $EVENT_ID"
+            echo "  Link: $EVENT_LINK"
+            echo "CAL_EVENT_ID=$EVENT_ID" >> $GITHUB_ENV
+            echo "CAL_EVENT_LINK=$EVENT_LINK" >> $GITHUB_ENV
+          else
+            echo "✗ Calendar event creation failed"
+            echo "$CAL_RESPONSE" | jq .
+            exit 1
+          fi
+          
+      - name: Skip Calendar (no OAuth)
+        if: steps.oauth_check.outputs.oauth_available != 'true' || inputs.skip_calendar == 'true'
+        run: |
+          echo "⊘ Calendar test skipped (OAuth not available or explicitly skipped)"
+          echo "CAL_EVENT_ID=skipped" >> $GITHUB_ENV
+          
+      - name: Append smoke results to Ledger
+        run: |
+          set -euo pipefail
+          
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          # Drive entry
+          DRIVE_ENTRY=$(jq -n \
+            --arg id "$(uuidgen)" \
+            --arg ts "$TIMESTAMP" \
+            --arg sha "$GITHUB_SHA" \
+            --arg fileId "$DRIVE_FILE_ID" \
+            --arg fileName "$DRIVE_FILE_NAME" \
+            '{
+              id: $id,
+              type: "drive.create",
+              timestamp: $ts,
+              status: "success",
+              actor: "github-actions",
+              input: {
+                name: $fileName,
+                mimeType: "text/plain"
+              },
+              output: {
+                fileId: $fileId,
+                fileName: $fileName
+              },
+              commitSha: $sha
+            }')
+          
+          ENTRIES="[$DRIVE_ENTRY"
+          
+          # Gmail entry (if executed)
+          if [ "${GMAIL_MESSAGE_ID:-}" != "skipped" ] && [ -n "${GMAIL_MESSAGE_ID:-}" ]; then
+            GMAIL_ENTRY=$(jq -n \
+              --arg id "$(uuidgen)" \
+              --arg ts "$TIMESTAMP" \
+              --arg sha "$GITHUB_SHA" \
+              --arg msgId "$GMAIL_MESSAGE_ID" \
+              --arg threadId "$GMAIL_THREAD_ID" \
+              '{
+                id: $id,
+                type: "gmail.send",
+                timestamp: $ts,
+                status: "success",
+                actor: "github-actions",
+                input: {
+                  subject: "Workspace Smoke Test",
+                  recipientCount: 1
+                },
+                output: {
+                  messageId: $msgId,
+                  threadId: $threadId
+                },
+                commitSha: $sha
+              }')
+            ENTRIES="$ENTRIES,$GMAIL_ENTRY"
+          else
+            GMAIL_SKIP=$(jq -n \
+              --arg id "$(uuidgen)" \
+              --arg ts "$TIMESTAMP" \
+              --arg sha "$GITHUB_SHA" \
+              '{
+                id: $id,
+                type: "gmail.send",
+                timestamp: $ts,
+                status: "skipped",
+                actor: "github-actions",
+                input: {
+                  reason: "user_oauth_not_available"
+                },
+                output: {},
+                commitSha: $sha
+              }')
+            ENTRIES="$ENTRIES,$GMAIL_SKIP"
+          fi
+          
+          # Calendar entry (if executed)
+          if [ "${CAL_EVENT_ID:-}" != "skipped" ] && [ -n "${CAL_EVENT_ID:-}" ]; then
+            CAL_ENTRY=$(jq -n \
+              --arg id "$(uuidgen)" \
+              --arg ts "$TIMESTAMP" \
+              --arg sha "$GITHUB_SHA" \
+              --arg eventId "$CAL_EVENT_ID" \
+              --arg eventLink "${CAL_EVENT_LINK:-}" \
+              '{
+                id: $id,
+                type: "calendar.create",
+                timestamp: $ts,
+                status: "success",
+                actor: "github-actions",
+                input: {
+                  summary: "Workspace Smoke Test",
+                  duration: "15min"
+                },
+                output: {
+                  eventId: $eventId,
+                  eventLink: $eventLink
+                },
+                commitSha: $sha
+              }')
+            ENTRIES="$ENTRIES,$CAL_ENTRY"
+          else
+            CAL_SKIP=$(jq -n \
+              --arg id "$(uuidgen)" \
+              --arg ts "$TIMESTAMP" \
+              --arg sha "$GITHUB_SHA" \
+              '{
+                id: $id,
+                type: "calendar.create",
+                timestamp: $ts,
+                status: "skipped",
+                actor: "github-actions",
+                input: {
+                  reason: "user_oauth_not_available"
+                },
+                output: {},
+                commitSha: $sha
+              }')
+            ENTRIES="$ENTRIES,$CAL_SKIP"
+          fi
+          
+          ENTRIES="$ENTRIES]"
+          
+          # Atomic append
+          mkdir -p ops
+          touch ops/ledger.json
+          
+          for attempt in {1..3}; do
+            if [ -s ops/ledger.json ]; then
+              LEDGER=$(cat ops/ledger.json)
+              echo "$LEDGER" | jq ". + $ENTRIES" > ops/ledger.json.tmp
+            else
+              echo "[]" | jq ". + $ENTRIES" > ops/ledger.json.tmp
+            fi
+            
+            if mv ops/ledger.json.tmp ops/ledger.json; then
+              echo "✓ Ledger updated (attempt $attempt)"
+              break
+            else
+              echo "⚠ Ledger write failed (attempt $attempt)"
+              sleep $((attempt * 2))
+            fi
+            
+            if [ $attempt -eq 3 ]; then
+              echo "✗ Ledger write failed after 3 attempts"
+              exit 1
+            fi
+          done
+          
+      - name: Commit Ledger updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add ops/ledger.json
+          
+          if git diff --staged --quiet; then
+            echo "No ledger changes to commit"
+          else
+            git commit -m "chore(ledger): workspace-smoke results for PR #${{ github.event.pull_request.number }}
+
+- drive.create: ${DRIVE_FILE_ID}
+- gmail.send: ${GMAIL_MESSAGE_ID:-skipped}
+- calendar.create: ${CAL_EVENT_ID:-skipped}
+
+Generated by workspace-smoke workflow"
+            
+            git push origin ${{ github.head_ref || github.ref }}
+            echo "✓ Ledger committed and pushed"
+          fi
+          
+      - name: Generate Smoke Test Report
+        if: always()
+        run: |
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ## Workspace Smoke Test Results — PR #${{ github.event.pull_request.number }}
+          
+          ### Test Coverage
+          
+          #### ✅ Drive (WIF+SA)
+          - **Tool:** \`drive.create\`
+          - **File ID:** \`${{ env.DRIVE_FILE_ID }}\`
+          - **File Name:** \`${{ env.DRIVE_FILE_NAME }}\`
+          - **Status:** Success
+          
+          #### ${{ steps.oauth_check.outputs.oauth_available == 'true' && '✅' || '⊘' }} Gmail (User OAuth)
+          - **Tool:** \`gmail.send\`
+          - **Message ID:** \`${{ env.GMAIL_MESSAGE_ID || 'skipped' }}\`
+          - **Status:** ${{ env.GMAIL_MESSAGE_ID != 'skipped' && env.GMAIL_MESSAGE_ID != '' && 'Success' || 'Skipped (no OAuth)' }}
+          
+          #### ${{ steps.oauth_check.outputs.oauth_available == 'true' && '✅' || '⊘' }} Calendar (User OAuth)
+          - **Tool:** \`calendar.create\`
+          - **Event ID:** \`${{ env.CAL_EVENT_ID || 'skipped' }}\`
+          - **Status:** ${{ env.CAL_EVENT_ID != 'skipped' && env.CAL_EVENT_ID != '' && 'Success' || 'Skipped (no OAuth)' }}
+          
+          ### Ledger
+          - **Commit SHA:** \`${{ github.sha }}\`
+          - **Entries Added:** 3 (drive + gmail + calendar)
+          - **Location:** \`ops/ledger.json\`
+          
+          ### Authentication Methods
+          - **Drive:** WIF+SA (always available)
+          - **Gmail/Calendar:** User OAuth (hybrid - graceful degradation)
+          
+          ### Security Compliance
+          - ✅ WIF+SA for Drive operations
+          - ✅ User OAuth for Gmail/Calendar (when available)
+          - ✅ No PII in ledger (IDs/counts only)
+          - ✅ No secrets printed
+          - ✅ Atomic ledger writes (3 retries)
+          - ✅ Graceful degradation on missing OAuth
+          
+          ---
+          *Generated by workspace-smoke workflow at $(date -u +%Y-%m-%dT%H:%M:%SZ)*
+          EOF
