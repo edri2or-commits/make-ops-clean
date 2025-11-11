@@ -1,0 +1,151 @@
+name: bootstrap-wif-autonomous
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/bootstrap-wif-autonomous.yml'
+
+permissions:
+  id-token: write
+  contents: write
+  issues: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Attempt WIF Auth (probe)
+        id: probe_auth
+        continue-on-error: true
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER || 'projects/PLACEHOLDER/locations/global/workloadIdentityPools/PLACEHOLDER/providers/PLACEHOLDER' }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT || 'ops-mcp@PLACEHOLDER.iam.gserviceaccount.com' }}
+
+      - name: Bootstrap Report - Auth Failed
+        if: steps.probe_auth.outcome == 'failure'
+        run: |
+          cat << 'EOF' > bootstrap-report.md
+          # 🔴 WIF Bootstrap Required
+          
+          ## Current Status
+          Authentication with Workload Identity Federation failed.
+          
+          ## Required Manual Steps
+          
+          Since we cannot auto-create GCP infrastructure from GitHub Actions without pre-existing credentials,
+          you need to set up WIF manually **once**:
+          
+          ### 1. Create Workload Identity Pool & Provider
+          ```bash
+          # Set your project
+          export PROJECT_ID="your-project-id"
+          export PROJECT_NUM=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+          
+          # Create pool
+          gcloud iam workload-identity-pools create github-pool \
+            --location=global \
+            --project=$PROJECT_ID
+          
+          # Create OIDC provider
+          gcloud iam workload-identity-pools providers create-oidc github-provider \
+            --location=global \
+            --workload-identity-pool=github-pool \
+            --issuer-uri=https://token.actions.githubusercontent.com \
+            --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+            --project=$PROJECT_ID
+          ```
+          
+          ### 2. Create Service Account & Grant Permissions
+          ```bash
+          # Create SA
+          gcloud iam service-accounts create ops-mcp \
+            --display-name="MCP Operations Service Account" \
+            --project=$PROJECT_ID
+          
+          # Grant WIF permission
+          gcloud iam service-accounts add-iam-policy-binding \
+            ops-mcp@${PROJECT_ID}.iam.gserviceaccount.com \
+            --role=roles/iam.workloadIdentityUser \
+            --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUM}/locations/global/workloadIdentityPools/github-pool/attribute.repository/edri2or-commits/make-ops-clean" \
+            --project=$PROJECT_ID
+          
+          # Grant Google Workspace API permissions
+          gcloud projects add-iam-policy-binding $PROJECT_ID \
+            --member=serviceAccount:ops-mcp@${PROJECT_ID}.iam.gserviceaccount.com \
+            --role=roles/editor
+          ```
+          
+          ### 3. Enable APIs
+          ```bash
+          gcloud services enable docs.googleapis.com \
+            sheets.googleapis.com \
+            drive.googleapis.com \
+            --project=$PROJECT_ID
+          ```
+          
+          ### 4. Add Secrets to GitHub
+          ```bash
+          # Get the values
+          export WIF_PROVIDER="projects/${PROJECT_NUM}/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          export WIF_SA="ops-mcp@${PROJECT_ID}.iam.gserviceaccount.com"
+          
+          # Add to GitHub (using gh CLI)
+          gh secret set WIF_PROVIDER -b"$WIF_PROVIDER" -R edri2or-commits/make-ops-clean
+          gh secret set WIF_SERVICE_ACCOUNT -b"$WIF_SA" -R edri2or-commits/make-ops-clean
+          ```
+          
+          ### 5. Verify
+          Re-run this workflow or trigger control-dispatch to start the autonomous loop.
+          
+          ---
+          **Next Steps:** Once secrets are added, the loop will activate automatically within 60 seconds.
+          EOF
+          
+          cat bootstrap-report.md
+
+      - name: Create Bootstrap Issue
+        if: steps.probe_auth.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('bootstrap-report.md', 'utf8');
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'infra:bootstrap — WIF/SA Configuration Required',
+              body: report,
+              labels: ['infrastructure', 'bootstrap']
+            });
+
+      - name: Success - WIF Already Configured
+        if: steps.probe_auth.outcome == 'success'
+        run: |
+          echo "✅ WIF authentication successful!"
+          gcloud auth list
+          TOKEN=$(gcloud auth print-access-token)
+          echo "✅ Token acquired (length: ${#TOKEN})"
+          echo "🎯 System ready for autonomous operations"
+
+      - name: Trigger Main Loop
+        if: steps.probe_auth.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🚀 Triggering eval-dod loop..."
+          curl -sf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/edri2or-commits/make-ops-clean/dispatches \
+            -d '{"event_type":"run_dod","client_payload":{"target_ref":"feature/pr-9-workspace-smoke"}}' \
+            && echo "✅ Loop triggered successfully" \
+            || echo "⚠️ Dispatch may have failed - check permissions"
