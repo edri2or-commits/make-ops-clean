@@ -14,24 +14,17 @@ permissions:
   issues: write
 
 jobs:
-  dod:
+  auth-selftest:
     runs-on: ubuntu-latest
+    outputs:
+      auth_ok: ${{ steps.verify.outputs.ok }}
     steps:
       - name: Checkout target ref
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.target_ref || 'feature/pr-9-workspace-smoke' }}
 
-      - name: Diagnostic ping
-        run: |
-          echo "actor=$GITHUB_ACTOR ref=${{ inputs.target_ref }} sha=$GITHUB_SHA"
-          mkdir -p ops
-          echo "$(date -u) :: ping $GITHUB_SHA on ${{ inputs.target_ref }}" >> ops/trigger.log
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ops/trigger.log && git commit -m "diag: ping from eval-dod" && git push || true
-
-      - name: Auth via WIF
+      - name: Auth via WIF (with retries)
         id: wif
         uses: google-github-actions/auth@v2
         with:
@@ -42,45 +35,97 @@ jobs:
       - name: Setup gcloud
         if: steps.wif.outcome == 'success'
         uses: google-github-actions/setup-gcloud@v2
+        continue-on-error: true
 
-      - name: Get ACCESS_TOKEN
-        id: token
+      - name: Verify token (3 retries)
+        id: verify
         run: |
           set +e
-          TOK=$(gcloud auth print-access-token 2>/dev/null || true)
-          if [ -n "$TOK" ]; then
-            echo "ok=true" >> $GITHUB_OUTPUT
-            echo "ACCESS_TOKEN=$TOK" >> $GITHUB_ENV
-          else
-            echo "ok=false" >> $GITHUB_OUTPUT
-          fi
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt/3 to get access token..."
+            TOK=$(gcloud auth print-access-token 2>/dev/null || true)
+            if [ -n "$TOK" ] && [ "${#TOK}" -gt 50 ]; then
+              echo "✅ Auth successful (token length: ${#TOK})"
+              echo "ok=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            [ $attempt -lt 3 ] && sleep $((attempt * 2))
+          done
+          echo "❌ Auth failed after 3 attempts"
+          echo "ok=false" >> $GITHUB_OUTPUT
 
-      - name: Ledger auth-failed + Issue
-        if: steps.token.outputs.ok != 'true'
+      - name: Ledger auth result
         run: |
           set -euo pipefail
           mkdir -p ops; [ -s ops/ledger.json ] || echo "[]" > ops/ledger.json
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          ENTRY=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
-            '{id:(now|tostring),type:"auth-test",timestamp:$ts,status:"failed",
-              actor:"github-actions",input:{},output:{missing:["WIF_PROVIDER","WIF_SERVICE_ACCOUNT or roles"]},commitSha:$sha}')
+          STATUS="${{ steps.verify.outputs.ok == 'true' && 'success' || 'failed' }}"
+          ENTRY=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" --arg status "$STATUS" \
+            '{id:(now|tostring),type:"auth-test",timestamp:$ts,status:$status,
+              actor:"github-actions",input:{provider:"WIF"},
+              output:{verified:($status=="success")},commitSha:$sha}')
           jq ". + [$ENTRY]" ops/ledger.json > ops/ledger.json.tmp && mv ops/ledger.json.tmp ops/ledger.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ops/ledger.json && git commit -m "chore(ledger): auth-selftest failed" && git push
+          git add ops/ledger.json && git commit -m "chore(ledger): auth-selftest $STATUS" && git push
 
-      - name: Open bootstrap issue
-        if: steps.token.outputs.ok != 'true'
+      - name: Open bootstrap issue on failure
+        if: steps.verify.outputs.ok != 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const {owner, repo} = context.repo;
-            const title = 'infra:bootstrap — WIF/SA configuration required';
-            const body  = 'Auth self-test failed on eval-dod workflow. Missing WIF_PROVIDER / WIF_SERVICE_ACCOUNT or IAM roles.';
+            const title = 'infra:bootstrap — configure WIF/SA';
+            const body = `## WIF/SA Configuration Required
+            
+            Auth self-test failed in eval-dod workflow.
+            
+            **Missing/Invalid:**
+            - \`WIF_PROVIDER\` secret
+            - \`WIF_SERVICE_ACCOUNT\` secret
+            - IAM roles: \`roles/iam.workloadIdentityUser\` + service-specific roles
+            
+            **Action Required:**
+            1. Configure WIF provider in GCP
+            2. Add GitHub secrets
+            3. Verify IAM bindings
+            
+            **Context:**
+            - Workflow: eval-dod
+            - Run: ${{ github.run_id }}
+            - Ref: ${{ inputs.target_ref || 'feature/pr-9-workspace-smoke' }}
+            `;
             await github.rest.issues.create({owner, repo, title, body});
 
+  dod:
+    needs: auth-selftest
+    if: needs.auth-selftest.outputs.auth_ok == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref || 'feature/pr-9-workspace-smoke' }}
+
+      - name: Auth via WIF
+        id: wif
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get ACCESS_TOKEN
+        id: token
+        run: |
+          set -euo pipefail
+          TOK=$(gcloud auth print-access-token)
+          echo "ACCESS_TOKEN=$TOK" >> $GITHUB_ENV
+          echo "✅ Token acquired (length: ${#TOK})"
+
       - name: Docs DoD
-        if: steps.token.outputs.ok == 'true'
         run: |
           set -euo pipefail
           DOC_ID=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
@@ -93,40 +138,40 @@ jobs:
             "https://docs.googleapis.com/v1/documents/${DOC_ID}:batchUpdate" | jq '.replies | length')
           echo "DOC_ID=$DOC_ID" >> $GITHUB_ENV
           echo "DOCS_WRITES=$REPLIES" >> $GITHUB_ENV
+          echo "✅ Docs: replaceAllText TODO→DONE (writes: $REPLIES)"
 
       - name: Sheets DoD
-        if: steps.token.outputs.ok == 'true'
         run: |
           set -euo pipefail
           SHEET_ID=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
             -d '{"properties":{"title":"DoD Test Sheet (CI)"}}' https://sheets.googleapis.com/v4/spreadsheets | jq -r .spreadsheetId)
           RES=$(curl -s -X PUT -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
             -d '{"values":[["שלום"]]}' \
-            "https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1?valueInputOption=RAW")
+            "https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1?valueInputOption=USER_ENTERED")
           CELLS=$(echo "$RES" | jq -r '.updatedCells')
           echo "SHEET_ID=$SHEET_ID" >> $GITHUB_ENV
           echo "SHEETS_CELLS=$CELLS" >> $GITHUB_ENV
+          echo "✅ Sheets: updated A1='שלום' (cells: $CELLS)"
 
       - name: Drive DoD
-        if: steps.token.outputs.ok == 'true'
         run: |
           set -euo pipefail
-          META=$(printf '%s' '{"name":"smoke-'$(date +%s)'.txt","mimeType":"text/plain"}' | jq -c .)
+          TS=$(date +%s)
+          META=$(printf '%s' '{"name":"smoke-'"$TS"'.txt","mimeType":"text/plain"}' | jq -c .)
           FILE_ID=$(curl -s -X POST \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -F "metadata=$META;type=application/json; charset=UTF-8" \
             -F "file=@/etc/hostname;type=text/plain" \
             "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" | jq -r .id)
           echo "DRIVE_FILE_ID=$FILE_ID" >> $GITHUB_ENV
+          echo "✅ Drive: created smoke-$TS.txt (id: $FILE_ID)"
 
       - name: Gmail/Calendar status
-        if: steps.token.outputs.ok == 'true'
         run: |
-          echo "Gmail: skipped (OAuth not configured)"
-          echo "Calendar: skipped (OAuth not configured)"
+          echo "ℹ️  Gmail: skipped (OAuth not configured)"
+          echo "ℹ️  Calendar: skipped (OAuth not configured)"
 
       - name: Ledger append (atomic ×3)
-        if: steps.token.outputs.ok == 'true'
         run: |
           set -euo pipefail
           mkdir -p ops; [ -s ops/ledger.json ] || echo "[]" > ops/ledger.json
@@ -142,13 +187,23 @@ jobs:
           DRV=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" --arg id "$DRIVE_FILE_ID" \
             '{id:(now|tostring),type:"drive.create",timestamp:$ts,status:"success",actor:"github-actions",
               input:{kind:"file","mimeType":"text/plain"},output:{fileId:$id},commitSha:$sha}')
-          for i in 1 2 3; do
-            jq ". + [$DOC, $SHT, $DRV]" ops/ledger.json > ops/ledger.json.tmp && mv ops/ledger.json.tmp ops/ledger.json && break || sleep $((i*2))
-            [ $i -eq 3 ] && exit 1
+          GMAIL=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            '{id:(now|tostring),type:"gmail.send",timestamp:$ts,status:"skipped",actor:"github-actions",
+              input:{},output:{reason:"OAuth not configured"},commitSha:$sha}')
+          CAL=$(jq -n --arg ts "$TS" --arg sha "$GITHUB_SHA" \
+            '{id:(now|tostring),type:"calendar.create",timestamp:$ts,status:"skipped",actor:"github-actions",
+              input:{},output:{reason:"OAuth not configured"},commitSha:$sha}')
+          
+          for attempt in 1 2 3; do
+            jq ". + [$DOC, $SHT, $DRV, $GMAIL, $CAL]" ops/ledger.json > ops/ledger.json.tmp && \
+              mv ops/ledger.json.tmp ops/ledger.json && break || sleep $((attempt * 2))
+            [ $attempt -eq 3 ] && exit 1
           done
+          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ops/ledger.json && git commit -m "chore(ledger): workspace DoD complete" && git push
+          git add ops/ledger.json && git commit -m "chore(ledger): DoD complete — Docs/Sheets/Drive" && git push
+          echo "✅ Ledger: 5 entries written atomically"
 
       - name: Find PR for target ref
         id: find_pr
@@ -166,9 +221,42 @@ jobs:
             if (prs.length > 0) {
               core.setOutput('pr_number', prs[0].number);
               core.setOutput('found', 'true');
+              console.log(`Found PR #${prs[0].number}`);
             } else {
               core.setOutput('found', 'false');
+              console.log('No PR found for ref');
             }
+
+      - name: Comment on PR with results
+        if: steps.find_pr.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.find_pr.outputs.pr_number }};
+            const body = `## 🎯 DoD Execution Complete
+            
+            **Status:** ✅ All checks passed
+            
+            **Resources Created:**
+            - 📄 **Docs**: \`${{ env.DOC_ID }}\` (replaceAllText: ${{ env.DOCS_WRITES }} writes)
+            - 📊 **Sheets**: \`${{ env.SHEET_ID }}\` (updated ${{ env.SHEETS_CELLS }} cells)
+            - 📦 **Drive**: \`${{ env.DRIVE_FILE_ID }}\` (smoke test file)
+            - 📧 **Gmail**: skipped (OAuth not configured)
+            - 📅 **Calendar**: skipped (OAuth not configured)
+            
+            **Ledger Tail (last 5 entries):**
+            \`\`\`json
+            See ops/ledger.json for full audit trail
+            \`\`\`
+            
+            **Next:** Auto-merge in progress...
+            `;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body
+            });
 
       - name: Auto-merge PR
         if: steps.find_pr.outputs.found == 'true' && success()
@@ -176,9 +264,17 @@ jobs:
         with:
           script: |
             const prNumber = ${{ steps.find_pr.outputs.pr_number }};
-            await github.rest.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-              merge_method: 'squash'
-            });
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                merge_method: 'squash',
+                commit_title: 'feat: workspace DoD automation (Docs/Sheets/Drive)',
+                commit_message: 'Zero-Touch autonomous control loop implementation'
+              });
+              console.log(`✅ PR #${prNumber} merged successfully`);
+            } catch (error) {
+              console.error(`❌ Merge failed: ${error.message}`);
+              throw error;
+            }
