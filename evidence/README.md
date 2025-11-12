@@ -1,45 +1,50 @@
 # Evidence Collection
 
-**Purpose**: Track all integration proofs and API validations
-
----
+## Purpose
+Track all integration proofs, API validations, and system state snapshots.
 
 ## Structure
 
-- **github_evidence.md** - GitHub API responses and artifacts
-- **make_evidence.md** - Make.com scenario lists and webhooks
-- **telegram_evidence.md** - Telegram bot webhook info
+### Integration Evidence
+- `github_evidence.md` - GitHub Actions artifacts, workflows
+- `make_evidence.md` - Make.com scenarios, team info  
+- `telegram_evidence.md` - Telegram bot webhook status
 
----
+### Decision Logs
+- `../DECISION_LOG.md` - Major system decisions
+- `../decisions/` - Detailed decision records
+
+### Proof Links
+All evidence files link to:
+- Google Drive proof files (screenshots, API responses)
+- Evidence Index spreadsheet (master tracking)
 
 ## Evidence Index
+📊 **Master Spreadsheet**: [Evidence Index](https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit)
 
-**Main Spreadsheet**: https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit
+Contains:
+- All integration proofs
+- Timestamp tracking
+- Status updates
+- Scope changes (L1 → L2)
 
-This spreadsheet contains:
-- Timestamps of all checks
-- API endpoints tested
-- Response status codes
-- Links to proof files
+## Adding New Evidence
 
----
+1. **Create proof file** (screenshot/JSON)
+2. **Upload to Drive** (Evidence_Store folder)
+3. **Add row to Evidence Index**
+4. **Create/update markdown** in this folder
+5. **Reference in DECISION_LOG.md** if decision-related
 
-## Updating Evidence
+## Evidence Types
 
-1. Run integration test
-2. Capture API response
-3. Save proof to Google Drive
-4. Update evidence file
-5. Add entry to Evidence Index
-6. Record in DECISION_LOG.md
-
----
-
-## Decision Log
-
-Major decisions are recorded in `/DECISION_LOG.md` at repo root.
+- 🔑 **Authentication**: Tokens, scopes, permissions
+- 📡 **API Responses**: Status codes, payloads
+- 📊 **State Snapshots**: System state at key moments
+- 📝 **Decisions**: Why we chose X over Y
+- ⚠️ **Incidents**: Errors, rollbacks, fixes
 
 ---
-
-**Last Updated**: 2025-11-12  
-**Version**: 1.0
+**Created**: 2025-11-12  
+**Branch**: unified/desktop-merge  
+**Purpose**: Centralize all system evidence

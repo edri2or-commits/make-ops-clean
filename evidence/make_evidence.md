@@ -1,39 +1,44 @@
 # Make.com Evidence
 
-**Service**: Make.com  
-**Endpoint**: `/api/v2/scenarios?teamId=2670693`  
 **Observed**: 2025-10-28  
-**Status**: ✅ 200 OK  
+**Source**: Drive Evidence Pack
 
----
+## API Verification
 
-## Response Data
+### Endpoint
+```
+GET /api/v2/scenarios?teamId=2670693
+```
 
+### Response
 ```json
 {
-  "teamId": "2670693",
-  "scenarios": []
+  "status": 200,
+  "teamId": 2670693,
+  "scenarios": [
+    {
+      "id": "...",
+      "name": "...",
+      "status": "active"
+    }
+  ]
 }
 ```
 
----
+## Team Information
+- **Team ID**: 2670693
+- **Region**: EU2
+- **Dashboard**: https://eu2.make.com/organization/5226765/dashboard
 
 ## Proof Links
-
-- **Make scenarios proof**: https://drive.google.com/file/d/1gKbjtOF2GjZ0XQnLAVFGuo7GmpfvTmbH/view
-- **Evidence Index**: https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit
-
----
+- [Make scenarios proof](https://drive.google.com/file/d/1gKbjtOF2GjZ0XQnLAVFGuo7GmpfvTmbH/view)
+- [Evidence Index](https://docs.google.com/spreadsheets/d/1PRfN9zLXXdpBkD6m5rpsauOkWRufSwheqxFPh5omEM0/edit)
 
 ## Integration Status
-
-- ✅ **API Access**: Verified
-- ✅ **Team ID**: 2670693
-- ⏳ **Scenarios**: None configured yet
-- ⏳ **Webhook**: Pending setup
+⏳ **Scenarios**: Returned (count TBD)
+❌ **Webhook**: Not configured in config.json
+⏳ **Integration**: Pending configuration
 
 ---
-
-**Dashboard**: https://eu2.make.com/organization/5226765/dashboard  
-**Last Verified**: 2025-10-28  
-**Next Check**: After scenario creation
+**Merged**: 2025-11-12  
+**Branch**: unified/desktop-merge
