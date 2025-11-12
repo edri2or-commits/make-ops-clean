@@ -1,0 +1,59 @@
+# Secrets (Desktop patterns)
+טוקנים/
+GPT/
+_audit/purged_*/
+*.env
+*.env.*
+client_secret*.json
+*secret*
+*.key
+*.pem
+
+# Config overrides (use config.example.json)
+config/config.json
+integrations/*/.env
+
+# State files
+claude_write_queue.json
+CLAUDE_STATE.json
+autopilot-state.json
+
+# Logs
+system.log
+*.log
+logs/
+tmp/
+
+# Build artifacts
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Installers
+*.exe
+*.msi
+*.dmg
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Temp
+archives/desktop-backup-*
