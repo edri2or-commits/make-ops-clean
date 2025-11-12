@@ -1,0 +1,55 @@
+{
+  "telegram": {
+    "enabled": false,
+    "bot_token": "YOUR_BOT_TOKEN_HERE",
+    "chat_id": "YOUR_CHAT_ID_HERE",
+    "instructions": {
+      "get_bot": "1. Open Telegram, search for @BotFather",
+      "create_bot": "2. Send /newbot and follow instructions",
+      "get_token": "3. Copy the token BotFather gives you",
+      "get_chat_id": "4. Search for @userinfobot and send any message to get your chat_id"
+    }
+  },
+  "github": {
+    "enabled": false,
+    "token": "YOUR_GITHUB_TOKEN_HERE",
+    "repo_owner": "edri2or-commits",
+    "repo_name": "make-ops-clean",
+    "instructions": {
+      "create_token": "1. Go to https://github.com/settings/tokens",
+      "click_generate": "2. Click 'Generate new token (classic)'",
+      "select_scopes": "3. Check: 'repo' (all), 'workflow'",
+      "copy_token": "4. Generate and copy the token"
+    }
+  },
+  "openai": {
+    "enabled": false,
+    "api_key": "YOUR_OPENAI_API_KEY_HERE",
+    "model": "gpt-4o-mini",
+    "max_tokens": 1000,
+    "instructions": {
+      "get_key": "1. Go to https://platform.openai.com/api-keys",
+      "create_key": "2. Click 'Create new secret key'",
+      "copy_key": "3. Copy the key (you won't see it again!)",
+      "add_credit": "4. Add credit at https://platform.openai.com/settings/organization/billing/overview"
+    }
+  },
+  "make": {
+    "enabled": false,
+    "webhook_url": "YOUR_MAKE_WEBHOOK_URL_HERE",
+    "instructions": {
+      "create_scenario": "1. Go to https://www.make.com/en/login",
+      "add_webhook": "2. Create new scenario, add 'Webhooks > Custom webhook'",
+      "copy_url": "3. Copy the webhook URL",
+      "test": "4. Save scenario and test"
+    }
+  },
+  "system": {
+    "auto_run_enabled": true,
+    "log_level": "INFO",
+    "retry_count": 3,
+    "notify_on_success": true,
+    "notify_on_error": true,
+    "check_interval_minutes": 60
+  }
+}
