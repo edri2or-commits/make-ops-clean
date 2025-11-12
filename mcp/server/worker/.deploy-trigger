@@ -1,0 +1,12 @@
+Deployment trigger timestamp: 2025-11-12T16:50:00Z
+
+This file triggers the MCP worker deployment workflow.
+The workflow will:
+- Install wrangler
+- Deploy to Cloudflare Workers
+- Generate and save the worker URL
+- Create connection instructions
+
+Status: Triggered by Claude automation
+User: Or Edri
+Purpose: Connect Claude Web to MCP infrastructure
