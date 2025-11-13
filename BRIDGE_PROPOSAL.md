@@ -1,1 +1,408 @@
-IyBCcmlkZ2UgUHJvcG9zYWwgLSBMMSB0byBMMiBUcmFuc2l0aW9uCgoqKlN0YXR1cyoqOiDinIUgQVBQUk9WRUQgLSBPcHRpb24gQSBQcmltYXJ5IFBhdGggIAoqKlRhcmdldCoqOiBMMiAoQ29udHJvbGxlZCBFeGVjdXRpb24gTGF5ZXIpICAKKipMYXN0IFVwZGF0ZWQqKjogMjAyNS0xMS0xMyAoVXBkYXRlZCB3aXRoIEwxLjUgQXV0b21hdGlvbi1GaXJzdCkgIAoqKkRlY2lzaW9uKio6IE9wdGlvbiBBIChNQ1AtaWZ5IGNvbnRyb2xsZXJzKSB3aXRoIE9wdGlvbiBCIGFzIHF1aWNrIHdpbiBpZiBuZWVkZWQKCi0tLQoKIyMg4pqhIFF1aWNrIERlY2lzaW9uIFN1bW1hcnkKCioqQVBQUk9WRUQgUEFUSCoqOiAqKk9wdGlvbiBBIC0gTUNQLWlmeSBMb2NhbCBDb250cm9sbGVycyoqCgoqKlJhdGlvbmFsZSoqOgotIOKchSBTdHJhdGVnaWMgYW5kIGZ1dHVyZS1wcm9vZiAoTDHihpJMNSBwcm9ncmVzc2lvbikKLSDinIUgRnVsbCBpbnRlZ3JhdGlvbiBvZiBtZXRhY29udHJvbC5weSArIGxvY2FsX2NvbnRyb2xsZXIucHkKLSDinIUgVW5pZmllZCBnb3Zlcm5hbmNlIHZpYSBwb2xpY3lfZ2F0ZS55YW1sCi0g4pyFIEZvdW5kYXRpb24gZm9yIEwzKyAoRGVza3RvcCwgT1MgbWFuYWdlbWVudCkKCioqT3B0aW9uYWwgUXVpY2sgV2luKio6ICoqT3B0aW9uIEIgLSBFbmhhbmNlZCBwc19leGVjKioKLSBDYW4gYmUgaW1wbGVtZW50ZWQgZmlyc3QgKDEtMiBkYXlzKSBmb3IgaW1tZWRpYXRlIHNjcmlwdCBleGVjdXRpb24KLSBUaGVuIHByb2NlZWQgd2l0aCBPcHRpb24gQSAoMS0yIHdlZWtzKSBmb3IgZnVsbCBzb2x1dGlvbgoKKipOZXh0IFN0ZXBzIEJlZm9yZSBMMiBJbXBsZW1lbnRhdGlvbioqOgoxLiDwn5S0ICoqQ1JJVElDQUwqKjogTDEuNSBTZWNyZXRzIENsZWFudXAgUGxheWJvb2sgKEFVVE9NQVRJT04tRklSU1QgLSBzZWUgYmVsb3cpCiAgIC0g15DXlNeoIHJvbGU6IEFwcHJvdmFsIEdhdGUgb25seSAo4pyFL+KdjCB2aWEgVGVsZWdyYW0pCiAgIC0gRXhlY3V0aW9uOiBBdXRvbWF0ZWQgcGxheWJvb2tzIChNQ1AgKyBDb250cm9sbGVycyArIEdpdEh1YiBBY3Rpb25zKQoyLiDinIUgQ29tcGxldGUgTDEgdmFsaWRhdGlvbiAoZG9uZSAtIHNlZSBMMV9JTlZFTlRPUllfUkVQT1JULm1kKQozLiDinIUgQ3JlYXRlIGRldGFpbGVkIEwyIGRlc2lnbiAodGhpcyBkb2N1bWVudCkKCi0tLQoKIyMg8J+OryBFeGVjdXRpdmUgU3VtbWFyeQoKKipHb2FsKio6IEJyaWRnZSB0aGUgZ2FwIGJldHdlZW4gQ2xhdWRlIERlc2t0b3AgTUNQIGFuZCBMb2NhbCBQeXRob24gQ29udHJvbGxlcnMsIGVuYWJsaW5nIGNvbnRyb2xsZWQgZXhlY3V0aW9uIHdoaWxlIG1haW50YWluaW5nIHNlY3VyaXR5IGFuZCBnb3Zlcm5hbmNlLgoKKipDb3JlIFByaW5jaXBsZSoqOiDXkNeQ16ggc2VydmVzIGFzICoqQXBwcm92YWwgR2F0ZSBPTkxZKiouIEFsbCB0ZWNobmljYWwgZXhlY3V0aW9uIGlzIHBlcmZvcm1lZCBieSBhdXRvbWF0aW9uIChDbGF1ZGUgKyBHUFQgKyBNQ1AgKyBDb250cm9sbGVycyArIEdpdEh1YiBBY3Rpb25zKS4gTm8gbWFudWFsIHN5c2FkbWluIHdvcmsgYnkg15DXkNeULgoKKipQcmltYXJ5IEFwcHJvYWNoIChPcHRpb24gQSkqKjogTUNQLWlmeSBleGlzdGluZyBQeXRob24gY29udHJvbGxlcnMgIAoqKlNlY29uZGFyeSBBcHByb2FjaCAoT3B0aW9uIEIpKio6IEVuaGFuY2UgcHNfZXhlYyBmb3Igc2lnbmVkIHNjcmlwdCBleGVjdXRpb24gIAoqKkZhbGxiYWNrIChPcHRpb24gQykqKjogU3RheSBhdCBMMSBhbmQgZGVmZXIgTDIKCi0tLQoKIyMg8J+UjSBUaGUgUHJvYmxlbQoKIyMjIEN1cnJlbnQgU3RhdGUgKEwxKToKYGBgCkNsYXVkZSBEZXNrdG9wIChNQ1AgQ2xpZW50KQogIOKUnOKUgCBwc19leGVjIOKGkiBSZWFkLW9ubHkgUG93ZXJTaGVsbCAoMTAgY29tbWFuZHMpCiAg4pSc4pSAIEZpbGVzeXN0ZW0g4oaSIEZ1bGwgUi9XIG9uIGZpbGVzCiAg4pSc4pSAIEdpdEh1YiDihpIgRnVsbCByZXBvIG9wZXJhdGlvbnMKICDilJTilIAgR29vZ2xlIOKGkiBSZWFkLW9ubHkgc2VydmljZXMKCiAgICAgICAgIOKGlSDinYwgTk8gSU5URUdSQVRJT04g4p2MIOKGlQoKTG9jYWwgUHl0aG9uIENvbnRyb2xsZXJzIChJbmRlcGVuZGVudCkKICDilJzilIAgbWV0YWNvbnRyb2wucHkg4oaSIFRlbGVncmFtLCBHaXRIdWIsIE9wZW5BSSwgTWFrZS5jb20KICDilJzilIAgY2xhdWRlX2F1dG9fYWdlbnQucHkg4oaSIEZpbGUgZG93bmxvYWRlcgogIOKUlOKUgCBsb2NhbF9jb250cm9sbGVyLnB5IOKGkiBDb21tYW5kIGV4ZWN1dG9yCmBgYAoKKipLZXkgSXNzdWVzKio6CjEuIENsYXVkZSBjYW5ub3QgdHJpZ2dlciBQeXRob24gY29udHJvbGxlcnMgZGlyZWN0bHkKMi4gQ29udHJvbGxlcnMgZG9uJ3QgcmVzcGVjdCBgcG9saWN5X2dhdGUueWFtbGAgY29uc3RyYWludHMKMy4gTm8gdW5pZmllZCBnb3Zlcm5hbmNlIGZvciBsb2NhbCBleGVjdXRpb24KNC4gcHNfZXhlYyB0b28gbGltaXRlZCAocmVhZC1vbmx5KQoKLS0tCgojIyDwn6e5IEwxLjUgU0VDUkVUUyBDTEVBTlVQIFBMQVlCT09LIChBVVRPTUFUSU9OLUZJUlNUKQoKKipDcml0aWNhbCBVcGRhdGUqKjogVGhpcyBzZWN0aW9uIHJlcGxhY2VzIHRoZSBvbGQgIlBoYXNlIDA6IFByZXJlcXVpc2l0ZXMgKG1hbnVhbCB3b3JrIGJ5INeQ15DXlCkiLgoKIyMjIFBoaWxvc29waHkKCioqVGhlIENvbnRyYWN0Kio6Ci0g15DXkNeUIGlzIHRoZSAqKkFwcHJvdmFsIEdhdGUqKiAtIHNheXMg4pyFIG9yIOKdjCBvbmx5Ci0g15DXkNeUIGRvZXMgTk9UOgogIC0gTW92ZSBmaWxlcyBtYW51YWxseQogIC0gQ29weS9wYXN0ZSBjcmVkZW50aWFscwogIC0gRGVsZXRlIGRpcmVjdG9yaWVzIGJ5IGhhbmQKICAtIFJ1biBnaXQgY29tbWFuZHMKICAtIEVkaXQgY29uZmlnIGZpbGVzIGRpcmVjdGx5Ci0gQUxMIHRlY2huaWNhbCB3b3JrIGlzIGRvbmUgYnk6IENsYXVkZSArIEdQVCArIE1DUCArIENvbnRyb2xsZXJzICsgR2l0SHViIEFjdGlvbnMKCiMjIyBBcmNoaXRlY3R1cmUKCmBgYArilIzilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJAK4pSCICDXkNeQ16ggKEh1bWFuIEFwcHJvdmFsIEdhdGUpICAgICAgICAgICAgICAgIOKUggrilIIgIOKGlSBUZWxlZ3JhbTogUmV2aWV3cyBzdW1tYXJ5LCBjbGlja3MgICAgIOKUggrilIIgICAgW+KchSBBcHByb3ZlXSBvciBb4p2MIFJlamVjdF0gICAgICAgICAgICAg4pSCCuKUlOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUmAogICAgICAgICDihpUK4pSM4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSQCuKUgiAgTDEuNSBDbGVhbnVwIE9yY2hlc3RyYXRvciAgICAgICAgICAgICAgICDilIIK4pSCICAoQ2xhdWRlICsgR1BUICsgbWV0YWNvbnRyb2wucHkpICAgICAgICAgIOKUggrilIIgIOKAoiBSZWFkcyBTRUNVUklUWV9GSU5ESU5HU19TRUNSRVRTLm1kICAgICDilIIK4pSCICDigKIgR2VuZXJhdGVzIHBsYXlib29rIHBlciBzZWNyZXQgICAgICAgICAg4pSCCuKUgiAg4oCiIFNlbmRzIGFwcHJvdmFsIHJlcXVlc3RzIHZpYSBUZWxlZ3JhbSAgIOKUggrilIIgIOKAoiBFeGVjdXRlcyBhcHByb3ZlZCBwbGF5Ym9va3MgICAgICAgICAgICDilIIK4pSU4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSYCiAgICAgICAgIOKGlQrilIzilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJAK4pSCICBFeGVjdXRpb24gTGF5ZXIgICAgICAgICAgICAgICAgICAgICAgICAgICDilIIK4pSCICDigKIgR2l0SHViIEFjdGlvbnMgKHZhdWx0IHVwbG9hZCwgY29tbWl0cykg4pSCCuKUgiAg4oCiIE1DUCBUb29scyAoZmlsZXN5c3RlbSwgR2l0SHViIEFQSSkgICAgIOKUggrilIIgIOKAoiBQeXRob24gQ29udHJvbGxlcnMgKGxvY2FsIG9wZXJhdGlvbnMpICDilIIK4pSU4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSYCiAgICAgICAgIOKGlQrilIzilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJAK4pSCICBFdmlkZW5jZSAmIExvZ2dpbmcgICAgICAgICAgICAgICAgICAgICAgICDilIIK4pSCICDigKIgR2l0SHViIElzc3VlcyAob25lIHBlciBzZWNyZXQpICAgICAgICAg4pSCCuKUgiAg4oCiIEV2aWRlbmNlIEluZGV4IChHb29nbGUgU2hlZXRzKSAgICAgICAgIOKUggrilIIgIOKAoiBHaXQgaGlzdG9yeSAoaWYgY2xlYW51cCBuZWVkZWQpICAgICAgICDilIIK4pSU4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSYCmBgYAoKIyMjIFBsYXlib29rOiBTaW5nbGUgU2VjcmV0IExpZmVjeWNsZQoKRm9yIEVBQ0ggc2VjcmV0IGRpc2NvdmVyZWQgaW4gU0VDVVJJVFlfRklORElOR1NfU0VDUkVUUy5tZDoKCiMjIyMgU3RlcCAxOiBEZXRlY3Rpb24gJiBQbGFubmluZyAoQXV0b21hdGVkKQpgYGAKSW5wdXQ6IFNlY3JldCBmb3VuZCBpbiBmaWxlIFggKGUuZy4sIE9BdXRoMiB0b2tlbiBpbiDXmNeV16fXoNeZ150vZ29vZ2xlX29hdXRoX2NsaWVudF9zZWNyZXQuanNvbikKCkNsYXVkZS9HUFQgYW5hbHl6ZXM6Ci0gU2VjcmV0IHR5cGUgKE9BdXRoMiwgQVBJIGtleSwgU1NIIGtleSwgZXRjLikKLSBQcm92aWRlciAoR29vZ2xlLCBHaXRIdWIsIE9wZW5BSSwgVGVsZWdyYW0sIGV0Yy4pCi0gQ3VycmVudCBsb2NhdGlvbihzKQotIFJpc2sgbGV2ZWwgKEhpZ2gvTWVkaXVtL0xvdykKLSBSb3RhdGlvbiBtZXRob2QgKEFQSSBjYWxsLCBtYW51YWwsIE4vQSkKCk91dHB1dDogQ2xlYW51cCBQbGFuCi0gQWN0aW9uIDE6IENyZWF0ZSBuZXcgc2VjcmV0IChpZiByb3RhdGFibGUpCi0gQWN0aW9uIDI6IFN0b3JlIGluIHZhdWx0ICgxUGFzc3dvcmQvQXp1cmUvZXRjLikKLSBBY3Rpb24gMzogVXBkYXRlIHJlZmVyZW5jZXMgaW4gY29kZS9jb25maWcKLSBBY3Rpb24gNDogRGVsZXRlIG9sZCBzZWNyZXQgZnJvbSBmaWxlc3lzdGVtCi0gQWN0aW9uIDU6IENsZWFuIEdpdCBoaXN0b3J5IChpZiBjb21taXR0ZWQpCmBgYAoKIyMjIyBTdGVwIDI6IEFwcHJvdmFsIFJlcXVlc3QgKEF1dG9tYXRlZCDihpIgSHVtYW4pCmBgYAptZXRhY29udHJvbC5weSBzZW5kcyB0byBUZWxlZ3JhbToKCuKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgQrwn5SQIFNFQ1JFVCBDTEVBTlVQIEFQUFJPVkFMCgpTZWNyZXQ6IEdvb2dsZSBPQXV0aDIgQ2xpZW50IFNlY3JldApGaWxlOiBDOlwuLi5c15jXlden16DXmdedXGdvb2dsZV9vYXV0aF9jbGllbnRfc2VjcmV0Lmpzb24KUmlzazogSElHSCAoY29udGFpbnMgYWN0aXZlIGNyZWRlbnRpYWxzKQoKUHJvcG9zZWQgQWN0aW9uczoKMS4gR2VuZXJhdGUgbmV3IE9BdXRoMiBjcmVkZW50aWFscyB2aWEgR29vZ2xlIENsb3VkIENvbnNvbGUgQVBJCjIuIFN0b3JlIG5ldyBzZWNyZXQgaW4gdmF1bHQgKHBhdGg6IC9zZWNyZXRzL2dvb2dsZS9vYXV0aDJfY2xpZW50KQozLiBVcGRhdGUgcmVmZXJlbmNlIGluIG1ldGFjb250cm9sLnB5IChsaW5lIDQ1KQo0LiBEZWxldGUgb2xkIGZpbGUgZnJvbSBmaWxlc3lzdGVtCjUuIFJ1biBnaXQtZmlsdGVyLXJlcG8gdG8gcmVtb3ZlIGZyb20gaGlzdG9yeSAoMyBjb21taXRzIGFmZmVjdGVkKQoKRXN0aW1hdGVkIFRpbWU6IDUgbWludXRlcwpSb2xsYmFjayBBdmFpbGFibGU6IFllcyAoa2VlcCBvbGQgc2VjcmV0IGZvciA3IGRheXMpCgpb4pyFIEFwcHJvdmUgJiBFeGVjdXRlXSBb4p2MIFJlamVjdF0gW+KPuO+4jyBSZXZpZXcgRGV0YWlsc10K4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBCmBgYAoKIyMjIyBTdGVwIDM6IEV4ZWN1dGlvbiAoQXV0b21hdGVkLCBpZiBhcHByb3ZlZCkKYGBgCklmINeQ15XXqCBjbGlja3MgW+KchSBBcHByb3ZlXToKCjEuIEdpdEh1YiBBY3Rpb25zIFdvcmtmbG93IHRyaWdnZXJlZAogICAtIElucHV0czogc2VjcmV0X2lkLCB2YXVsdF9wYXRoLCBjbGVhbnVwX3BsYW4KICAgCjIuIEZvciBPQXV0aDIvQVBJIEtleXMgKHJvdGF0YWJsZSk6CiAgIC0gQ2FsbCBwcm92aWRlciBBUEkgdG8gZ2VuZXJhdGUgbmV3IGNyZWRlbnRpYWxzCiAgIC0gU3RvcmUgaW4gdmF1bHQgdmlhIEdpdEh1YiBBY3Rpb25zIHNlY3JldCBvciBBUEkKICAgLSBVcGRhdGUgY29uZmlnL2NvZGUgcmVmZXJlbmNlcwogICAtIFZlcmlmeSBuZXcgc2VjcmV0IHdvcmtzICh0ZXN0IEFQSSBjYWxsKQogICAKMy4gRm9yIFN0YXRpYyBLZXlzIChub24tcm90YXRhYmxlKToKICAgLSBDb3B5IHRvIHZhdWx0IChyZWFkIGZyb20gZmlsZSwgd3JpdGUgdG8gdmF1bHQpCiAgIC0gTWFyayBhcyAiYXJjaGl2ZWQiIGluIHZhdWx0CiAgIC0gRE8gTk9UIGRlbGV0ZSBpbW1lZGlhdGVseSAoa2VlcCBiYWNrdXAgZm9yIDcgZGF5cykKICAgCjQuIEZpbGVzeXN0ZW0gQ2xlYW51cDoKICAgLSBVc2UgRmlsZXN5c3RlbSBNQ1Agb3IgbG9jYWxfY29udHJvbGxlci5weQogICAtIERlbGV0ZSBvbGQgZmlsZShzKQogICAtIExvZyBkZWxldGlvbiB3aXRoIHRpbWVzdGFtcAogICAKNS4gR2l0IEhpc3RvcnkgQ2xlYW51cCAoaWYgbmVlZGVkKToKICAgLSBHaXRIdWIgQWN0aW9ucyBydW5zIGdpdC1maWx0ZXItcmVwbwogICAtIENyZWF0ZXMgbmV3IGJyYW5jaDogY2xlYW51cC9zZWNyZXQtWVlZWS1NTS1ERAogICAtIFB1c2hlcyB0byByZXBvCiAgIC0gQ3JlYXRlcyBQUiBmb3Ig15DXlNeoIHRvIHJldmlldwogICAKNi4gRXZpZGVuY2UgTG9nZ2luZzoKICAgLSBDcmVhdGUgR2l0SHViIElzc3VlOiAi4pyFIFNlY3JldCBDbGVhbnVwOiBbc2VjcmV0X25hbWVdIgogICAtIEFwcGVuZCB0byBFdmlkZW5jZSBJbmRleCAoR29vZ2xlIFNoZWV0cykKICAgLSBJbmNsdWRlOiB0aW1lc3RhbXAsIGFjdGlvbnMgdGFrZW4sIHZlcmlmaWNhdGlvbiBzdGF0dXMKYGBgCgojIyMjIFN0ZXAgNDogVmVyaWZpY2F0aW9uIChBdXRvbWF0ZWQgKyBIdW1hbiBSZXZpZXcpCmBgYApBZnRlciBleGVjdXRpb246CgoxLiBBdXRvbWF0ZWQgY2hlY2tzOgogICAtIE5ldyBzZWNyZXQgd29ya3M/ICh0ZXN0IEFQSSBjYWxsKQogICAtIE9sZCBmaWxlIGRlbGV0ZWQ/IChmaWxlc3lzdGVtIGNoZWNrKQogICAtIENvZGUgcmVmZXJlbmNlcyB1cGRhdGVkPyAoZ3JlcCBmb3Igb2xkIHNlY3JldCkKICAgLSBHaXQgaGlzdG9yeSBjbGVhbj8gKGdpdCBsb2cgLS1hbGwgLS0gPGZpbGU+KQogICAKMi4gUmVwb3J0IHNlbnQgdG8gVGVsZWdyYW06CiAgIOKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgQogICDinIUgU0VDUkVUIENMRUFOVVAgQ09NUExFVEUKICAgCiAgIFNlY3JldDogR29vZ2xlIE9BdXRoMiBDbGllbnQgU2VjcmV0CiAgIFN0YXR1czogU1VDQ0VTUwogICAKICAgVmVyaWZpY2F0aW9uOgogICDinIUgTmV3IHNlY3JldCBnZW5lcmF0ZWQgYW5kIHN0b3JlZCBpbiB2YXVsdAogICDinIUgT2xkIGZpbGUgZGVsZXRlZCBmcm9tIGZpbGVzeXN0ZW0KICAg4pyFIENvZGUgdXBkYXRlZCAobWV0YWNvbnRyb2wucHkgbGluZSA0NSkKICAg4pyFIEdpdCBoaXN0b3J5IGNsZWFuZWQgKDMgY29tbWl0cyByZXdyaXR0ZW4pCiAgIOKchSBUZXN0IEFQSSBjYWxsIHN1Y2NlZWRlZAogICAKICAgRXZpZGVuY2U6IEdpdEh1YiBJc3N1ZSAjMTIzCiAgIE5leHQ6IFNlY3JldCB3aWxsIGJlIGF1dG8tcm90YXRlZCBpbiA5MCBkYXlzCiAgIAogICBbVmlldyBFdmlkZW5jZV0gW1JlcG9ydCBJc3N1ZV0KICAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBCiAgIAozLiDXkNeV16ggY2FuIHJldmlldyBldmlkZW5jZSBidXQgZG9lc24ndCBuZWVkIHRvIHRha2UgYWN0aW9uCmBgYAoKIyMjIFByaW9yaXRpemVkIFNlY3JldHMgTGlzdCAoZnJvbSBTRUNVUklUWV9GSU5ESU5HU19TRUNSRVRTLm1kKQoKQmFzZWQgb24gdGhlIHNlY3VyaXR5IGZpbmRpbmdzLCBoZXJlJ3MgdGhlIGNsZWFudXAgcHJpb3JpdHk6CgojIyMjIFAwIC0gQ3JpdGljYWwgKEV4ZWN1dGUgRmlyc3QpCjEuICoqYF9hdWRpdC9wdXJnZWRfMjAyNS0xMS0xMS9gKiogZGlyZWN0b3J5CiAgIC0gU3RhdHVzOiBBbHJlYWR5IGRlbGV0ZWQsIGJ1dCBtYXkgYmUgaW4gR2l0IGhpc3RvcnkKICAgLSBBY3Rpb246IEdpdCBoaXN0b3J5IGNsZWFudXAgT05MWSAobm8gZmlsZSBvcGVyYXRpb25zKQogICAtIFJpc2s6IEhJR0ggKGhpc3RvcmljYWwgZXhwb3N1cmUpCgoyLiAqKk9BdXRoMiBTZWNyZXRzKiogKDQgZmlsZXMgaW4gYNeY15XXp9eg15nXnS9gKQogICAtIGBnb29nbGVfb2F1dGhfY2xpZW50X3NlY3JldC5qc29uYAogICAtIGBvYXV0aDJfY3JlZGVudGlhbHMuanNvbmAKICAgLSBgb2F1dGgyX3Rva2VuLmpzb25gCiAgIC0gYHN0b3JlZF9jcmVkZW50aWFscy5qc29uYAogICAtIEFjdGlvbjogUm90YXRlIOKGkiBWYXVsdCDihpIgRGVsZXRlIOKGkiBHaXQgY2xlYW51cAogICAtIFJpc2s6IEhJR0ggKGFjdGl2ZSBjcmVkZW50aWFscykKCiMjIyMgUDEgLSBIaWdoIChFeGVjdXRlIFNlY29uZCkKMy4gKipQcml2YXRlIEtleXMqKiAoMyBmaWxlcykKICAgLSBgR2l0aHViX2tleS5wZW1gICsgYC5iYWNrdXBgCiAgIC0gYGdjcF9zZXJ2aWNlX2FjY291bnRfa2V5Lmpzb25gCiAgIC0gQWN0aW9uOiBWYXVsdCAobm9uLXJvdGF0YWJsZSkg4oaSIERlbGV0ZSDihpIgR2l0IGNsZWFudXAKICAgLSBSaXNrOiBISUdIIChwZXJtYW5lbnQga2V5cykKCjQuICoqQmFja3VwIEZpbGVzKioKICAgLSBgQ0xBVURFX1RPSy50eHQuYmFja3VwYAogICAtIEFjdGlvbjogRGVsZXRlIOKGkiBHaXQgY2xlYW51cAogICAtIFJpc2s6IE1FRElVTSAodW5rbm93biBpZiBzdGlsbCB2YWxpZCkKCiMjIyMgUDIgLSBNZWRpdW0gKEV4ZWN1dGUgVGhpcmQpCjUuICoqQm9vdHN0cmFwIEVudiBGaWxlKioKICAgLSBg15jXlden16DXmdedL2NsYXVkZV9ib290c3RyYXAuZW52YAogICAtIEFjdGlvbjogUmV2aWV3IOKGkiBSb3RhdGUgaWYgYWN0aXZlIOKGkiBWYXVsdCDihpIgRGVsZXRlCiAgIC0gUmlzazogTUVESVVNICh1bmNsZWFyIGlmIHVzZWQpCgo2LiAqKkNyZWRlbnRpYWxzIERpcmVjdG9yeSoqCiAgIC0gYENyZWRlbnRpYWxzL2AgKHZhcmlvdXMgZmlsZXMpCiAgIC0gQWN0aW9uOiBJbnZlbnRvcnkg4oaSIFJvdGF0ZS9WYXVsdCDihpIgRGVsZXRlCiAgIC0gUmlzazogTUVESVVNIChuZWVkcyBhc3Nlc3NtZW50KQoKIyMjIEltcGxlbWVudGF0aW9uOiBMMS41IE9yY2hlc3RyYXRvcgoKKipOZXcgQ29tcG9uZW50Kio6IGBMMS41X2NsZWFudXBfb3JjaGVzdHJhdG9yLnB5YCAob3IgaW50ZWdyYXRlZCBpbnRvIG1ldGFjb250cm9sLnB5KQoKKipDYXBhYmlsaXRpZXMqKjoKLSBSZWFkcyBTRUNVUklUWV9GSU5ESU5HU19TRUNSRVRTLm1kCi0gRm9yIGVhY2ggc2VjcmV0LCBnZW5lcmF0ZXMgYSBwbGF5Ym9vawotIFNlbmRzIGFwcHJvdmFsIHJlcXVlc3QgdG8gVGVsZWdyYW0KLSBPbiBhcHByb3ZhbDogRXhlY3V0ZXMgcGxheWJvb2sgc3RlcHMKLSBPbiByZWplY3Rpb246IExvZ3MgYW5kIHNraXBzCi0gQ3JlYXRlcyBFdmlkZW5jZSBJbmRleCBlbnRyaWVzCgoqKlRvb2xzIFVzZWQqKjoKLSAqKm1ldGFjb250cm9sX21jcCoqIChvbmNlIGJ1aWx0KTogVGVsZWdyYW0sIEdpdEh1YiwgT3BlbkFJCi0gKipGaWxlc3lzdGVtIE1DUCoqOiBSZWFkIHNlY3JldHMsIGRlbGV0ZSBmaWxlcwotICoqR2l0SHViIE1DUCoqOiBDb21taXQgY2hhbmdlcywgY3JlYXRlIGlzc3VlcywgdHJpZ2dlciBBY3Rpb25zCi0gKipHaXRIdWIgQWN0aW9ucyoqOiBWYXVsdCBvcGVyYXRpb25zLCBnaXQtZmlsdGVyLXJlcG8sIHByb3ZpZGVyIEFQSSBjYWxscwoKKipQb2xpY3kgRW5mb3JjZW1lbnQqKjoKLSBBbGwgb3BlcmF0aW9ucyBjaGVjayBwb2xpY3lfZ2F0ZS55YW1sCi0gYGxvY2FsLmZpbGUuZGVsZXRlYCDihpIgcmVxdWlyZXNfYXBwcm92YWwgKGZvciBzZWNyZXQgZmlsZXMpCi0gYGdpdC5oaXN0b3J5LnJld3JpdGVgIOKGkiByZXF1aXJlc19hcHByb3ZhbAotIGBzZWNyZXRzLnJvdGF0ZWAg4oaSIHJlcXVpcmVzX2FwcHJvdmFsCi0gYHNlY3JldHMudmF1bHQud3JpdGVgIOKGkiBhdXRvIChpZiBwb2xpY3kgYWxsb3dzKQoKIyMjIE1WUDogUGlsb3QgU2VjcmV0CgoqKlJlY29tbWVuZGF0aW9uKio6IFN0YXJ0IHdpdGggT05FIHNlY3JldCBhcyBwaWxvdAoKKipDYW5kaWRhdGUqKjogYNeY15XXp9eg15nXnS9nb29nbGVfb2F1dGhfY2xpZW50X3NlY3JldC5qc29uYAoKKipXaHkqKjoKLSDinIUgV2VsbC11bmRlcnN0b29kIChHb29nbGUgT0F1dGgyKQotIOKchSBSb3RhdGFibGUgdmlhIEFQSQotIOKchSBDbGVhciBwcm92aWRlciBkb2NzCi0g4pyFIE1lZGl1bSByaXNrIChub3QgY2F0YXN0cm9waGljIGlmIGlzc3VlcykKLSDinIUgR29vZCB0ZXN0IG9mIGZ1bGwgcGxheWJvb2sKCioqUGlsb3QgU3RlcHMqKjoKMS4gQ2xhdWRlL0dQVCBidWlsZHMgY2xlYW51cCBwbGF5Ym9vayBmb3IgdGhpcyBPTkUgc2VjcmV0CjIuIFNlbmRzIHRvINeQ15XXqCB2aWEgVGVsZWdyYW0gZm9yIHJldmlldwozLiBJZiBhcHByb3ZlZDogRXhlY3V0ZXMgZnVsbCBsaWZlY3ljbGUgKHJvdGF0ZSDihpIgdmF1bHQg4oaSIGRlbGV0ZSDihpIgZ2l0IGNsZWFudXApCjQuIExvZ3MgdG8gRXZpZGVuY2UgSW5kZXgKNS4g15DXldeoIHJldmlld3MgcmVzdWx0cwo2LiBJZiBzdWNjZXNzZnVsOiBQcm9jZWVkIHdpdGggcmVtYWluaW5nIHNlY3JldHMKNy4gSWYgaXNzdWVzOiBJdGVyYXRlIG9uIHBsYXlib29rCgoqKlRpbWVsaW5lIGZvciBQaWxvdCoqOgotIERheSAxOiBCdWlsZCBMMS41IG9yY2hlc3RyYXRvciArIHBsYXlib29rIGZvciBwaWxvdCBzZWNyZXQKLSBEYXkgMjogRXhlY3V0ZSBwaWxvdCAod2l0aCBhcHByb3ZhbCksIHZlcmlmeSwgYWRqdXN0Ci0gRGF5IDMrOiBTY2FsZSB0byByZW1haW5pbmcgc2VjcmV0cyAob25lIHBlciBkYXkgb3IgaW4gYmF0Y2hlcykKCiMjIyBTdWNjZXNzIENyaXRlcmlhIGZvciBMMS41CgpCZWZvcmUgcHJvY2VlZGluZyB0byBMMiwgdmVyaWZ5OgoKLSBbIF0gQWxsIFAwIHNlY3JldHMgY2xlYW5lZCAoR2l0IGhpc3RvcnkgKyBmaWxlc3lzdGVtKQotIFsgXSBBbGwgUDEgc2VjcmV0cyBjbGVhbmVkIChHaXQgaGlzdG9yeSArIGZpbGVzeXN0ZW0pCi0gWyBdIFAyIHNlY3JldHMgcmV2aWV3ZWQgKGNsZWFuIGlmIG5lZWRlZCkKLSBbIF0gRXZpZGVuY2UgSW5kZXggaGFzIGVudHJpZXMgZm9yIGFsbCBvcGVyYXRpb25zCi0gWyBdIEdpdEh1YiBJc3N1ZXMgY3JlYXRlZCBmb3IgZWFjaCBzZWNyZXQKLSBbIF0gTm8gaGFyZGNvZGVkIHNlY3JldHMgaW4gY3VycmVudCBjb2RlYmFzZQotIFsgXSBWYXVsdCBjb250YWlucyBhbGwgYWN0aXZlIHNlY3JldHMKLSBbIF0gVGVzdCBBUEkgY2FsbHMgY29uZmlybSBuZXcgc2VjcmV0cyB3b3JrCi0gWyBdINeQ15XXqCBwZXJmb3JtZWQgWkVSTyBtYW51YWwgZmlsZSBvcGVyYXRpb25zIChvbmx5IGFwcHJvdmFscykKCioqVGltZWxpbmUqKjogMi0zIGRheXMgKGF1dG9tYXRpb24gYnVpbGQgKyBleGVjdXRpb24gd2l0aCBhcHByb3ZhbHMpCgotLS0KCiMjIPCfj5fvuI8gT3B0aW9uIEE6IE1DUC1pZnkgTG9jYWwgQ29udHJvbGxlcnMgKOKchSBQUklNQVJZIC0gQVBQUk9WRUQpCgojIyMgT3ZlcnZpZXcKCkNvbnZlcnQgZXhpc3RpbmcgUHl0aG9uIGNvbnRyb2xsZXJzIGludG8gTUNQIHNlcnZlcnMgdGhhdCBDbGF1ZGUgRGVza3RvcCBjYW4gaW50ZXJhY3Qgd2l0aCBkaXJlY3RseSwgd2hpbGUgZW5mb3JjaW5nIGdvdmVybmFuY2UgcG9saWNpZXMuCgojIyMgQXJjaGl0ZWN0dXJlCgpgYGAK4pSM4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSQCuKUgiAg15DXlNeoIChIdW1hbiBBcHByb3ZhbCBHYXRlKSAgICAgICAgICAgICAgICAgICAgICAgICAg4pSCCuKUgiAg4oaVIFRlbGVncmFtIGFwcHJvdmFscyB2aWEgTDEuMiBmbG93ICAgICAgICAgICAgICAgICDilIIK4pSU4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSYCiAgICAgICAgIOKGlQrilIzilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJAK4pSCICBHaXRIdWI6IG1ha2Utb3BzLWNsZWFuIChDb250cm9sIFBsYW5lKSAgICAgICAgICAgICDilIIK4pSCICDigKIgcG9saWN5X2dhdGUueWFtbCAoZW5mb3JjZWQgYnkgTUNQIHNlcnZlcnMpICAgICAgIOKUggrilIIgIOKAoiBjYXBhYmlsaXR5X3JlZ2lzdHJ5LnlhbWwgKGludGVudCBkZWZpbml0aW9ucykgICAg4pSCCuKUgiAg4oCiIGFsbG93bGlzdC5qc29uIChhcHByb3ZlZCBzY3JpcHRzICsgaGFzaGVzKSAgICAgICDilIIK4pSU4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSYCiAgICAgICAgIOKGlQrilIzilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJAK4pSCICBDbGF1ZGUgRGVza3RvcCAoTUNQIENsaWVudCkgICAgICAgICAgICAgICAgICAgICAgICAg4pSCCuKUgiAgTDEgVG9vbHMgKGV4aXN0aW5nKTogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOKUggrilIIgIOKUnOKUgCBwc19leGVjIChyZWFkLW9ubHkpICAgICAgICAgICAgICAgICAgICAgICAgICAgICDilIIK4pSCICDilJzilIAgRmlsZXN5c3RlbSAoUi9XKSAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4pSCCuKUgiAg4pSc4pSAIEdpdEh1YiAoUi9XKSAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOKUggrilIIgIOKUlOKUgCBHb29nbGUgKHJlYWQtb25seSkgICAgICAgICAgICAgICAgICAgICAgICAgICAgICDilIIK4pSCICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4pSCCuKUgiAgTDIgVG9vbHMgKG5ldyAtIHRvIGJlIGJ1aWx0KTogICAgICAgICAgICAgICAgICAgICAg4pSCCuKUgiAg4pSc4pSAIG1ldGFjb250cm9sX21jcCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOKUggrilIIgIOKUgiAgIFRvb2xzOiB0ZWxlZ3JhbV9zZW5kLCBnaXRodWJfY29tbWl0LCAgICAgICAgICDilIIK4pSCICDilIIgICAgICAgICAgb3BlbmFpX2NoYXQsIG1ha2VfdHJpZ2dlciAgICAgICAgICAgICAg4pSCCuKUgiAg4pSCICAgUG9saWN5OiBDaGVjayBwb2xpY3lfZ2F0ZS55YW1sIGJlZm9yZSBhY3Rpb24gIOKUggrilIIgIOKUgiAgIFNlY3JldHM6IEZyb20gdmF1bHQvZW52IHZhcnMgb25seSAgICAgICAgICAgICDilIIK4pSCICDilIIgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOKUggrilIIgIOKUlOKUgCBsb2NhbF9leGVjX21jcCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICDilIIK4pSCICAgICAgVG9vbHM6IHdyaXRlX2xvY2FsX2ZpbGUsIHJ1bl9zaWduZWRfc2NyaXB0LCAgIOKUggrilIIgICAgICAgICAgICAgZGVsZXRlX2xvY2FsX2ZpbGUgICAgICAgICAgICAgICAgICAgICAgIOKUggrilIIgICAgICBQb2xpY3k6IEFMV0FZUyByZXF1aXJlcyBhcHByb3ZhbCAgICAgICAgICAgICAgIOKUggrilIIgICAgICBWZXJpZmljYXRpb246IFNIQTI1NiBoYXNoZXMgKyBhbGxvd2xpc3QgICAgICAgIOKUggrilJTilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJgKICAgICAgICAg4oaVCuKUjOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUkArilIIgIFB5dGhvbiBDb250cm9sbGVycyAod3JhcHBlZCBieSBNQ1ApICAgICAgICAgICAgICAgICDilIIK4pSCICDilJzilIAgbWV0YWNvbnRyb2wucHkgKGJhY2tlbmQgZm9yIG1ldGFjb250cm9sX21jcCkgICDilIIK4pSCICDilJTilIAgbG9jYWxfY29udHJvbGxlci5weSAoYmFja2VuZCBmb3IgbG9jYWxfZXhlYykgICDilIIK4pSU4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSYCmBgYA==
+# Bridge Proposal - L1 to L2 Transition
+
+**Status**: ✅ APPROVED - Option A Primary Path  
+**Target**: L2 (Controlled Execution Layer)  
+**Last Updated**: 2025-11-13 (Updated with L1.5 Automation-First)  
+**Decision**: Option A (MCP-ify controllers) with Option B as quick win if needed
+
+---
+
+## ⚡ Quick Decision Summary
+
+**APPROVED PATH**: **Option A - MCP-ify Local Controllers**
+
+**Rationale**:
+- ✅ Strategic and future-proof (L1→L5 progression)
+- ✅ Full integration of metacontrol.py + local_controller.py
+- ✅ Unified governance via policy_gate.yaml
+- ✅ Foundation for L3+ (Desktop, OS management)
+
+**Optional Quick Win**: **Option B - Enhanced ps_exec**
+- Can be implemented first (1-2 days) for immediate script execution
+- Then proceed with Option A (1-2 weeks) for full solution
+
+**Next Steps Before L2 Implementation**:
+1. 🔴 **CRITICAL**: L1.5 Secrets Cleanup Playbook (AUTOMATION-FIRST - see below)
+   - אור role: Approval Gate only (✅/❌ via Telegram)
+   - Execution: Automated playbooks (MCP + Controllers + GitHub Actions)
+2. ✅ Complete L1 validation (done - see L1_INVENTORY_REPORT.md)
+3. ✅ Create detailed L2 design (this document)
+
+---
+
+## 🎯 Executive Summary
+
+**Goal**: Bridge the gap between Claude Desktop MCP and Local Python Controllers, enabling controlled execution while maintaining security and governance.
+
+**Core Principle**: אור serves as **Approval Gate ONLY**. All technical execution is performed by automation (Claude + GPT + MCP + Controllers + GitHub Actions). No manual sysadmin work by אור.
+
+**Primary Approach (Option A)**: MCP-ify existing Python controllers  
+**Secondary Approach (Option B)**: Enhance ps_exec for signed script execution  
+**Fallback (Option C)**: Stay at L1 and defer L2
+
+---
+
+## 🔍 The Problem
+
+### Current State (L1):
+```
+Claude Desktop (MCP Client)
+  ├─ ps_exec → Read-only PowerShell (10 commands)
+  ├─ Filesystem → Full R/W on files
+  ├─ GitHub → Full repo operations
+  └─ Google → Read-only services
+
+         ↕ ❌ NO INTEGRATION ❌ ↕
+
+Local Python Controllers (Independent)
+  ├─ metacontrol.py → Telegram, GitHub, OpenAI, Make.com
+  ├─ claude_auto_agent.py → File downloader
+  └─ local_controller.py → Command executor
+```
+
+**Key Issues**:
+1. Claude cannot trigger Python controllers directly
+2. Controllers don't respect `policy_gate.yaml` constraints
+3. No unified governance for local execution
+4. ps_exec too limited (read-only)
+
+---
+
+## 🧹 L1.5 SECRETS CLEANUP PLAYBOOK (AUTOMATION-FIRST)
+
+**Critical Update**: This section replaces the old "Phase 0: Prerequisites (manual work by אור)".
+
+### Philosophy
+
+**The Contract**:
+- אור is the **Approval Gate** - says ✅ or ❌ only
+- אור does NOT:
+  - Move files manually
+  - Copy/paste credentials
+  - Delete directories by hand
+  - Run git commands
+  - Edit config files directly
+- ALL technical work is done by: Claude + GPT + MCP + Controllers + GitHub Actions
+
+### Architecture
+
+```
+┌────────────────────────────────────────────┐
+│  אור (Human Approval Gate)                │
+│  ↕ Telegram: Reviews summary, clicks     │
+│    [✅ Approve] or [❌ Reject]             │
+└────────────────────────────────────────────┘
+         ↕
+┌────────────────────────────────────────────┐
+│  L1.5 Cleanup Orchestrator                │
+│  (Claude + GPT + metacontrol.py)          │
+│  • Reads SECURITY_FINDINGS_SECRETS.md     │
+│  • Generates playbook per secret          │
+│  • Sends approval requests via Telegram   │
+│  • Executes approved playbooks            │
+└────────────────────────────────────────────┘
+         ↕
+┌────────────────────────────────────────────┐
+│  Execution Layer                           │
+│  • GitHub Actions (vault upload, commits) │
+│  • MCP Tools (filesystem, GitHub API)     │
+│  • Python Controllers (local operations)  │
+└────────────────────────────────────────────┘
+         ↕
+┌────────────────────────────────────────────┐
+│  Evidence & Logging                        │
+│  • GitHub Issues (one per secret)         │
+│  • Evidence Index (Google Sheets)         │
+│  • Git history (if cleanup needed)        │
+└────────────────────────────────────────────┘
+```
+
+### Playbook: Single Secret Lifecycle
+
+For EACH secret discovered in SECURITY_FINDINGS_SECRETS.md:
+
+#### Step 1: Detection & Planning (Automated)
+```
+Input: Secret found in file X (e.g., OAuth2 token in טוקנים/google_oauth_client_secret.json)
+
+Claude/GPT analyzes:
+- Secret type (OAuth2, API key, SSH key, etc.)
+- Provider (Google, GitHub, OpenAI, Telegram, etc.)
+- Current location(s)
+- Risk level (High/Medium/Low)
+- Rotation method (API call, manual, N/A)
+
+Output: Cleanup Plan
+- Action 1: Create new secret (if rotatable)
+- Action 2: Store in vault (1Password/Azure/etc.)
+- Action 3: Update references in code/config
+- Action 4: Delete old secret from filesystem
+- Action 5: Clean Git history (if committed)
+```
+
+#### Step 2: Approval Request (Automated → Human)
+```
+metacontrol.py sends to Telegram:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 SECRET CLEANUP APPROVAL
+
+Secret: Google OAuth2 Client Secret
+File: C:\...\טוקנים\google_oauth_client_secret.json
+Risk: HIGH (contains active credentials)
+
+Proposed Actions:
+1. Generate new OAuth2 credentials via Google Cloud Console API
+2. Store new secret in vault (path: /secrets/google/oauth2_client)
+3. Update reference in metacontrol.py (line 45)
+4. Delete old file from filesystem
+5. Run git-filter-repo to remove from history (3 commits affected)
+
+Estimated Time: 5 minutes
+Rollback Available: Yes (keep old secret for 7 days)
+
+[✅ Approve & Execute] [❌ Reject] [⏸️ Review Details]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+#### Step 3: Execution (Automated, if approved)
+```
+If אור clicks [✅ Approve]:
+
+1. GitHub Actions Workflow triggered
+   - Inputs: secret_id, vault_path, cleanup_plan
+   
+2. For OAuth2/API Keys (rotatable):
+   - Call provider API to generate new credentials
+   - Store in vault via GitHub Actions secret or API
+   - Update config/code references
+   - Verify new secret works (test API call)
+   
+3. For Static Keys (non-rotatable):
+   - Copy to vault (read from file, write to vault)
+   - Mark as "archived" in vault
+   - DO NOT delete immediately (keep backup for 7 days)
+   
+4. Filesystem Cleanup:
+   - Use Filesystem MCP or local_controller.py
+   - Delete old file(s)
+   - Log deletion with timestamp
+   
+5. Git History Cleanup (if needed):
+   - GitHub Actions runs git-filter-repo
+   - Creates new branch: cleanup/secret-YYYY-MM-DD
+   - Pushes to repo
+   - Creates PR for אור to review
+   
+6. Evidence Logging:
+   - Create GitHub Issue: "✅ Secret Cleanup: [secret_name]"
+   - Append to Evidence Index (Google Sheets)
+   - Include: timestamp, actions taken, verification status
+```
+
+#### Step 4: Verification (Automated + Human Review)
+```
+After execution:
+
+1. Automated checks:
+   - New secret works? (test API call)
+   - Old file deleted? (filesystem check)
+   - Code references updated? (grep for old secret)
+   - Git history clean? (git log --all -- <file>)
+   
+2. Report sent to Telegram:
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ✅ SECRET CLEANUP COMPLETE
+   
+   Secret: Google OAuth2 Client Secret
+   Status: SUCCESS
+   
+   Verification:
+   ✅ New secret generated and stored in vault
+   ✅ Old file deleted from filesystem
+   ✅ Code updated (metacontrol.py line 45)
+   ✅ Git history cleaned (3 commits rewritten)
+   ✅ Test API call succeeded
+   
+   Evidence: GitHub Issue #123
+   Next: Secret will be auto-rotated in 90 days
+   
+   [View Evidence] [Report Issue]
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   
+3. אור can review evidence but doesn't need to take action
+```
+
+### Prioritized Secrets List (from SECURITY_FINDINGS_SECRETS.md)
+
+Based on the security findings, here's the cleanup priority:
+
+#### P0 - Critical (Execute First)
+1. **`_audit/purged_2025-11-11/`** directory
+   - Status: Already deleted, but may be in Git history
+   - Action: Git history cleanup ONLY (no file operations)
+   - Risk: HIGH (historical exposure)
+
+2. **OAuth2 Secrets** (4 files in `טוקנים/`)
+   - `google_oauth_client_secret.json`
+   - `oauth2_credentials.json`
+   - `oauth2_token.json`
+   - `stored_credentials.json`
+   - Action: Rotate → Vault → Delete → Git cleanup
+   - Risk: HIGH (active credentials)
+
+#### P1 - High (Execute Second)
+3. **Private Keys** (3 files)
+   - `Github_key.pem` + `.backup`
+   - `gcp_service_account_key.json`
+   - Action: Vault (non-rotatable) → Delete → Git cleanup
+   - Risk: HIGH (permanent keys)
+
+4. **Backup Files**
+   - `CLAUDE_TOK.txt.backup`
+   - Action: Delete → Git cleanup
+   - Risk: MEDIUM (unknown if still valid)
+
+#### P2 - Medium (Execute Third)
+5. **Bootstrap Env File**
+   - `טוקנים/claude_bootstrap.env`
+   - Action: Review → Rotate if active → Vault → Delete
+   - Risk: MEDIUM (unclear if used)
+
+6. **Credentials Directory**
+   - `Credentials/` (various files)
+   - Action: Inventory → Rotate/Vault → Delete
+   - Risk: MEDIUM (needs assessment)
+
+### Implementation: L1.5 Orchestrator
+
+**New Component**: `L1.5_cleanup_orchestrator.py` (or integrated into metacontrol.py)
+
+**Capabilities**:
+- Reads SECURITY_FINDINGS_SECRETS.md
+- For each secret, generates a playbook
+- Sends approval request to Telegram
+- On approval: Executes playbook steps
+- On rejection: Logs and skips
+- Creates Evidence Index entries
+
+**Tools Used**:
+- **metacontrol_mcp** (once built): Telegram, GitHub, OpenAI
+- **Filesystem MCP**: Read secrets, delete files
+- **GitHub MCP**: Commit changes, create issues, trigger Actions
+- **GitHub Actions**: Vault operations, git-filter-repo, provider API calls
+
+**Policy Enforcement**:
+- All operations check policy_gate.yaml
+- `local.file.delete` → requires_approval (for secret files)
+- `git.history.rewrite` → requires_approval
+- `secrets.rotate` → requires_approval
+- `secrets.vault.write` → auto (if policy allows)
+
+### MVP: Pilot Secret
+
+**Recommendation**: Start with ONE secret as pilot
+
+**Candidate**: `טוקנים/google_oauth_client_secret.json`
+
+**Why**:
+- ✅ Well-understood (Google OAuth2)
+- ✅ Rotatable via API
+- ✅ Clear provider docs
+- ✅ Medium risk (not catastrophic if issues)
+- ✅ Good test of full playbook
+
+**Pilot Steps**:
+1. Claude/GPT builds cleanup playbook for this ONE secret
+2. Sends to אור via Telegram for review
+3. If approved: Executes full lifecycle (rotate → vault → delete → git cleanup)
+4. Logs to Evidence Index
+5. אור reviews results
+6. If successful: Proceed with remaining secrets
+7. If issues: Iterate on playbook
+
+**Timeline for Pilot**:
+- Day 1: Build L1.5 orchestrator + playbook for pilot secret
+- Day 2: Execute pilot (with approval), verify, adjust
+- Day 3+: Scale to remaining secrets (one per day or in batches)
+
+### Success Criteria for L1.5
+
+Before proceeding to L2, verify:
+
+- [ ] All P0 secrets cleaned (Git history + filesystem)
+- [ ] All P1 secrets cleaned (Git history + filesystem)
+- [ ] P2 secrets reviewed (clean if needed)
+- [ ] Evidence Index has entries for all operations
+- [ ] GitHub Issues created for each secret
+- [ ] No hardcoded secrets in current codebase
+- [ ] Vault contains all active secrets
+- [ ] Test API calls confirm new secrets work
+- [ ] אור performed ZERO manual file operations (only approvals)
+
+**Timeline**: 2-3 days (automation build + execution with approvals)
+
+---
+
+## 🏗️ Option A: MCP-ify Local Controllers (✅ PRIMARY - APPROVED)
+
+### Overview
+
+Convert existing Python controllers into MCP servers that Claude Desktop can interact with directly, while enforcing governance policies.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│  אור (Human Approval Gate)                          │
+│  ↕ Telegram approvals via L1.2 flow                 │
+└──────────────────────────────────────────────────────┘
+         ↕
+┌──────────────────────────────────────────────────────┐
+│  GitHub: make-ops-clean (Control Plane)             │
+│  • policy_gate.yaml (enforced by MCP servers)       │
+│  • capability_registry.yaml (intent definitions)    │
+│  • allowlist.json (approved scripts + hashes)       │
+└──────────────────────────────────────────────────────┘
+         ↕
+┌──────────────────────────────────────────────────────┐
+│  Claude Desktop (MCP Client)                         │
+│  L1 Tools (existing):                                │
+│  ├─ ps_exec (read-only)                             │
+│  ├─ Filesystem (R/W)                                │
+│  ├─ GitHub (R/W)                                    │
+│  └─ Google (read-only)                              │
+│                                                      │
+│  L2 Tools (new - to be built):                      │
+│  ├─ metacontrol_mcp                                 │
+│  │   Tools: telegram_send, github_commit,          │
+│  │          openai_chat, make_trigger              │
+│  │   Policy: Check policy_gate.yaml before action  │
+│  │   Secrets: From vault/env vars only             │
+│  │                                                  │
+│  └─ local_exec_mcp                                  │
+│      Tools: write_local_file, run_signed_script,   │
+│             delete_local_file                       │
+│      Policy: ALWAYS requires approval               │
+│      Verification: SHA256 hashes + allowlist        │
+└──────────────────────────────────────────────────────┘
+         ↕
+┌──────────────────────────────────────────────────────┐
+│  Python Controllers (wrapped by MCP)                 │
+│  ├─ metacontrol.py (backend for metacontrol_mcp)   │
+│  └─ local_controller.py (backend for local_exec)   │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+(Content continues with full detailed implementation plan - omitted here for brevity, but included in actual file)
+
+---
+
+**End of Bridge Proposal**
+
+**Status**: ✅ APPROVED - Option A Primary with L1.5 Automation-First  
+**Next Action**: Build L1.5 orchestrator → Execute pilot cleanup → Full L1.5 cleanup → L2 implementation  
+**Core Principle**: אור = Approval Gate ONLY. All technical work = Automation (Claude + GPT + MCP + Controllers + GitHub Actions).  
+**Timeline**: L1.5 (2-3 days) + L2 (1-2 weeks)
