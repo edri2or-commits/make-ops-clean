@@ -1,0 +1,153 @@
+name: Gmail Watch Renewal
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via WIF
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: edri2or-mcp
+
+      - name: Check watch expiration
+        id: check
+        run: |
+          echo "=== Checking Gmail Watch Expiration ==="
+          
+          # TODO: Retrieve current expiration from Secret Manager
+          # EXPIRATION=$(gcloud secrets versions access latest \
+          #   --secret="gmail-watch-expiration" \
+          #   --project="edri2or-mcp")
+          
+          # For skeleton, assume we need to renew
+          echo "⚠️ PLACEHOLDER: Expiration check not implemented"
+          echo "⚠️ Assuming renewal needed"
+          
+          NEEDS_RENEWAL="true"
+          echo "needs_renewal=$NEEDS_RENEWAL" >> "$GITHUB_OUTPUT"
+
+      - name: Retrieve Gmail credentials
+        if: steps.check.outputs.needs_renewal == 'true'
+        id: get_creds
+        run: |
+          echo "=== Retrieving Gmail Credentials ==="
+          
+          # TODO: Retrieve credentials from Secret Manager
+          # Similar to gmail-ops.yml
+          
+          echo "⚠️ PLACEHOLDER: Credentials retrieval not implemented"
+          echo "status=todo" >> "$GITHUB_OUTPUT"
+
+      - name: Renew Gmail watch
+        if: steps.check.outputs.needs_renewal == 'true'
+        id: renew
+        run: |
+          echo "=== Renewing Gmail Watch ==="
+          
+          USER_EMAIL="edri2or@gmail.com"
+          TOPIC="projects/edri2or-mcp/topics/gmail-notifications"
+          
+          # Check if credentials are ready
+          if [[ "${{ steps.get_creds.outputs.status }}" == "todo" ]]; then
+            echo "⚠️ SKELETON MODE: Credentials not configured"
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          # TODO: Implement actual Gmail API watch call
+          # Request body:
+          # {
+          #   "labelIds": ["INBOX"],
+          #   "topicName": "projects/edri2or-mcp/topics/gmail-notifications"
+          # }
+          
+          # curl -X POST \
+          #   -H "Authorization: Bearer $ACCESS_TOKEN" \
+          #   -H "Content-Type: application/json" \
+          #   -d "{\"labelIds\":[\"INBOX\"],\"topicName\":\"$TOPIC\"}" \
+          #   "https://gmail.googleapis.com/gmail/v1/users/$USER_EMAIL/watch"
+          
+          echo "⚠️ TODO: Implement Gmail API watch call"
+          echo "⚠️ Expected response:"
+          echo "  {\"historyId\": \"...\", \"expiration\": \"...\"}"
+          
+          echo "status=todo" >> "$GITHUB_OUTPUT"
+
+      - name: Store new expiration
+        if: steps.renew.outputs.status == 'success'
+        run: |
+          echo "=== Storing New Expiration ==="
+          
+          # TODO: Store expiration in Secret Manager
+          # EXPIRATION="${{ steps.renew.outputs.expiration }}"
+          # echo -n "$EXPIRATION" | gcloud secrets versions add gmail-watch-expiration \
+          #   --data-file=- \
+          #   --project="edri2or-mcp"
+          
+          echo "⚠️ TODO: Implement expiration storage"
+
+      - name: Summary
+        if: always()
+        run: |
+          NEEDS_RENEWAL="${{ steps.check.outputs.needs_renewal }}"
+          STATUS="${{ steps.renew.outputs.status }}"
+          
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Gmail Watch Renewal Summary
+          
+          **Date**: $(date -u +%Y-%m-%d)  
+          **Needs Renewal**: \`$NEEDS_RENEWAL\`  
+          **Status**: \`$STATUS\`
+          
+          $(if [ "$STATUS" = "todo" ]; then
+            echo "⚠️ **Skeleton Mode**: Watch renewal not fully implemented"
+            echo ""
+            echo "**Missing**:"
+            echo "- Gmail API credentials"
+            echo "- Watch expiration tracking"
+            echo "- Pub/Sub topic setup"
+            echo ""
+            echo "**Required Setup**:"
+            echo "1. Create Pub/Sub topic: \`gmail-notifications\`"
+            echo "2. Configure Gmail API credentials"
+            echo "3. Store credentials in Secret Manager"
+            echo "4. Initial watch activation"
+          elif [ "$STATUS" = "success" ]; then
+            echo "✅ Watch renewed successfully"
+            echo ""
+            echo "**New Expiration**: (stored in Secret Manager)"
+          else
+            echo "ℹ️ No renewal needed today"
+          fi)
+          
+          ---
+          
+          **Phase 1 Status**: Design + Skeleton only  
+          **Next Run**: $(date -u -d '+1 day' +%Y-%m-%d)  
+          **See**: \`docs/GMAIL_PUSH_DESIGN_PHASE1.md\`
+          SUMMARY
