@@ -1,0 +1,133 @@
+name: Google MCP - Enable APIs (Scheduled Poller)
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:  # Manual trigger for testing
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  check-and-enable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Check trigger file
+        id: check
+        run: |
+          if [ -f ".ops/triggers/google-mcp-enable-apis.flag" ]; then
+            CONTENT=$(cat .ops/triggers/google-mcp-enable-apis.flag)
+            echo "content=$CONTENT" >> $GITHUB_OUTPUT
+            
+            if [[ "$CONTENT" == "enable-apis"* ]]; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              echo "✅ Trigger detected: $CONTENT"
+            else
+              echo "should_run=false" >> $GITHUB_OUTPUT
+              echo "⏭️ Skipping - already processed: $CONTENT"
+            fi
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "⏭️ No trigger file found"
+          fi
+      
+      - name: Authenticate to GCP via WIF
+        if: steps.check.outputs.should_run == 'true'
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Setup gcloud CLI
+        if: steps.check.outputs.should_run == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: edri2or-mcp
+      
+      - name: Enable Google APIs
+        if: steps.check.outputs.should_run == 'true'
+        id: enable
+        run: |
+          set -e
+          
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Starting API enablement at $TIMESTAMP"
+          
+          # APIs to enable
+          APIS=(
+            "gmail.googleapis.com"
+            "drive.googleapis.com"
+            "calendar-json.googleapis.com"
+            "sheets.googleapis.com"
+            "docs.googleapis.com"
+            "iap.googleapis.com"
+          )
+          
+          ENABLED=()
+          FAILED=()
+          
+          # Enable each API
+          for api in "${APIS[@]}"; do
+            echo "Enabling $api..."
+            if gcloud services enable "$api" --project=edri2or-mcp 2>&1; then
+              ENABLED+=("$api")
+              echo "✅ $api enabled"
+            else
+              FAILED+=("$api")
+              echo "❌ Failed: $api"
+            fi
+          done
+          
+          # Verify
+          echo ""
+          echo "=== Verification ==="
+          VERIFIED=()
+          for api in "${APIS[@]}"; do
+            if gcloud services list --enabled --project=edri2or-mcp --filter="name:$api" --format="value(name)" | grep -q "$api"; then
+              VERIFIED+=("$api")
+              echo "✅ $api: ENABLED"
+            else
+              echo "❌ $api: NOT ENABLED"
+            fi
+          done
+          
+          # Create result JSON
+          mkdir -p .ops/results
+          cat > .ops/results/google-apis-enabled.json <<EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "status": "success",
+            "project": "edri2or-mcp",
+            "apis_verified": [
+              $(printf '"%s",' "${VERIFIED[@]}" | sed 's/,$//')
+            ],
+            "apis_failed": [
+              $(printf '"%s",' "${FAILED[@]}" | sed 's/,$//')
+            ],
+            "github_run_id": "${{ github.run_id }}",
+            "github_sha": "${{ github.sha }}"
+          }
+          EOF
+          
+          # Update trigger to mark complete
+          echo "completed-$TIMESTAMP" > .ops/triggers/google-mcp-enable-apis.flag
+          
+          echo "verified_count=${#VERIFIED[@]}" >> $GITHUB_OUTPUT
+          echo "total_count=${#APIS[@]}" >> $GITHUB_OUTPUT
+      
+      - name: Commit results
+        if: steps.check.outputs.should_run == 'true'
+        run: |
+          git config user.name "Claude Automation"
+          git config user.email "automation@claude-ops.local"
+          git add .ops/results/google-apis-enabled.json
+          git add .ops/triggers/google-mcp-enable-apis.flag
+          git commit -m "L2: Google APIs enabled - Phase 1 complete [automated]" || echo "No changes"
+          git push || echo "Nothing to push"
