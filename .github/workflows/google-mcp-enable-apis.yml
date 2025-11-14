@@ -1,0 +1,149 @@
+name: Google MCP - Enable APIs
+
+on:
+  push:
+    paths:
+      - '.ops/triggers/google-mcp-enable-apis.flag'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  enable-apis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to GCP via WIF
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: edri2or-mcp
+      
+      - name: Enable Google APIs
+        id: enable
+        run: |
+          set -e
+          
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Starting API enablement at $TIMESTAMP"
+          
+          # APIs to enable
+          APIS=(
+            "gmail.googleapis.com"
+            "drive.googleapis.com"
+            "calendar-json.googleapis.com"
+            "sheets.googleapis.com"
+            "docs.googleapis.com"
+            "iap.googleapis.com"
+          )
+          
+          ENABLED=()
+          ALREADY_ENABLED=()
+          FAILED=()
+          
+          # Enable each API
+          for api in "${APIS[@]}"; do
+            echo "Enabling $api..."
+            if gcloud services enable "$api" --project=edri2or-mcp 2>&1; then
+              # Check if it was already enabled or just enabled
+              if gcloud services list --enabled --project=edri2or-mcp --filter="name:$api" --format="value(name)" | grep -q "$api"; then
+                ENABLED+=("$api")
+                echo "✅ $api is now enabled"
+              fi
+            else
+              FAILED+=("$api")
+              echo "❌ Failed to enable $api"
+            fi
+          done
+          
+          # Verify all APIs are enabled
+          echo ""
+          echo "=== Verification ==="
+          VERIFIED=()
+          for api in "${APIS[@]}"; do
+            if gcloud services list --enabled --project=edri2or-mcp --filter="name:$api" --format="value(name)" | grep -q "$api"; then
+              VERIFIED+=("$api")
+              echo "✅ $api: ENABLED"
+            else
+              echo "❌ $api: NOT ENABLED"
+            fi
+          done
+          
+          # Create result JSON
+          mkdir -p .ops/results
+          cat > .ops/results/google-apis-enabled.json <<EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "status": "success",
+            "project": "edri2or-mcp",
+            "apis_requested": [
+              $(printf '"%s",' "${APIS[@]}" | sed 's/,$//')
+            ],
+            "apis_enabled": [
+              $(printf '"%s",' "${ENABLED[@]}" | sed 's/,$//')
+            ],
+            "apis_verified": [
+              $(printf '"%s",' "${VERIFIED[@]}" | sed 's/,$//')
+            ],
+            "apis_failed": [
+              $(printf '"%s",' "${FAILED[@]}" | sed 's/,$//')
+            ],
+            "github_run_id": "${{ github.run_id }}",
+            "github_sha": "${{ github.sha }}"
+          }
+          EOF
+          
+          # Update trigger file to mark complete
+          echo "completed-$TIMESTAMP" > .ops/triggers/google-mcp-enable-apis.flag
+          
+          # Set outputs
+          echo "verified_count=${#VERIFIED[@]}" >> $GITHUB_OUTPUT
+          echo "total_count=${#APIS[@]}" >> $GITHUB_OUTPUT
+      
+      - name: Commit results
+        run: |
+          git config user.name "Claude Automation"
+          git config user.email "automation@claude-ops.local"
+          git add .ops/results/google-apis-enabled.json
+          git add .ops/triggers/google-mcp-enable-apis.flag
+          git commit -m "L2: Google APIs enabled - Phase 1 complete" || echo "No changes"
+          git push || echo "Nothing to push"
+      
+      - name: Create summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## ✅ Google APIs Enabled
+          
+          **Project**: edri2or-mcp  
+          **Verified**: ${{ steps.enable.outputs.verified_count }} / ${{ steps.enable.outputs.total_count }}
+          **Run ID**: ${{ github.run_id }}
+          
+          ### APIs Enabled:
+          - gmail.googleapis.com
+          - drive.googleapis.com
+          - calendar-json.googleapis.com
+          - sheets.googleapis.com
+          - docs.googleapis.com
+          - iap.googleapis.com
+          
+          **Next Phase**: Create OAuth Client
+          EOF
+      
+      - name: Upload result artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: google-apis-result
+          path: .ops/results/google-apis-enabled.json
+          retention-days: 30
