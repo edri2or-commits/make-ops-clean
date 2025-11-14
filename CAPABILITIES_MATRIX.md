@@ -4,7 +4,7 @@
 
 **Created**: 2025-11-14  
 **Last Updated**: 2025-11-14  
-**Version**: 1.0.0
+**Version**: 1.0.1
 
 ---
 
@@ -115,7 +115,32 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 **Server**: `mcp-servers/ps_exec/` (Node.js + dispatcher.ps1)  
 **SDK**: `@modelcontextprotocol/sdk`
 
-### 2.3 Local Scripts
+### 2.3 Local CLI Tools
+
+| From | To | Capability | Status | Details | Limitations |
+|------|----|-----------| -------|---------|-------------|
+| Claude MCP | gcloud CLI (local) | Detect installation | ✅ Verified | Can confirm presence at known path | Detection only |
+| Claude MCP | gcloud CLI (local) | Execute commands | ❌ Blocked | ps_exec whitelist only | Architectural constraint |
+
+**Installation Path**: `C:\Users\edri2\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\`  
+**Binary**: `gcloud.cmd` (10,925 bytes) + `gcloud.ps1` (3,951 bytes)  
+**Status**: Installed and detected (verified 2025-11-14)  
+**Last Updated**: 2025-11-12 (inferred from directory timestamps)  
+**Version**: Unknown (cannot execute `--version` via MCP)
+
+**Gap**: Cannot execute gcloud commands via MCP due to ps_exec whitelist restrictions. This is **by design** for security.
+
+**Workaround**: Use GitHub Actions → GCP (via WIF) path for Cloud Shell access. This approach:
+- Doesn't depend on local gcloud installation
+- Uses proven WIF authentication pattern
+- Provides full audit trail
+- Maintains zero-touch principle
+
+**Evidence**: See `logs/LOG_LOCAL_GCLOUD_STATUS.md` for detailed investigation
+
+---
+
+### 2.4 Local Scripts
 
 **56 scripts available**:
 - **33 Python** scripts
@@ -220,6 +245,12 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 **Evidence**: Document 6 shows Cloud Shell verified operational  
 **Gap**: No automated triggering path from Claude yet
 
+**Recommended Path**: GitHub Actions → gcloud CLI (in Actions runner) → Cloud Shell
+- Bypasses local gcloud dependency
+- Uses proven WIF authentication
+- Full automation and audit trail
+- See `logs/LOG_LOCAL_GCLOUD_STATUS.md` for architecture reasoning
+
 ---
 
 ## 5️⃣ Canva Layer
@@ -289,6 +320,26 @@ Claude → PowerShell MCP (dir, type, test_path)
 **Status**: 🟡 Partial (can read, cannot execute)  
 **Gap**: No automated execution path
 
+### 7.3 Claude → Cloud Shell (Recommended)
+
+**Problem**: Cannot execute local gcloud commands due to MCP restrictions
+
+**Solution**: GitHub Actions → Cloud Shell execution
+
+**Pattern**:
+```
+Claude → GitHub (create/trigger cloud-shell-exec workflow)
+       → GitHub Actions runner (has gcloud pre-installed)
+       → Authenticate via WIF
+       → Execute: gcloud cloud-shell ssh --command "..."
+       → Store output as artifact
+       → Claude reads artifact
+```
+
+**Status**: ⚠️ Planned  
+**Priority**: High (enables full Cloud Shell automation)  
+**Evidence**: See `logs/LOG_LOCAL_GCLOUD_STATUS.md` for design rationale
+
 ---
 
 ## 8️⃣ Critical Gaps & Blockers
@@ -309,20 +360,21 @@ Claude → PowerShell MCP (dir, type, test_path)
 
 **Issue**: Only 10 whitelisted commands available
 
-**Impact**: ❌ Cannot execute arbitrary scripts
+**Impact**: ❌ Cannot execute arbitrary scripts, ❌ Cannot run gcloud locally
 
 **Workaround**: 
 1. Read script via `type` command
 2. Analyze and understand
-3. Request manual execution if needed
+3. Execute via GitHub Actions if automation needed
+4. Request manual execution if Actions not viable
 
-**Status**: Accepted limitation
+**Status**: Accepted limitation, architectural constraint by design
 
 ### 8.3 Script Execution
 
 **Issue**: 56 scripts available locally, but no direct execution path from Claude
 
-**Impact**: Cannot automate Python/Shell scripts
+**Impact**: Cannot automate Python/Shell scripts from Claude
 
 **Workaround**: Either:
 1. Manual execution by אור
@@ -330,6 +382,16 @@ Claude → PowerShell MCP (dir, type, test_path)
 3. Use PowerShell MCP where applicable
 
 **Status**: Accepted limitation, automation possible via Actions
+
+### 8.4 Local gcloud CLI Access
+
+**Issue**: gcloud installed locally but cannot be executed via MCP
+
+**Impact**: Cannot use local gcloud for Cloud Shell, cannot verify version
+
+**Workaround**: Use GitHub Actions runners (have gcloud pre-installed, WIF auth works)
+
+**Status**: ✅ Workaround designed (see 7.3), waiting for implementation
 
 ---
 
@@ -352,26 +414,40 @@ Claude → PowerShell MCP (dir, type, test_path)
 **GitHub**: Full access via PAT (appropriate for ops automation)  
 **Google MCP**: Read-only scopes (appropriate for safety)  
 **PowerShell**: Whitelist-only (appropriate for security)  
-**Filesystem**: Allowed directories only (appropriate for scope)
+**Filesystem**: Allowed directories only (appropriate for scope)  
+**gcloud**: Detection only, no execution (appropriate for zero-touch model)
 
 ---
 
 ## 🔟 Roadmap to 100%
 
-### Priority 1: Verification Runners (High Value, Low Risk)
+### Priority 1: Cloud Shell via Actions (High Value, Low Risk)
+
+**Goal**: Enable automated Cloud Shell command execution
+
+**Tasks**:
+1. ⏳ Create `.github/workflows/cloud-shell-exec.yml`
+2. ⏳ Use WIF auth (proven with Sheets)
+3. ⏳ Execute gcloud commands in runner
+4. ⏳ Return output as artifact
+
+**Effort**: Low (copy existing Sheets pattern)  
+**Risk**: Low (read operations)  
+**Impact**: Unblocks full GCP automation
+
+### Priority 2: Verification Runners (High Value, Low Risk)
 
 **Goal**: Close GitHub Actions → GCP gaps
 
 **Tasks**:
 1. ✅ Sheets append (DONE)
 2. ⏳ Secret Manager read (need workflow)
-3. ⏳ Cloud Shell exec (need workflow)
-4. ⏳ Drive write (need workflow)
+3. ⏳ Drive write (need workflow)
 
 **Effort**: Low (reuse existing WIF)  
 **Risk**: Low (read-only operations)
 
-### Priority 2: OAuth Migration (High Value, Medium Risk)
+### Priority 3: OAuth Migration (High Value, Medium Risk)
 
 **Goal**: Complete secret migration
 
@@ -383,7 +459,7 @@ Claude → PowerShell MCP (dir, type, test_path)
 **Effort**: Low (proven process)  
 **Risk**: Medium (requires testing)
 
-### Priority 3: Script Automation (Medium Value, Medium Effort)
+### Priority 4: Script Automation (Medium Value, Medium Effort)
 
 **Goal**: Enable automated script execution
 
@@ -399,7 +475,16 @@ Claude → PowerShell MCP (dir, type, test_path)
 
 ## 📝 Update Log
 
-### 2025-11-14
+### 2025-11-14 (v1.0.1)
+- Added section 2.3: Local CLI Tools (gcloud)
+- Documented gcloud installation detection capability
+- Clarified architectural constraint preventing local gcloud execution
+- Added bridge pattern 7.3 for Cloud Shell via GitHub Actions
+- Updated gap 8.4 with gcloud-specific blocker and workaround
+- Created evidence log: `logs/LOG_LOCAL_GCLOUD_STATUS.md`
+- Updated roadmap: Cloud Shell via Actions now Priority 1
+
+### 2025-11-14 (v1.0.0)
 - Initial version created
 - Documented all verified capabilities
 - Identified 3 main gaps (GCP direct access, script execution, secret migration)
@@ -423,7 +508,8 @@ When adding a new capability:
 When a capability changes:
 1. Update status/limitations
 2. Add note to Update Log
-3. Commit with message: `L0: update capabilities matrix - [what changed]`
+3. Update version number
+4. Commit with message: `L0: update capabilities matrix - [what changed]`
 
 ---
 
