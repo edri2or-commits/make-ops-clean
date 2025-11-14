@@ -1,0 +1,250 @@
+{
+  "name": "L1.2 Telegram Approval Handler",
+  "description": "Receives Telegram callback_query, extracts PR number, sends repository_dispatch to GitHub",
+  "version": 1,
+  "modules": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": {
+          "name": "telegram-approve",
+          "pass": false,
+          "get": false,
+          "post": true
+        },
+        "requireSecretHeader": true,
+        "secretHeaderName": "X-Telegram-Bot-Api-Secret-Token"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {},
+        "expect": [
+          {
+            "name": "callback_query",
+            "type": "collection",
+            "label": "Callback Query",
+            "spec": [
+              {
+                "name": "id",
+                "type": "text",
+                "label": "ID"
+              },
+              {
+                "name": "from",
+                "type": "collection",
+                "label": "From",
+                "spec": [
+                  {
+                    "name": "id",
+                    "type": "number",
+                    "label": "User ID"
+                  },
+                  {
+                    "name": "username",
+                    "type": "text",
+                    "label": "Username"
+                  },
+                  {
+                    "name": "first_name",
+                    "type": "text",
+                    "label": "First Name"
+                  }
+                ]
+              },
+              {
+                "name": "message",
+                "type": "collection",
+                "label": "Message",
+                "spec": [
+                  {
+                    "name": "message_id",
+                    "type": "number",
+                    "label": "Message ID"
+                  },
+                  {
+                    "name": "date",
+                    "type": "number",
+                    "label": "Date"
+                  }
+                ]
+              },
+              {
+                "name": "data",
+                "type": "text",
+                "label": "Callback Data (JSON)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "json": "{{1.callback_query.data}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        },
+        "restore": {
+          "expect": {
+            "action": { "mode": "chose", "label": "Text" },
+            "pr": { "mode": "chose", "label": "Number" },
+            "approval_id": { "mode": "chose", "label": "Text" }
+          }
+        },
+        "expect": [
+          {
+            "name": "action",
+            "type": "text",
+            "label": "Action"
+          },
+          {
+            "name": "pr",
+            "type": "number",
+            "label": "PR Number"
+          },
+          {
+            "name": "approval_id",
+            "type": "text",
+            "label": "Approval ID"
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "module": "gateway:Ignore",
+      "version": 1,
+      "parameters": {},
+      "filter": {
+        "name": "Only Approve Actions",
+        "conditions": [
+          [
+            {
+              "a": "{{2.action}}",
+              "b": "approve",
+              "o": "text:equal"
+            }
+          ]
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false
+      },
+      "mapper": {
+        "url": "https://api.github.com/repos/edri2or-commits/make-ops-clean/dispatches",
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer {{GITHUB_TOKEN}}"
+          },
+          {
+            "name": "Accept",
+            "value": "application/vnd.github.v3+json"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": false,
+        "body": "{\n  \"event_type\": \"merge_approved\",\n  \"client_payload\": {\n    \"pr_number\": {{2.pr}},\n    \"approval_id\": \"{{2.approval_id}}\",\n    \"approved_by\": \"{{1.callback_query.from.username}}\",\n    \"approved_at\": \"{{formatDate(1.callback_query.message.date; \"YYYY-MM-DDTHH:mm:ss[Z]\")}}\"\n  }\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        },
+        "restore": {
+          "expect": {
+            "method": { "mode": "chose", "label": "POST" },
+            "headers": { "mode": "chose" },
+            "qs": { "mode": "chose" },
+            "bodyType": { "label": "Raw" },
+            "parseResponse": { "mode": "chose" }
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false
+      },
+      "mapper": {
+        "url": "https://api.telegram.org/bot{{TELEGRAM_BOT_TOKEN}}/answerCallbackQuery",
+        "method": "post",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "body": "{\n  \"callback_query_id\": \"{{1.callback_query.id}}\",\n  \"text\": \"✅ Approval sent to GitHub Actions\"\n}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0
+        },
+        "restore": {
+          "expect": {
+            "method": { "mode": "chose", "label": "POST" },
+            "headers": { "mode": "chose" },
+            "qs": { "mode": "chose" },
+            "bodyType": { "label": "Raw" },
+            "parseResponse": { "mode": "chose" }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": false,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}
