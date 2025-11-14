@@ -1,0 +1,57 @@
+name: Enable Google APIs for MCP
+
+on:
+  workflow_dispatch:
+    inputs:
+      apis:
+        description: 'APIs to enable (comma-separated)'
+        required: false
+        default: 'gmail.googleapis.com,drive.googleapis.com,calendar-json.googleapis.com,sheets.googleapis.com,docs.googleapis.com'
+
+jobs:
+  enable-apis:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - id: auth
+        name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Enable APIs
+        id: enable
+        run: |
+          echo "Enabling APIs: ${{ inputs.apis }}"
+          
+          # Split by comma and enable each API
+          IFS=',' read -ra APIS <<< "${{ inputs.apis }}"
+          for api in "${APIS[@]}"; do
+            echo "Enabling $api..."
+            gcloud services enable "$api" --project=edri2or-mcp
+          done
+          
+          echo "✅ APIs enabled successfully"
+      
+      - name: List enabled APIs
+        run: |
+          echo "Currently enabled APIs:"
+          gcloud services list --enabled --project=edri2or-mcp | grep -E "gmail|drive|calendar|sheets|docs" || echo "No Google workspace APIs enabled yet"
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-enablement-results
+          path: |
+            /tmp/api-results.txt
+          retention-days: 7
