@@ -1,0 +1,180 @@
+name: Setup Google MCP - Complete Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: 'Step to execute'
+        required: true
+        type: choice
+        options:
+          - '1-enable-apis'
+          - '2-create-oauth-client'
+          - '3-store-credentials'
+          - 'all'
+
+jobs:
+  setup-google-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - id: auth
+        name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Step 1 - Enable APIs
+        if: ${{ inputs.step == '1-enable-apis' || inputs.step == 'all' }}
+        run: |
+          echo "=== Enabling Google APIs ==="
+          
+          APIs="gmail.googleapis.com drive.googleapis.com calendar-json.googleapis.com sheets.googleapis.com docs.googleapis.com iap.googleapis.com"
+          
+          for api in $APIs; do
+            echo "Enabling $api..."
+            gcloud services enable "$api" --project=edri2or-mcp || echo "Already enabled or failed: $api"
+          done
+          
+          echo ""
+          echo "=== Verifying enabled APIs ==="
+          gcloud services list --enabled --project=edri2or-mcp | grep -E "gmail|drive|calendar|sheets|docs|iap"
+      
+      - name: Step 2 - Create OAuth Client
+        if: ${{ inputs.step == '2-create-oauth-client' || inputs.step == 'all' }}
+        id: oauth
+        run: |
+          echo "=== Creating OAuth 2.0 Client ==="
+          
+          # Note: OAuth client creation via gcloud is limited
+          # We'll use REST API via curl
+          
+          TOKEN=$(gcloud auth print-access-token)
+          PROJECT_NUMBER=$(gcloud projects describe edri2or-mcp --format='value(projectNumber)')
+          
+          # First, ensure OAuth consent screen is configured
+          # This is a prerequisite for creating OAuth clients
+          
+          echo "Creating OAuth consent screen (if not exists)..."
+          
+          CONSENT_RESPONSE=$(curl -s -X PATCH \
+            "https://iap.googleapis.com/v1/projects/$PROJECT_NUMBER/iap_web/oauth/brands/-" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "application_title": "Claude MCP Google Full",
+              "support_email": "edri2or@gmail.com"
+            }' || echo "Consent screen may already exist")
+          
+          echo "Consent response: $CONSENT_RESPONSE"
+          
+          # Now create OAuth client using OAuth2 API
+          echo "Creating OAuth 2.0 Desktop Client..."
+          
+          CLIENT_RESPONSE=$(curl -s -X POST \
+            "https://oauth2.googleapis.com/v2/clients" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "client_id": "",
+              "client_type": "DESKTOP",
+              "display_name": "claude-mcp-google-full",
+              "redirect_uris": ["http://localhost:3000/oauth2callback", "urn:ietf:wg:oauth:2.0:oob"]
+            }')
+          
+          echo "Client response: $CLIENT_RESPONSE"
+          
+          # Extract credentials
+          CLIENT_ID=$(echo "$CLIENT_RESPONSE" | jq -r '.client_id // empty')
+          CLIENT_SECRET=$(echo "$CLIENT_RESPONSE" | jq -r '.client_secret // empty')
+          
+          if [ -z "$CLIENT_ID" ]; then
+            echo "❌ Failed to create OAuth client"
+            echo "Response was: $CLIENT_RESPONSE"
+            
+            # Alternative: Use gcloud alpha command (if available)
+            echo "Trying alternative method with gcloud..."
+            gcloud alpha iap oauth-clients create \
+              --brand=projects/$PROJECT_NUMBER/brands/- \
+              --display_name="claude-mcp-google-full" \
+              --project=edri2or-mcp || echo "Alternative method also failed"
+            
+            exit 1
+          fi
+          
+          echo "✅ OAuth client created successfully"
+          echo "CLIENT_ID=$CLIENT_ID" >> $GITHUB_OUTPUT
+          echo "CLIENT_SECRET=$CLIENT_SECRET" >> $GITHUB_OUTPUT
+          
+          # Store in files for next step
+          echo "$CLIENT_ID" > /tmp/client_id.txt
+          echo "$CLIENT_SECRET" > /tmp/client_secret.txt
+      
+      - name: Step 3 - Store Credentials in Secret Manager
+        if: ${{ inputs.step == '3-store-credentials' || inputs.step == 'all' }}
+        run: |
+          echo "=== Storing OAuth credentials in Secret Manager ==="
+          
+          if [ -f /tmp/client_id.txt ]; then
+            CLIENT_ID=$(cat /tmp/client_id.txt)
+            CLIENT_SECRET=$(cat /tmp/client_secret.txt)
+          else
+            echo "❌ No credentials from previous step - run step 2 first"
+            exit 1
+          fi
+          
+          # Store Client ID
+          echo "Storing google-mcp-client-id..."
+          echo -n "$CLIENT_ID" | gcloud secrets create google-mcp-client-id \
+            --data-file=- \
+            --project=edri2or-mcp \
+            --replication-policy="automatic" || \
+          echo -n "$CLIENT_ID" | gcloud secrets versions add google-mcp-client-id \
+            --data-file=- \
+            --project=edri2or-mcp
+          
+          # Store Client Secret
+          echo "Storing google-mcp-client-secret..."
+          echo -n "$CLIENT_SECRET" | gcloud secrets create google-mcp-client-secret \
+            --data-file=- \
+            --project=edri2or-mcp \
+            --replication-policy="automatic" || \
+          echo -n "$CLIENT_SECRET" | gcloud secrets versions add google-mcp-client-secret \
+            --data-file=- \
+            --project=edri2or-mcp
+          
+          echo "✅ Credentials stored in Secret Manager"
+          
+          # Verify
+          echo ""
+          echo "=== Verifying secrets ==="
+          gcloud secrets list --project=edri2or-mcp | grep google-mcp
+      
+      - name: Create Summary
+        run: |
+          echo "## Google MCP Setup Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Step executed**: ${{ inputs.step }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Update claude_desktop_config.json with credentials" >> $GITHUB_STEP_SUMMARY
+          echo "2. Restart Claude Desktop" >> $GITHUB_STEP_SUMMARY
+          echo "3. Complete OAuth consent flow" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-mcp-setup-${{ github.run_number }}
+          path: |
+            /tmp/*.txt
+          retention-days: 1
