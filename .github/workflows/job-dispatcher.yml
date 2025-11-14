@@ -1,0 +1,225 @@
+name: Job Dispatcher
+
+on:
+  push:
+    paths:
+      - 'jobs/requests/*.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need to see what changed
+
+      - name: Detect new job requests
+        id: detect
+        run: |
+          echo "=== Detecting New Job Requests ===" 
+          
+          # Get changed files in jobs/requests/
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '^jobs/requests/.*\.json$' || true)
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No new job requests detected"
+            echo "has_jobs=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          echo "New job requests detected:"
+          echo "$CHANGED_FILES"
+          
+          # Take first job file for this run
+          JOB_FILE=$(echo "$CHANGED_FILES" | head -n 1)
+          echo "Processing: $JOB_FILE"
+          echo "job_file=$JOB_FILE" >> "$GITHUB_OUTPUT"
+          echo "has_jobs=true" >> "$GITHUB_OUTPUT"
+
+      - name: Parse job request
+        if: steps.detect.outputs.has_jobs == 'true'
+        id: parse
+        run: |
+          JOB_FILE="${{ steps.detect.outputs.job_file }}"
+          
+          echo "=== Parsing Job Request: $JOB_FILE ==="
+          
+          # Validate JSON
+          if ! jq empty "$JOB_FILE" 2>/dev/null; then
+            echo "ERROR: Invalid JSON in $JOB_FILE"
+            exit 1
+          fi
+          
+          # Extract fields
+          TYPE=$(jq -r '.type' "$JOB_FILE")
+          REQUEST_ID=$(jq -r '.request_id' "$JOB_FILE")
+          COMMAND=$(jq -r '.command' "$JOB_FILE")
+          PROJECT_ID=$(jq -r '.project_id // "edri2or-mcp"' "$JOB_FILE")
+          
+          echo "Type: $TYPE"
+          echo "Request ID: $REQUEST_ID"
+          echo "Command: $COMMAND"
+          echo "Project ID: $PROJECT_ID"
+          
+          # Validate required fields
+          if [ "$TYPE" = "null" ] || [ "$REQUEST_ID" = "null" ] || [ "$COMMAND" = "null" ]; then
+            echo "ERROR: Missing required fields (type, request_id, command)"
+            exit 1
+          fi
+          
+          # Set outputs
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+          echo "request_id=$REQUEST_ID" >> "$GITHUB_OUTPUT"
+          echo "command=$COMMAND" >> "$GITHUB_OUTPUT"
+          echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to GCP via WIF
+        if: steps.detect.outputs.has_jobs == 'true' && steps.parse.outputs.type == 'cloud-shell'
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Setup gcloud CLI
+        if: steps.detect.outputs.has_jobs == 'true' && steps.parse.outputs.type == 'cloud-shell'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ steps.parse.outputs.project_id }}
+
+      - name: Execute Cloud Shell command
+        if: steps.detect.outputs.has_jobs == 'true' && steps.parse.outputs.type == 'cloud-shell'
+        id: execute
+        run: |
+          set +e  # Don't exit on error
+          
+          REQUEST_ID="${{ steps.parse.outputs.request_id }}"
+          COMMAND="${{ steps.parse.outputs.command }}"
+          PROJECT_ID="${{ steps.parse.outputs.project_id }}"
+          
+          echo "=== Executing Cloud Shell Command ==="
+          echo "Request ID: $REQUEST_ID"
+          echo "Command: $COMMAND"
+          echo "Project: $PROJECT_ID"
+          
+          TIMESTAMP_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          START_EPOCH=$(date +%s)
+          
+          # Execute command and capture output
+          OUTPUT_FILE="cloud_shell_output.txt"
+          ERROR_FILE="cloud_shell_error.txt"
+          
+          gcloud cloud-shell ssh \
+            --project="$PROJECT_ID" \
+            --command="$COMMAND" \
+            > "$OUTPUT_FILE" 2> "$ERROR_FILE"
+          
+          EXIT_CODE=$?
+          END_EPOCH=$(date +%s)
+          TIMESTAMP_END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          DURATION=$((END_EPOCH - START_EPOCH))
+          
+          echo "Exit code: $EXIT_CODE"
+          echo "Duration: ${DURATION}s"
+          
+          # Preview output (first 500 chars)
+          OUTPUT_PREVIEW=$(head -c 500 "$OUTPUT_FILE" | tr '\n' ' ')
+          
+          # Set outputs
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          echo "timestamp_start=$TIMESTAMP_START" >> "$GITHUB_OUTPUT"
+          echo "timestamp_end=$TIMESTAMP_END" >> "$GITHUB_OUTPUT"
+          echo "duration=$DURATION" >> "$GITHUB_OUTPUT"
+          echo "output_preview=$OUTPUT_PREVIEW" >> "$GITHUB_OUTPUT"
+          
+          # Determine status
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write result file
+        if: steps.detect.outputs.has_jobs == 'true' && steps.parse.outputs.type == 'cloud-shell'
+        run: |
+          REQUEST_ID="${{ steps.parse.outputs.request_id }}"
+          
+          # Create result JSON
+          cat > "jobs/results/${REQUEST_ID}.json" <<EOF
+          {
+            "request_id": "$REQUEST_ID",
+            "status": "${{ steps.execute.outputs.status }}",
+            "timestamp_start": "${{ steps.execute.outputs.timestamp_start }}",
+            "timestamp_end": "${{ steps.execute.outputs.timestamp_end }}",
+            "execution_time_seconds": ${{ steps.execute.outputs.duration }},
+            "github_run_id": "${{ github.run_id }}",
+            "github_run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "exit_code": ${{ steps.execute.outputs.exit_code }},
+            "output_preview": "${{ steps.execute.outputs.output_preview }}",
+            "artifact_name": "cloud-shell-execution-${REQUEST_ID}",
+            "errors": []
+          }
+          EOF
+          
+          echo "Result written to jobs/results/${REQUEST_ID}.json"
+          cat "jobs/results/${REQUEST_ID}.json"
+
+      - name: Commit result file
+        if: steps.detect.outputs.has_jobs == 'true'
+        run: |
+          REQUEST_ID="${{ steps.parse.outputs.request_id }}"
+          
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions Job Dispatcher"
+          git add "jobs/results/${REQUEST_ID}.json"
+          git commit -m "L1: job result - ${REQUEST_ID}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: Upload execution artifacts
+        if: always() && steps.detect.outputs.has_jobs == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-shell-execution-${{ steps.parse.outputs.request_id }}
+          path: |
+            cloud_shell_output.txt
+            cloud_shell_error.txt
+            jobs/results/${{ steps.parse.outputs.request_id }}.json
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.detect.outputs.has_jobs }}" = "true" ]; then
+            REQUEST_ID="${{ steps.parse.outputs.request_id }}"
+            STATUS="${{ steps.execute.outputs.status }}"
+            EXIT_CODE="${{ steps.execute.outputs.exit_code }}"
+            
+            cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Job Dispatcher Summary
+          
+          **Request ID**: \`$REQUEST_ID\`  
+          **Status**: \`$STATUS\`  
+          **Exit Code**: \`$EXIT_CODE\`  
+          **Duration**: ${{ steps.execute.outputs.duration }}s
+          
+          ### Output Preview
+          \`\`\`
+          ${{ steps.execute.outputs.output_preview }}
+          \`\`\`
+          
+          **Result File**: \`jobs/results/${REQUEST_ID}.json\`  
+          **Artifacts**: \`cloud-shell-execution-${REQUEST_ID}\`
+          SUMMARY
+          else
+            echo "No job requests detected in this push" >> "$GITHUB_STEP_SUMMARY"
+          fi
