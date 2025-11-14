@@ -17,6 +17,7 @@ on:
   push:
     paths:
       - '.github/workflows/health.yml'
+      - '.ops/state/enable-google-apis.json'
 
 jobs:
   health:
@@ -101,3 +102,111 @@ jobs:
           name: discovery-status
           path: status/
           if-no-files-found: error
+
+  # NEW JOB: Google APIs enablement (triggered by state file)
+  enable-google-apis:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Check state file
+        id: check_state
+        run: |
+          if [ -f ".ops/state/enable-google-apis.json" ]; then
+            STATE=$(cat .ops/state/enable-google-apis.json)
+            STATUS=$(echo "$STATE" | jq -r '.status // "pending"')
+            
+            if [ "$STATUS" == "pending" ]; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              echo "✅ State is pending, will execute"
+            else
+              echo "should_run=false" >> $GITHUB_OUTPUT
+              echo "⏭️ State is $STATUS, skipping"
+            fi
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "⏭️ No state file, skipping"
+          fi
+      
+      - name: Authenticate to GCP
+        if: steps.check_state.outputs.should_run == 'true'
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Setup gcloud
+        if: steps.check_state.outputs.should_run == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: edri2or-mcp
+      
+      - name: Enable Google APIs
+        if: steps.check_state.outputs.should_run == 'true'
+        id: enable
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          APIS=(
+            "gmail.googleapis.com"
+            "drive.googleapis.com"
+            "calendar-json.googleapis.com"
+            "sheets.googleapis.com"
+            "docs.googleapis.com"
+            "iap.googleapis.com"
+          )
+          
+          VERIFIED=()
+          
+          for api in "${APIS[@]}"; do
+            echo "Enabling $api..."
+            gcloud services enable "$api" --project=edri2or-mcp 2>&1 || true
+          done
+          
+          echo ""
+          echo "=== Verification ==="
+          for api in "${APIS[@]}"; do
+            if gcloud services list --enabled --project=edri2or-mcp --filter="name:$api" --format="value(name)" | grep -q "$api"; then
+              VERIFIED+=("$api")
+              echo "✅ $api ENABLED"
+            fi
+          done
+          
+          mkdir -p .ops/results
+          cat > .ops/results/google-apis-phase1.json <<EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "status": "success",
+            "phase": "1-enable-apis",
+            "project": "edri2or-mcp",
+            "verified_count": ${#VERIFIED[@]},
+            "total_count": ${#APIS[@]},
+            "github_run_id": "${{ github.run_id }}"
+          }
+          EOF
+          
+          cat > .ops/state/enable-google-apis.json <<EOF
+          {
+            "status": "completed",
+            "completed_at": "$TIMESTAMP",
+            "run_id": "${{ github.run_id }}"
+          }
+          EOF
+          
+          echo "verified=${#VERIFIED[@]}" >> $GITHUB_OUTPUT
+          echo "total=${#APIS[@]}" >> $GITHUB_OUTPUT
+      
+      - name: Commit results
+        if: steps.check_state.outputs.should_run == 'true'
+        run: |
+          git config user.name "Claude Automation"
+          git config user.email "automation@claude-ops.local"
+          git add .ops/results/google-apis-phase1.json .ops/state/enable-google-apis.json
+          git commit -m "L2 Phase 1: APIs enabled (${{ steps.enable.outputs.verified }}/${{ steps.enable.outputs.total }})" || true
+          git push || true
