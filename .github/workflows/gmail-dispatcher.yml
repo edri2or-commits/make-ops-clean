@@ -1,0 +1,232 @@
+name: Gmail Job Dispatcher
+
+on:
+  push:
+    paths:
+      - 'jobs/requests/gmail-req-*.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    outputs:
+      has_jobs: ${{ steps.detect.outputs.has_jobs }}
+      request_id: ${{ steps.parse.outputs.request_id }}
+      action: ${{ steps.parse.outputs.action }}
+      message_id: ${{ steps.parse.outputs.message_id }}
+      query: ${{ steps.parse.outputs.query }}
+      thread_id: ${{ steps.parse.outputs.thread_id }}
+      history_id: ${{ steps.parse.outputs.history_id }}
+      user_email: ${{ steps.parse.outputs.user_email }}
+      project_id: ${{ steps.parse.outputs.project_id }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect new Gmail job requests
+        id: detect
+        run: |
+          echo "=== Detecting New Gmail Job Requests ===" 
+          
+          # Get changed files matching gmail pattern
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '^jobs/requests/gmail-req-.*\.json$' || true)
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No new Gmail job requests detected"
+            echo "has_jobs=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          echo "New Gmail job requests detected:"
+          echo "$CHANGED_FILES"
+          
+          # Take first job file for this run
+          JOB_FILE=$(echo "$CHANGED_FILES" | head -n 1)
+          echo "Processing: $JOB_FILE"
+          echo "job_file=$JOB_FILE" >> "$GITHUB_OUTPUT"
+          echo "has_jobs=true" >> "$GITHUB_OUTPUT"
+
+      - name: Parse job request
+        if: steps.detect.outputs.has_jobs == 'true'
+        id: parse
+        run: |
+          JOB_FILE="${{ steps.detect.outputs.job_file }}"
+          
+          echo "=== Parsing Gmail Job Request: $JOB_FILE ==="
+          
+          # Validate JSON
+          if ! jq empty "$JOB_FILE" 2>/dev/null; then
+            echo "ERROR: Invalid JSON in $JOB_FILE"
+            exit 1
+          fi
+          
+          # Extract fields
+          TYPE=$(jq -r '.type' "$JOB_FILE")
+          REQUEST_ID=$(jq -r '.request_id' "$JOB_FILE")
+          ACTION=$(jq -r '.action' "$JOB_FILE")
+          MESSAGE_ID=$(jq -r '.message_id // ""' "$JOB_FILE")
+          QUERY=$(jq -r '.query // ""' "$JOB_FILE")
+          THREAD_ID=$(jq -r '.thread_id // ""' "$JOB_FILE")
+          HISTORY_ID=$(jq -r '.history_id // ""' "$JOB_FILE")
+          USER_EMAIL=$(jq -r '.user_email // "edri2or@gmail.com"' "$JOB_FILE")
+          PROJECT_ID=$(jq -r '.project_id // "edri2or-mcp"' "$JOB_FILE")
+          
+          echo "Type: $TYPE"
+          echo "Request ID: $REQUEST_ID"
+          echo "Action: $ACTION"
+          echo "User Email: $USER_EMAIL"
+          echo "Project ID: $PROJECT_ID"
+          
+          # Validate required fields
+          if [ "$TYPE" != "gmail" ]; then
+            echo "ERROR: Invalid type: $TYPE (expected: gmail)"
+            exit 1
+          fi
+          
+          if [ "$REQUEST_ID" = "null" ] || [ "$ACTION" = "null" ]; then
+            echo "ERROR: Missing required fields (request_id, action)"
+            exit 1
+          fi
+          
+          # Validate action
+          case "$ACTION" in
+            read_message|list_messages|get_thread|get_history)
+              echo "Valid action: $ACTION"
+              ;;
+            *)
+              echo "ERROR: Invalid action: $ACTION"
+              echo "Must be one of: read_message, list_messages, get_thread, get_history"
+              exit 1
+              ;;
+          esac
+          
+          # Set outputs
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+          echo "request_id=$REQUEST_ID" >> "$GITHUB_OUTPUT"
+          echo "action=$ACTION" >> "$GITHUB_OUTPUT"
+          echo "message_id=$MESSAGE_ID" >> "$GITHUB_OUTPUT"
+          echo "query=$QUERY" >> "$GITHUB_OUTPUT"
+          echo "thread_id=$THREAD_ID" >> "$GITHUB_OUTPUT"
+          echo "history_id=$HISTORY_ID" >> "$GITHUB_OUTPUT"
+          echo "user_email=$USER_EMAIL" >> "$GITHUB_OUTPUT"
+          echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+
+  execute:
+    needs: dispatch
+    if: needs.dispatch.outputs.has_jobs == 'true'
+    uses: ./.github/workflows/gmail-ops.yml
+    with:
+      action: ${{ needs.dispatch.outputs.action }}
+      message_id: ${{ needs.dispatch.outputs.message_id }}
+      query: ${{ needs.dispatch.outputs.query }}
+      thread_id: ${{ needs.dispatch.outputs.thread_id }}
+      history_id: ${{ needs.dispatch.outputs.history_id }}
+      user_email: ${{ needs.dispatch.outputs.user_email }}
+      project_id: ${{ needs.dispatch.outputs.project_id }}
+    secrets: inherit
+
+  write_result:
+    needs: [dispatch, execute]
+    runs-on: ubuntu-latest
+    if: always() && needs.dispatch.outputs.has_jobs == 'true'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Write result file
+        run: |
+          REQUEST_ID="${{ needs.dispatch.outputs.request_id }}"
+          ACTION="${{ needs.dispatch.outputs.action }}"
+          USER_EMAIL="${{ needs.dispatch.outputs.user_email }}"
+          STATUS="${{ needs.execute.outputs.status }}"
+          ERROR="${{ needs.execute.outputs.error }}"
+          RESULT_SUMMARY="${{ needs.execute.outputs.result_summary }}"
+          
+          echo "=== Writing Result File ==="
+          echo "Request ID: $REQUEST_ID"
+          echo "Action: $ACTION"
+          echo "Status: $STATUS"
+          
+          # Create result JSON
+          cat > "jobs/results/${REQUEST_ID}.json" <<'EOF'
+          {
+            "request_id": "REQUEST_ID_PLACEHOLDER",
+            "type": "gmail",
+            "action": "ACTION_PLACEHOLDER",
+            "user_email": "USER_EMAIL_PLACEHOLDER",
+            "status": "STATUS_PLACEHOLDER",
+            "timestamp": "TIMESTAMP_PLACEHOLDER",
+            "github_run_id": "${{ github.run_id }}",
+            "github_run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "result_summary": "RESULT_SUMMARY_PLACEHOLDER",
+            "error": "ERROR_PLACEHOLDER"
+          }
+          EOF
+          
+          # Replace placeholders
+          sed -i "s/REQUEST_ID_PLACEHOLDER/$REQUEST_ID/g" "jobs/results/${REQUEST_ID}.json"
+          sed -i "s/ACTION_PLACEHOLDER/$ACTION/g" "jobs/results/${REQUEST_ID}.json"
+          sed -i "s/USER_EMAIL_PLACEHOLDER/$USER_EMAIL/g" "jobs/results/${REQUEST_ID}.json"
+          sed -i "s/STATUS_PLACEHOLDER/$STATUS/g" "jobs/results/${REQUEST_ID}.json"
+          sed -i "s/RESULT_SUMMARY_PLACEHOLDER/$RESULT_SUMMARY/g" "jobs/results/${REQUEST_ID}.json"
+          sed -i "s/ERROR_PLACEHOLDER/$ERROR/g" "jobs/results/${REQUEST_ID}.json"
+          sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -u +%Y-%m-%dT%H:%M:%SZ)/g" "jobs/results/${REQUEST_ID}.json"
+          
+          echo "Result written to jobs/results/${REQUEST_ID}.json"
+          cat "jobs/results/${REQUEST_ID}.json"
+
+      - name: Commit result file
+        run: |
+          REQUEST_ID="${{ needs.dispatch.outputs.request_id }}"
+          
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions - Gmail Dispatcher"
+          git add "jobs/results/${REQUEST_ID}.json"
+          git commit -m "L1: gmail result - ${REQUEST_ID}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: Upload result artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gmail-result-${{ needs.dispatch.outputs.request_id }}
+          path: jobs/results/${{ needs.dispatch.outputs.request_id }}.json
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          REQUEST_ID="${{ needs.dispatch.outputs.request_id }}"
+          ACTION="${{ needs.dispatch.outputs.action }}"
+          STATUS="${{ needs.execute.outputs.status }}"
+          ERROR="${{ needs.execute.outputs.error }}"
+          
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Gmail Job Summary
+          
+          **Request ID**: \`$REQUEST_ID\`  
+          **Action**: \`$ACTION\`  
+          **Status**: \`$STATUS\`
+          
+          $(if [ "$STATUS" = "failure" ]; then
+            echo "**Error**: $ERROR"
+          elif [ "$STATUS" = "todo" ]; then
+            echo "⚠️ **Skeleton Mode**: Workflow not fully implemented"
+          else
+            echo "✅ Operation completed"
+          fi)
+          
+          **Result File**: \`jobs/results/${REQUEST_ID}.json\`  
+          **Run URL**: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          ---
+          
+          **Phase 1 Status**: Design + Skeleton only  
+          **See**: \`docs/GMAIL_PUSH_DESIGN_PHASE1.md\`
+          SUMMARY
