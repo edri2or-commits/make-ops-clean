@@ -1,0 +1,150 @@
+name: Setup Google MCP - Automated
+
+on:
+  push:
+    paths:
+      - '.ops/triggers/google-mcp-setup.flag'
+
+jobs:
+  setup-google-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - id: auth
+        name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Read trigger config
+        id: config
+        run: |
+          STEP=$(cat .ops/triggers/google-mcp-setup.flag | head -n 1)
+          echo "step=$STEP" >> $GITHUB_OUTPUT
+          echo "Executing step: $STEP"
+      
+      - name: Step 1 - Enable APIs
+        if: ${{ steps.config.outputs.step == 'enable-apis' || steps.config.outputs.step == 'all' }}
+        run: |
+          echo "=== Enabling Google APIs ==="
+          
+          gcloud services enable gmail.googleapis.com --project=edri2or-mcp
+          gcloud services enable drive.googleapis.com --project=edri2or-mcp
+          gcloud services enable calendar-json.googleapis.com --project=edri2or-mcp
+          gcloud services enable sheets.googleapis.com --project=edri2or-mcp
+          gcloud services enable docs.googleapis.com --project=edri2or-mcp
+          gcloud services enable iap.googleapis.com --project=edri2or-mcp
+          
+          echo "✅ APIs enabled"
+          
+          gcloud services list --enabled --project=edri2or-mcp | grep -E "gmail|drive|calendar|sheets|docs|iap"
+      
+      - name: Step 2 - Create OAuth Client via Cloud Shell
+        if: ${{ steps.config.outputs.step == 'create-oauth' || steps.config.outputs.step == 'all' }}
+        id: oauth
+        run: |
+          echo "=== Creating OAuth Client ==="
+          
+          # Use gcloud to create OAuth brand and client
+          PROJECT_NUM=$(gcloud projects describe edri2or-mcp --format='value(projectNumber)')
+          
+          # Try to create OAuth brand (may already exist)
+          gcloud alpha iap oauth-brands create \
+            --application_title="Claude MCP Google Full" \
+            --support_email=edri2or@gmail.com \
+            --project=edri2or-mcp 2>/dev/null || echo "Brand may already exist"
+          
+          # Create OAuth client
+          CLIENT_OUTPUT=$(gcloud alpha iap oauth-clients create \
+            --brand=projects/$PROJECT_NUM/brands/$PROJECT_NUM \
+            --display_name="claude-mcp-google-full" \
+            --project=edri2or-mcp 2>&1 || echo "")
+          
+          echo "Client output: $CLIENT_OUTPUT"
+          
+          # Extract client ID and secret from output
+          CLIENT_ID=$(echo "$CLIENT_OUTPUT" | grep -oP 'name: \K[^/]+$' || echo "")
+          
+          if [ -z "$CLIENT_ID" ]; then
+            echo "⚠️ Could not extract client ID from gcloud output"
+            echo "Output was: $CLIENT_OUTPUT"
+            
+            # Alternative: list existing clients
+            echo "Listing existing OAuth clients..."
+            gcloud alpha iap oauth-clients list \
+              --brand=projects/$PROJECT_NUM/brands/$PROJECT_NUM \
+              --project=edri2or-mcp
+          fi
+          
+          echo "CLIENT_ID=$CLIENT_ID" >> $GITHUB_OUTPUT
+      
+      - name: Step 3 - Get credentials and store
+        if: ${{ steps.config.outputs.step == 'store-creds' || steps.config.outputs.step == 'all' }}
+        run: |
+          echo "=== Storing credentials ==="
+          
+          PROJECT_NUM=$(gcloud projects describe edri2or-mcp --format='value(projectNumber)')
+          
+          # List OAuth clients to get full details
+          CLIENT_LIST=$(gcloud alpha iap oauth-clients list \
+            --brand=projects/$PROJECT_NUM/brands/$PROJECT_NUM \
+            --project=edri2or-mcp \
+            --format=json)
+          
+          echo "Available clients: $CLIENT_LIST"
+          
+          # Extract first client's credentials
+          CLIENT_ID=$(echo "$CLIENT_LIST" | jq -r '.[0].name | split("/") | .[-1]')
+          CLIENT_SECRET=$(echo "$CLIENT_LIST" | jq -r '.[0].secret')
+          
+          if [ "$CLIENT_ID" != "null" ] && [ ! -z "$CLIENT_ID" ]; then
+            echo "Found client ID: $CLIENT_ID"
+            
+            # Store in Secret Manager
+            echo -n "$CLIENT_ID" | gcloud secrets create google-mcp-client-id \
+              --data-file=- --project=edri2or-mcp --replication-policy=automatic \
+              2>/dev/null || \
+            echo -n "$CLIENT_ID" | gcloud secrets versions add google-mcp-client-id \
+              --data-file=- --project=edri2or-mcp
+            
+            if [ "$CLIENT_SECRET" != "null" ] && [ ! -z "$CLIENT_SECRET" ]; then
+              echo -n "$CLIENT_SECRET" | gcloud secrets create google-mcp-client-secret \
+                --data-file=- --project=edri2or-mcp --replication-policy=automatic \
+                2>/dev/null || \
+              echo -n "$CLIENT_SECRET" | gcloud secrets versions add google-mcp-client-secret \
+                --data-file=- --project=edri2or-mcp
+              
+              echo "✅ Credentials stored in Secret Manager"
+            fi
+          fi
+          
+          # List secrets
+          gcloud secrets list --project=edri2or-mcp | grep google-mcp || echo "No secrets found yet"
+      
+      - name: Update trigger file (mark complete)
+        run: |
+          echo "completed-$(date -u +%Y%m%d-%H%M%S)" > .ops/triggers/google-mcp-setup.flag
+          git config user.name "Claude Automation"
+          git config user.email "automation@claude-ops.local"
+          git add .ops/triggers/google-mcp-setup.flag
+          git commit -m "Google MCP setup step completed" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+      
+      - name: Create summary
+        run: |
+          echo "## ✅ Google MCP Setup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Step**: ${{ steps.config.outputs.step }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next: Update claude_desktop_config.json" >> $GITHUB_STEP_SUMMARY
