@@ -1,0 +1,286 @@
+name: Gmail Operations
+
+on:
+  workflow_call:
+    inputs:
+      action:
+        description: 'Action to perform (read_message, list_messages, get_thread, get_history)'
+        required: true
+        type: string
+      message_id:
+        description: 'Message ID (for read_message)'
+        required: false
+        type: string
+      query:
+        description: 'Search query (for list_messages)'
+        required: false
+        type: string
+      thread_id:
+        description: 'Thread ID (for get_thread)'
+        required: false
+        type: string
+      history_id:
+        description: 'History ID (for get_history)'
+        required: false
+        type: string
+      user_email:
+        description: 'User email address'
+        required: false
+        type: string
+        default: 'edri2or@gmail.com'
+      project_id:
+        description: 'GCP Project ID'
+        required: false
+        type: string
+        default: 'edri2or-mcp'
+    outputs:
+      status:
+        description: 'Operation status (success/failure)'
+        value: ${{ jobs.execute.outputs.status }}
+      result_summary:
+        description: 'Summary of operation result'
+        value: ${{ jobs.execute.outputs.result_summary }}
+      error:
+        description: 'Error message if operation failed'
+        value: ${{ jobs.execute.outputs.error }}
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    outputs:
+      status: ${{ steps.operation.outputs.status }}
+      result_summary: ${{ steps.operation.outputs.result_summary }}
+      error: ${{ steps.operation.outputs.error }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via WIF
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ inputs.project_id }}
+
+      - name: Validate inputs
+        id: validate
+        run: |
+          ACTION="${{ inputs.action }}"
+          
+          echo "=== Validating Inputs ==="
+          echo "Action: $ACTION"
+          echo "User Email: ${{ inputs.user_email }}"
+          echo "Project: ${{ inputs.project_id }}"
+          
+          # Validate action
+          case "$ACTION" in
+            read_message|list_messages|get_thread|get_history)
+              echo "✅ Valid action: $ACTION"
+              ;;
+            *)
+              echo "❌ Invalid action: $ACTION"
+              echo "Must be one of: read_message, list_messages, get_thread, get_history"
+              exit 1
+              ;;
+          esac
+          
+          # Validate action-specific required inputs
+          case "$ACTION" in
+            read_message)
+              if [[ -z "${{ inputs.message_id }}" ]]; then
+                echo "❌ message_id is required for action: $ACTION"
+                exit 1
+              fi
+              ;;
+            get_thread)
+              if [[ -z "${{ inputs.thread_id }}" ]]; then
+                echo "❌ thread_id is required for action: $ACTION"
+                exit 1
+              fi
+              ;;
+            get_history)
+              if [[ -z "${{ inputs.history_id }}" ]]; then
+                echo "❌ history_id is required for action: $ACTION"
+                exit 1
+              fi
+              ;;
+          esac
+          
+          echo "✅ Validation passed"
+
+      - name: Retrieve Gmail credentials from Secret Manager
+        id: get_creds
+        run: |
+          echo "=== Retrieving Gmail Credentials ==="
+          
+          # TODO: Determine authentication method (Service Account vs OAuth)
+          # For now, this is a placeholder
+          
+          # Option 1: Service Account (if Workspace)
+          # gcloud secrets versions access latest \
+          #   --secret="gmail-service-account-key" \
+          #   --project="${{ inputs.project_id }}" > sa-key.json
+          
+          # Option 2: OAuth 2.0 (if Personal Gmail)
+          # CLIENT_ID=$(gcloud secrets versions access latest \
+          #   --secret="gmail-oauth-client-id" \
+          #   --project="${{ inputs.project_id }}")
+          # CLIENT_SECRET=$(gcloud secrets versions access latest \
+          #   --secret="gmail-oauth-client-secret" \
+          #   --project="${{ inputs.project_id }}")
+          # REFRESH_TOKEN=$(gcloud secrets versions access latest \
+          #   --secret="gmail-oauth-refresh-token" \
+          #   --project="${{ inputs.project_id }}")
+          
+          echo "⚠️ PLACEHOLDER: Credentials retrieval not implemented yet"
+          echo "⚠️ Requires: Authentication method decision + Secret Manager setup"
+          
+          # For skeleton, mark as TODO
+          echo "status=todo" >> "$GITHUB_OUTPUT"
+
+      - name: Execute Gmail operation
+        id: operation
+        run: |
+          set +e  # Don't exit on error, we want to capture it
+          
+          ACTION="${{ inputs.action }}"
+          MESSAGE_ID="${{ inputs.message_id }}"
+          QUERY="${{ inputs.query }}"
+          THREAD_ID="${{ inputs.thread_id }}"
+          HISTORY_ID="${{ inputs.history_id }}"
+          USER_EMAIL="${{ inputs.user_email }}"
+          PROJECT_ID="${{ inputs.project_id }}"
+          
+          echo "=== Executing Gmail Operation ==="
+          echo "Action: $ACTION"
+          echo "User: $USER_EMAIL"
+          
+          # Initialize outputs
+          STATUS="failure"
+          ERROR=""
+          RESULT_SUMMARY=""
+          
+          # Check if credentials are ready
+          if [[ "${{ steps.get_creds.outputs.status }}" == "todo" ]]; then
+            echo "⚠️ SKELETON MODE: Credentials not configured"
+            ERROR="Authentication not configured. This is a skeleton workflow."
+            STATUS="skipped"
+            echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+            echo "error=$ERROR" >> "$GITHUB_OUTPUT"
+            echo "result_summary=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          # TODO: Implement actual Gmail API calls
+          # This would use curl or gcloud to call Gmail API
+          
+          case "$ACTION" in
+            read_message)
+              echo "→ Reading message: $MESSAGE_ID"
+              
+              # Placeholder for actual API call:
+              # curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+              #   "https://gmail.googleapis.com/gmail/v1/users/$USER_EMAIL/messages/$MESSAGE_ID?format=full"
+              
+              echo "⚠️ TODO: Implement read_message API call"
+              STATUS="todo"
+              RESULT_SUMMARY="Message ID: $MESSAGE_ID (not implemented)"
+              ;;
+              
+            list_messages)
+              echo "→ Listing messages with query: $QUERY"
+              
+              # Placeholder for actual API call:
+              # curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+              #   "https://gmail.googleapis.com/gmail/v1/users/$USER_EMAIL/messages?q=$QUERY"
+              
+              echo "⚠️ TODO: Implement list_messages API call"
+              STATUS="todo"
+              RESULT_SUMMARY="Query: $QUERY (not implemented)"
+              ;;
+              
+            get_thread)
+              echo "→ Getting thread: $THREAD_ID"
+              
+              # Placeholder for actual API call:
+              # curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+              #   "https://gmail.googleapis.com/gmail/v1/users/$USER_EMAIL/threads/$THREAD_ID"
+              
+              echo "⚠️ TODO: Implement get_thread API call"
+              STATUS="todo"
+              RESULT_SUMMARY="Thread ID: $THREAD_ID (not implemented)"
+              ;;
+              
+            get_history)
+              echo "→ Getting history since: $HISTORY_ID"
+              
+              # Placeholder for actual API call:
+              # curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+              #   "https://gmail.googleapis.com/gmail/v1/users/$USER_EMAIL/history?startHistoryId=$HISTORY_ID"
+              
+              echo "⚠️ TODO: Implement get_history API call"
+              STATUS="todo"
+              RESULT_SUMMARY="History ID: $HISTORY_ID (not implemented)"
+              ;;
+          esac
+          
+          # Set outputs
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "result_summary=$RESULT_SUMMARY" >> "$GITHUB_OUTPUT"
+          
+          if [[ -n "$ERROR" ]]; then
+            echo "error=$ERROR" >> "$GITHUB_OUTPUT"
+          else
+            echo "error=" >> "$GITHUB_OUTPUT"
+          fi
+          
+          # Always exit successfully for skeleton
+          exit 0
+
+      - name: Summary
+        if: always()
+        run: |
+          STATUS="${{ steps.operation.outputs.status }}"
+          ERROR="${{ steps.operation.outputs.error }}"
+          
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Gmail Operation Summary
+          
+          **Action**: \`${{ inputs.action }}\`  
+          **User**: \`${{ inputs.user_email }}\`  
+          **Project**: \`${{ inputs.project_id }}\`  
+          **Status**: \`$STATUS\`
+          
+          $(if [ "$STATUS" = "failure" ]; then
+            echo "**Error**: $ERROR"
+          elif [ "$STATUS" = "todo" ]; then
+            echo "⚠️ **Skeleton Mode**: This workflow is not fully implemented yet"
+            echo ""
+            echo "**Missing**:"
+            echo "- Authentication configuration (Service Account or OAuth)"
+            echo "- Gmail API integration"
+            echo "- Secret Manager credential retrieval"
+          else
+            echo "✅ Operation completed"
+          fi)
+          
+          ---
+          
+          **Phase 1 Status**: Design + Skeleton only  
+          **See**: \`docs/GMAIL_PUSH_DESIGN_PHASE1.md\`
+          SUMMARY
