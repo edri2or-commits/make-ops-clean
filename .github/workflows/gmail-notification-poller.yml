@@ -1,0 +1,234 @@
+name: Gmail Notification Poller
+
+on:
+  schedule:
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via WIF
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: edri2or-mcp
+
+      - name: Pull notifications from Pub/Sub
+        id: pull
+        run: |
+          echo "=== Pulling Gmail Notifications from Pub/Sub ==="
+          
+          SUBSCRIPTION="gmail-pull-sub"
+          PROJECT="edri2or-mcp"
+          LIMIT=10
+          
+          # TODO: Ensure subscription exists
+          # For skeleton, check if we can access Pub/Sub
+          
+          # Check if subscription exists
+          if ! gcloud pubsub subscriptions describe "$SUBSCRIPTION" \
+            --project="$PROJECT" &>/dev/null; then
+            echo "⚠️ Subscription '$SUBSCRIPTION' does not exist"
+            echo "⚠️ SKELETON MODE: Pub/Sub not configured"
+            echo "message_count=0" >> "$GITHUB_OUTPUT"
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          # Pull messages
+          echo "Pulling up to $LIMIT messages from $SUBSCRIPTION..."
+          
+          MESSAGES=$(gcloud pubsub subscriptions pull "$SUBSCRIPTION" \
+            --limit=$LIMIT \
+            --format=json \
+            --project="$PROJECT" 2>&1)
+          
+          EXIT_CODE=$?
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "⚠️ Failed to pull messages"
+            echo "Error: $MESSAGES"
+            echo "message_count=0" >> "$GITHUB_OUTPUT"
+            echo "status=error" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          # Count messages
+          MESSAGE_COUNT=$(echo "$MESSAGES" | jq 'length' 2>/dev/null || echo "0")
+          
+          echo "Pulled $MESSAGE_COUNT message(s)"
+          echo "message_count=$MESSAGE_COUNT" >> "$GITHUB_OUTPUT"
+          
+          # Save messages for processing
+          echo "$MESSAGES" > notifications.json
+          
+          if [ "$MESSAGE_COUNT" -gt 0 ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=empty" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Process notifications
+        if: steps.pull.outputs.status == 'success'
+        id: process
+        run: |
+          echo "=== Processing Notifications ==="
+          
+          MESSAGE_COUNT="${{ steps.pull.outputs.message_count }}"
+          PROCESSED=0
+          ERRORS=0
+          
+          # Read notifications
+          MESSAGES=$(cat notifications.json)
+          
+          # Process each message
+          for i in $(seq 0 $((MESSAGE_COUNT - 1))); do
+            echo "--- Processing message $((i + 1))/$MESSAGE_COUNT ---"
+            
+            # Extract message details
+            ACK_ID=$(echo "$MESSAGES" | jq -r ".[$i].ackId")
+            DATA_B64=$(echo "$MESSAGES" | jq -r ".[$i].message.data")
+            MESSAGE_ID=$(echo "$MESSAGES" | jq -r ".[$i].message.messageId")
+            PUBLISH_TIME=$(echo "$MESSAGES" | jq -r ".[$i].message.publishTime")
+            
+            echo "Message ID: $MESSAGE_ID"
+            echo "Published: $PUBLISH_TIME"
+            
+            # Decode base64 data
+            DATA=$(echo "$DATA_B64" | base64 -d 2>/dev/null || echo "{}")
+            
+            echo "Decoded data: $DATA"
+            
+            # Extract email address and historyId
+            EMAIL_ADDRESS=$(echo "$DATA" | jq -r '.emailAddress // ""')
+            HISTORY_ID=$(echo "$DATA" | jq -r '.historyId // ""')
+            
+            if [[ -z "$EMAIL_ADDRESS" || -z "$HISTORY_ID" ]]; then
+              echo "⚠️ Missing emailAddress or historyId, skipping"
+              ((ERRORS++))
+              continue
+            fi
+            
+            echo "Email: $EMAIL_ADDRESS"
+            echo "History ID: $HISTORY_ID"
+            
+            # Create job request
+            TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
+            REQUEST_ID="gmail-req-history-${TIMESTAMP}-${HISTORY_ID}"
+            
+            cat > "jobs/requests/${REQUEST_ID}.json" <<EOF
+          {
+            "type": "gmail",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "request_id": "$REQUEST_ID",
+            "action": "get_history",
+            "history_id": "$HISTORY_ID",
+            "user_email": "$EMAIL_ADDRESS",
+            "requester": "gmail-poller",
+            "metadata": {
+              "pubsub_message_id": "$MESSAGE_ID",
+              "publish_time": "$PUBLISH_TIME",
+              "ack_id": "$ACK_ID"
+            }
+          }
+          EOF
+            
+            echo "✅ Created job request: $REQUEST_ID"
+            ((PROCESSED++))
+            
+            # Acknowledge message
+            echo "Acknowledging message..."
+            gcloud pubsub subscriptions ack gmail-pull-sub \
+              --ack-ids="$ACK_ID" \
+              --project="edri2or-mcp" || echo "⚠️ Failed to ack"
+          done
+          
+          echo "=== Processing Complete ==="
+          echo "Processed: $PROCESSED/$MESSAGE_COUNT"
+          echo "Errors: $ERRORS"
+          
+          echo "processed=$PROCESSED" >> "$GITHUB_OUTPUT"
+          echo "errors=$ERRORS" >> "$GITHUB_OUTPUT"
+
+      - name: Commit job requests
+        if: steps.process.outputs.processed > 0
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions - Gmail Poller"
+          git add jobs/requests/gmail-req-*.json
+          git commit -m "L1: gmail notifications - created ${{ steps.process.outputs.processed }} job request(s)" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: Summary
+        if: always()
+        run: |
+          STATUS="${{ steps.pull.outputs.status }}"
+          MESSAGE_COUNT="${{ steps.pull.outputs.message_count }}"
+          PROCESSED="${{ steps.process.outputs.processed }}"
+          ERRORS="${{ steps.process.outputs.errors }}"
+          
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Gmail Notification Poller Summary
+          
+          **Time**: $(date -u +%Y-%m-%d\ %H:%M:%S) UTC  
+          **Status**: \`$STATUS\`
+          
+          $(if [ "$STATUS" = "skipped" ]; then
+            echo "⚠️ **Skeleton Mode**: Pub/Sub subscription not configured"
+            echo ""
+            echo "**Required Setup**:"
+            echo "1. Create Pub/Sub topic: \`gmail-notifications\`"
+            echo "2. Create pull subscription: \`gmail-pull-sub\`"
+            echo "3. Activate Gmail watch"
+            echo ""
+            echo "**Commands**:"
+            echo "\`\`\`bash"
+            echo "gcloud pubsub topics create gmail-notifications --project=edri2or-mcp"
+            echo "gcloud pubsub subscriptions create gmail-pull-sub \\"
+            echo "  --topic=gmail-notifications \\"
+            echo "  --ack-deadline=600 \\"
+            echo "  --project=edri2or-mcp"
+            echo "\`\`\`"
+          elif [ "$STATUS" = "empty" ]; then
+            echo "ℹ️ No new notifications"
+          elif [ "$STATUS" = "success" ]; then
+            echo "**Messages Pulled**: $MESSAGE_COUNT  "
+            echo "**Jobs Created**: $PROCESSED  "
+            echo "**Errors**: $ERRORS"
+            echo ""
+            if [ "$PROCESSED" -gt 0 ]; then
+              echo "✅ Created $PROCESSED job request(s) in \`jobs/requests/\`"
+              echo ""
+              echo "These will be processed by \`gmail-dispatcher.yml\`"
+            fi
+          else
+            echo "❌ Error pulling messages"
+          fi)
+          
+          ---
+          
+          **Phase 1 Status**: Design + Skeleton  
+          **Next Poll**: ~10 minutes  
+          **See**: \`docs/GMAIL_PUSH_DESIGN_PHASE1.md\`
+          SUMMARY
