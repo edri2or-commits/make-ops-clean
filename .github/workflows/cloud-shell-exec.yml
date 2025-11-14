@@ -1,0 +1,158 @@
+name: Cloud Shell Execute
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Command to execute in Cloud Shell'
+        required: true
+        type: string
+        default: 'echo "Hello from Cloud Shell" && whoami && pwd && uname -a'
+      project_id:
+        description: 'GCP Project ID'
+        required: false
+        type: string
+        default: 'edri2or-mcp'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via WIF
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ inputs.project_id }}
+
+      - name: Execute command in Cloud Shell
+        id: exec
+        run: |
+          set +e  # Don't exit on error, we want to capture all output
+          
+          TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
+          OUTPUT_FILE="cloud_shell_output_${TIMESTAMP}.txt"
+          ERROR_FILE="cloud_shell_error_${TIMESTAMP}.txt"
+          
+          echo "=== Executing Cloud Shell Command ===" | tee -a "$OUTPUT_FILE"
+          echo "Command: ${{ inputs.command }}" | tee -a "$OUTPUT_FILE"
+          echo "Project: ${{ inputs.project_id }}" | tee -a "$OUTPUT_FILE"
+          echo "Timestamp: $(date -u +%FT%TZ)" | tee -a "$OUTPUT_FILE"
+          echo "Runner: ubuntu-latest (GitHub Actions)" | tee -a "$OUTPUT_FILE"
+          echo "========================================" | tee -a "$OUTPUT_FILE"
+          echo "" | tee -a "$OUTPUT_FILE"
+          
+          # Execute the command
+          gcloud cloud-shell ssh \
+            --project="${{ inputs.project_id }}" \
+            --command="${{ inputs.command }}" \
+            > >(tee -a "$OUTPUT_FILE") \
+            2> >(tee -a "$ERROR_FILE" >&2)
+          
+          EXIT_CODE=$?
+          
+          echo "" | tee -a "$OUTPUT_FILE"
+          echo "========================================" | tee -a "$OUTPUT_FILE"
+          echo "Exit Code: $EXIT_CODE" | tee -a "$OUTPUT_FILE"
+          
+          # Create JSON report
+          cat > cloud_shell_exec.json <<EOF
+          {
+            "timestamp": "$(date -u +%FT%TZ)",
+            "command": "${{ inputs.command }}",
+            "project_id": "${{ inputs.project_id }}",
+            "exit_code": $EXIT_CODE,
+            "github_run_id": "${{ github.run_id }}",
+            "github_sha": "${{ github.sha }}",
+            "runner": "ubuntu-latest",
+            "output_file": "$OUTPUT_FILE",
+            "error_file": "$ERROR_FILE"
+          }
+          EOF
+          
+          # Set outputs
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          echo "timestamp=${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          
+          # Create artifacts directory
+          mkdir -p artifacts/cloud-shell
+          cp cloud_shell_exec.json artifacts/cloud-shell/
+          cp "$OUTPUT_FILE" artifacts/cloud-shell/
+          [ -f "$ERROR_FILE" ] && cp "$ERROR_FILE" artifacts/cloud-shell/
+          
+          # Add to step summary
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Cloud Shell Execution Report
+          
+          **Command**: \`${{ inputs.command }}\`  
+          **Project**: \`${{ inputs.project_id }}\`  
+          **Exit Code**: \`$EXIT_CODE\`  
+          **Timestamp**: \`$(date -u +%FT%TZ)\`
+          
+          ### Output Preview
+          \`\`\`
+          $(head -n 20 "$OUTPUT_FILE")
+          \`\`\`
+          
+          Full output available in artifacts.
+          SUMMARY
+          
+          # Exit with the command's exit code
+          exit $EXIT_CODE
+
+      - name: Upload execution artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cloud-shell-execution-${{ steps.exec.outputs.timestamp }}
+          path: |
+            cloud_shell_exec.json
+            cloud_shell_output_*.txt
+            cloud_shell_error_*.txt
+            artifacts/cloud-shell/
+          retention-days: 30
+
+      - name: Commit execution log to repository
+        if: always()
+        run: |
+          mkdir -p artifacts/cloud-shell
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add artifacts/cloud-shell/ || true
+          git commit -m "L1: Cloud Shell execution log - run ${{ github.run_id }}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: Execution summary
+        if: always()
+        run: |
+          echo "==================================="
+          echo "Cloud Shell Execution Complete"
+          echo "==================================="
+          echo "Exit Code: ${{ steps.exec.outputs.exit_code }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Artifacts: cloud-shell-execution-${{ steps.exec.outputs.timestamp }}"
+          echo "==================================="
+          
+          if [ "${{ steps.exec.outputs.exit_code }}" = "0" ]; then
+            echo "✅ SUCCESS"
+          else
+            echo "❌ FAILED"
+            exit 1
+          fi
