@@ -4,7 +4,7 @@
 
 **Created**: 2025-11-14  
 **Last Updated**: 2025-11-14  
-**Version**: 1.0.2
+**Version**: 1.1.0
 
 ---
 
@@ -13,6 +13,72 @@
 This is the **master reference** for all capabilities across the Claude-Ops system. Every chat session, automation, and tool must reference this document to understand what Claude can and cannot do.
 
 **Update Protocol**: When a new capability is added, this file MUST be updated before the capability is considered operational.
+
+---
+
+## ⚡ GLOBAL EXECUTION MODEL
+
+**CRITICAL CONTRACT**
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Or (אור)                           │
+│                                                      │
+│  Role: Intent + Approval ONLY                       │
+│  - Defines objectives ("enable Google full access") │
+│  - Approves HIGH RISK operations                    │
+│  - Clicks OAuth consent (when required by provider) │
+│                                                      │
+│  NEVER:                                              │
+│  ❌ Opens consoles (GCP, Azure, AWS, etc.)          │
+│  ❌ Enables APIs manually                           │
+│  ❌ Creates credentials manually                    │
+│  ❌ Edits config files manually                     │
+│  ❌ Runs commands manually                          │
+│  ❌ Executes scripts manually                       │
+│                                                      │
+└──────────────────┬──────────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────────┐
+│                Claude (Executor)                     │
+│                                                      │
+│  Role: Technical Execution via Automation           │
+│  - Plans automation strategy                        │
+│  - Creates GitHub Actions workflows                 │
+│  - Triggers workflows via API                       │
+│  - Monitors execution                               │
+│  - Reads results from artifacts/logs                │
+│  - Updates config files via MCP/filesystem          │
+│  - Documents changes in CAPABILITIES_MATRIX.md      │
+│                                                      │
+│  Tools:                                              │
+│  ✅ GitHub Actions (WIF → GCP)                      │
+│  ✅ Cloud Shell (via Actions)                       │
+│  ✅ MCP Servers (filesystem, ps_exec, etc.)         │
+│  ✅ REST APIs (GCP, GitHub, etc.)                   │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+```
+
+**Translation of this model**:
+- Or provides **strategic direction** ("I want full Google capabilities")
+- Claude provides **tactical execution** (creates workflows, runs automation)
+- Or provides **approval gates** for HIGH RISK operations
+- Or provides **one-time clicks** when OAuth providers require human consent
+
+**This is not negotiable**. Any plan, workflow, or documentation that asks Or to:
+- Run commands
+- Open web consoles
+- Edit files manually
+- Configure systems manually
+
+...is **INVALID** and violates the core contract.
+
+**Replacement strategy**: If a step requires Or's manual action, Claude MUST either:
+1. Automate it via GitHub Actions / Cloud Shell / MCP
+2. Document it as a ONE-TIME human click (OAuth consent only)
+3. Mark it as a gap and propose automation path
 
 ---
 
@@ -89,10 +155,10 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude (local) | User filesystem | Read images | ✅ Verified | Base64 image reading | Allowed dirs only |
 
 **Allowed Directories**:
-- `C:\Users\edri2` (primary)
-- `C:\` (secondary)
+- `C:\\Users\\edri2` (primary)
+- `C:\\` (secondary)
 
-**Key Directory**: `C:\Users\edri2\Work\AI-Projects\Claude-Ops\`
+**Key Directory**: `C:\\Users\\edri2\\Work\\AI-Projects\\Claude-Ops\\`
 
 ### 2.2 PowerShell MCP
 
@@ -115,7 +181,7 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 11. `screenshot` - Capture primary display screenshot ⭐ **NEW**
 
 **Screenshot Details**:
-- **Output Directory**: `C:\Users\edri2\Work\AI-Projects\Claude-Ops\screenshots\`
+- **Output Directory**: `C:\\Users\\edri2\\Work\\AI-Projects\\Claude-Ops\\screenshots\\`
 - **Filename Format**: `screenshot_YYYYMMDD_HHmmss.png`
 - **Technology**: .NET System.Drawing (System.Windows.Forms + System.Drawing)
 - **Capture**: Primary display, full resolution
@@ -132,7 +198,7 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | gcloud CLI (local) | Detect installation | ✅ Verified | Can confirm presence at known path | Detection only |
 | Claude MCP | gcloud CLI (local) | Execute commands | ❌ Blocked | ps_exec whitelist only | Architectural constraint |
 
-**Installation Path**: `C:\Users\edri2\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\`  
+**Installation Path**: `C:\\Users\\edri2\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\`  
 **Binary**: `gcloud.cmd` (10,925 bytes) + `gcloud.ps1` (3,951 bytes)  
 **Status**: Installed and detected (verified 2025-11-14)  
 **Last Updated**: 2025-11-12 (inferred from directory timestamps)  
@@ -177,11 +243,14 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | Gmail API | Search messages | ✅ Verified | Full Gmail search syntax | Read-only |
 | Claude MCP | Gmail API | Read threads | ✅ Verified | Full thread context | Read-only |
 | Claude MCP | Gmail API | List messages | ✅ Verified | Pagination supported | Read-only |
-| Claude MCP | Gmail API | Send email | ❌ Blocked | Not in MCP scope | Cannot send |
-| Claude MCP | Gmail API | Download attachments | ❌ Blocked | Not in MCP scope | Cannot access |
+| Claude MCP | Gmail API | Send email | ⚠️ Planned | Will require OAuth scope expansion | Automation in progress |
+| Claude MCP | Gmail API | Download attachments | ⚠️ Planned | Will require OAuth scope expansion | Automation in progress |
 
-**Authentication**: OAuth 2.0 via MCP  
-**Scopes**: `gmail.readonly`
+**Authentication**: OAuth 2.0 via native Claude integration  
+**Current Scopes**: `gmail.readonly`  
+**Planned Scopes**: Full Gmail access (send, modify, labels, settings)  
+**Expansion Method**: Separate Google MCP server with extended scopes  
+**Approval Required**: Yes - HIGH RISK operations (send, delete)
 
 ### 3.2 Google Drive
 
@@ -190,11 +259,14 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | Drive API | Search files | ✅ Verified | Full query syntax | Read-only |
 | Claude MCP | Drive API | Fetch documents | ✅ Verified | Get document content | Read-only |
 | Claude MCP | Drive API | List folders | ✅ Verified | Navigate folder structure | Read-only |
-| Claude MCP | Drive API | Create files | ❌ Blocked | Not in MCP scope | Cannot create |
-| Claude MCP | Drive API | Edit files | ❌ Blocked | Not in MCP scope | Cannot edit |
+| Claude MCP | Drive API | Create files | ⚠️ Planned | Will require OAuth scope expansion | Automation in progress |
+| Claude MCP | Drive API | Edit files | ⚠️ Planned | Will require OAuth scope expansion | Automation in progress |
 
-**Authentication**: OAuth 2.0 via MCP  
-**Scopes**: `drive.readonly`
+**Authentication**: OAuth 2.0 via native Claude integration  
+**Current Scopes**: `drive.readonly`  
+**Planned Scopes**: Full Drive access (create, edit, delete, share)  
+**Expansion Method**: Separate Google MCP server with extended scopes  
+**Approval Required**: Yes - HIGH RISK operations (delete, share)
 
 ### 3.3 Google Calendar
 
@@ -204,11 +276,28 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | Calendar API | Search events | ✅ Verified | Query-based search | Read-only |
 | Claude MCP | Calendar API | Find free time | ✅ Verified | Free/busy lookup | Read-only |
 | Claude MCP | Calendar API | Get event details | ✅ Verified | Full event metadata | Read-only |
-| Claude MCP | Calendar API | Create events | ❌ Blocked | Not in MCP scope | Cannot create |
-| Claude MCP | Calendar API | Edit events | ❌ Blocked | Not in MCP scope | Cannot edit |
+| Claude MCP | Calendar API | Create events | ⚠️ Planned | Will require OAuth scope expansion | Automation in progress |
+| Claude MCP | Calendar API | Edit events | ⚠️ Planned | Will require OAuth scope expansion | Automation in progress |
 
-**Authentication**: OAuth 2.0 via MCP  
-**Scopes**: `calendar.readonly`
+**Authentication**: OAuth 2.0 via native Claude integration  
+**Current Scopes**: `calendar.readonly`  
+**Planned Scopes**: Full Calendar access (create, edit, delete events)  
+**Expansion Method**: Separate Google MCP server with extended scopes  
+**Approval Required**: Yes - HIGH RISK operations (delete events, send invites)
+
+### 3.4 Google Sheets & Docs (Planned)
+
+| From | To | Capability | Status | Details | Limitations |
+|------|----|-----------| -------|---------|-------------|
+| Claude MCP | Sheets API | Read sheets | ⚠️ Planned | Via new MCP server | Not yet configured |
+| Claude MCP | Sheets API | Update cells | ⚠️ Planned | Via new MCP server | Not yet configured |
+| Claude MCP | Docs API | Read docs | ⚠️ Planned | Via new MCP server | Not yet configured |
+| Claude MCP | Docs API | Edit docs | ⚠️ Planned | Via new MCP server | Not yet configured |
+
+**Note**: Sheets currently accessible via GitHub Actions → WIF (see section 4.1)  
+**Planned**: Direct MCP access with full read/write capabilities  
+**Expansion Method**: Same Google MCP server as Gmail/Drive/Calendar  
+**Approval Required**: Yes - MEDIUM/HIGH RISK depending on operation
 
 ---
 
@@ -247,19 +336,24 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 
 | From | To | Capability | Status | Details | Limitations |
 |------|----|-----------| -------|---------|-------------|
-| Local (אור) | Cloud Shell | SSH access | ✅ Verified | `gcloud cloud-shell ssh` works | Manual only |
-| Local (אור) | Cloud Shell | Execute commands | ✅ Verified | Tested and working | Manual only |
+| Local (אור) | Cloud Shell | SSH access | ✅ Verified | `gcloud cloud-shell ssh` works | Manual only - VIOLATES CONTRACT |
+| Local (אור) | Cloud Shell | Execute commands | ✅ Verified | Tested and working | Manual only - VIOLATES CONTRACT |
 | Claude | Cloud Shell | Automated exec | ⚠️ Planned | Need automation bridge | Not built yet |
 | GitHub Actions | Cloud Shell | Execute commands | ⚠️ Planned | Possible via workflow | Not built yet |
+
+**⚠️ CONTRACT VIOLATION**: Current status shows אור executing commands manually  
+**Required Fix**: Automate via GitHub Actions (see section 7.3)
 
 **Evidence**: Document 6 shows Cloud Shell verified operational  
 **Gap**: No automated triggering path from Claude yet
 
 **Recommended Path**: GitHub Actions → gcloud CLI (in Actions runner) → Cloud Shell
 - Bypasses local gcloud dependency
-- Uses proven WIF authentication
+- Uses proven WIF authentication pattern
 - Full automation and audit trail
-- See `logs/LOG_LOCAL_GCLOUD_STATUS.md` for architecture reasoning
+- Maintains zero-touch principle
+
+**Priority**: HIGH - This enables full GCP automation while respecting the contract
 
 ---
 
@@ -324,11 +418,13 @@ Claude → GitHub (create workflow/trigger)
 Claude → PowerShell MCP (dir, type, test_path)
        → Read script file
        → Analyze content
-       → [Manual] או runs script locally
+       → GitHub Actions wrapper (automated execution)
 ```
 
-**Status**: 🟡 Partial (can read, cannot execute)  
-**Gap**: No automated execution path
+**Status**: 🟡 Partial (can read, automation possible)  
+**Gap**: Need to build GitHub Actions wrappers for key scripts
+
+**⚠️ IMPORTANT**: The pattern "Or runs script locally" is NO LONGER VALID per the global execution model.
 
 ### 7.3 Claude → Cloud Shell (Recommended)
 
@@ -347,7 +443,7 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 ```
 
 **Status**: ⚠️ Planned  
-**Priority**: High (enables full Cloud Shell automation)  
+**Priority**: HIGH (enables full Cloud Shell automation while respecting contract)  
 **Evidence**: See `logs/LOG_LOCAL_GCLOUD_STATUS.md` for design rationale
 
 ---
@@ -375,8 +471,7 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 **Workaround**: 
 1. Read script via `type` command
 2. Analyze and understand
-3. Execute via GitHub Actions if automation needed
-4. Request manual execution if Actions not viable
+3. Execute via GitHub Actions (automated wrapper)
 
 **Status**: Accepted limitation, architectural constraint by design
 
@@ -384,14 +479,15 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 **Issue**: 56 scripts available locally, but no direct execution path from Claude
 
-**Impact**: Cannot automate Python/Shell scripts from Claude
+**Impact**: Cannot automate Python/Shell scripts from Claude directly
 
-**Workaround**: Either:
-1. Manual execution by אור
-2. Create GitHub Actions wrappers
-3. Use PowerShell MCP where applicable
+**Workaround**:
+1. Create GitHub Actions wrappers (automated)
+2. Use PowerShell MCP where applicable (limited)
 
-**Status**: Accepted limitation, automation possible via Actions
+**Status**: Automation via Actions is the path forward (respects contract)
+
+**⚠️ REMOVED**: "Manual execution by אור" - this violates the contract
 
 ### 8.4 Local gcloud CLI Access
 
@@ -431,6 +527,27 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 ## 🔟 Roadmap to 100%
 
+### Priority 0: Google MCP Full Setup (HIGHEST PRIORITY)
+
+**Goal**: Enable full Google capabilities (Gmail, Drive, Calendar, Sheets, Docs) with approval gates
+
+**Tasks**:
+1. 🔄 Create GitHub Actions workflows for OAuth setup (automated)
+2. 🔄 Enable required GCP APIs (automated)
+3. 🔄 Create OAuth client credentials (automated)
+4. 🔄 Store credentials in Secret Manager (automated)
+5. 🔄 Update claude_desktop_config.json (automated)
+6. 🔄 Verification tests (automated)
+7. ⏳ Or: Click OAuth consent (one-time human action)
+
+**Executor**: Claude (via automation)  
+**Or's Role**: Intent + Approval + One OAuth click  
+**Effort**: Low (automation-first approach)  
+**Risk**: Low (approval gates in place)  
+**Impact**: Unlocks full Google productivity suite
+
+**See**: `plans/GOOGLE_MCP_AUTOMATION_PLAN.md` for detailed execution plan
+
 ### Priority 1: Cloud Shell via Actions (High Value, Low Risk)
 
 **Goal**: Enable automated Cloud Shell command execution
@@ -441,9 +558,11 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 3. ⏳ Execute gcloud commands in runner
 4. ⏳ Return output as artifact
 
+**Executor**: Claude (via automation)  
+**Or's Role**: Approval only  
 **Effort**: Low (copy existing Sheets pattern)  
 **Risk**: Low (read operations)  
-**Impact**: Unblocks full GCP automation
+**Impact**: Unblocks full GCP automation while respecting contract
 
 ### Priority 2: Verification Runners (High Value, Low Risk)
 
@@ -454,6 +573,8 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 2. ⏳ Secret Manager read (need workflow)
 3. ⏳ Drive write (need workflow)
 
+**Executor**: Claude (via automation)  
+**Or's Role**: Approval only  
 **Effort**: Low (reuse existing WIF)  
 **Risk**: Low (read-only operations)
 
@@ -466,6 +587,8 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 2. ⏳ GPT/ OAuth (next)
 3. ⏳ GCP SA keys (verify usage first)
 
+**Executor**: Claude (via automation)  
+**Or's Role**: Approval only  
 **Effort**: Low (proven process)  
 **Risk**: Medium (requires testing)
 
@@ -474,10 +597,12 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 **Goal**: Enable automated script execution
 
 **Tasks**:
-1. ⏳ Create GitHub Actions for key scripts
+1. ⏳ Create GitHub Actions wrappers for key scripts
 2. ⏳ Build trigger mechanism from Claude
 3. ⏳ Establish result retrieval pattern
 
+**Executor**: Claude (via automation)  
+**Or's Role**: Approval only  
 **Effort**: Medium  
 **Risk**: Low
 
@@ -485,8 +610,19 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 ## 📝 Update Log
 
+### 2025-11-14 (v1.1.0)
+- **Added GLOBAL EXECUTION MODEL section** ⭐ CRITICAL
+- Defined contract: Or = Intent + Approval, Claude = Executor
+- Updated all sections to remove manual execution by Or
+- Marked Cloud Shell manual usage as contract violation
+- Updated Google Layer (3.x) with planned full capabilities
+- Added Priority 0: Google MCP Full Setup to roadmap
+- Updated all roadmap items with "Executor: Claude" and "Or's Role: Approval only"
+- Referenced `plans/GOOGLE_MCP_AUTOMATION_PLAN.md` for execution details
+- Commit message: "L0: Add global execution model - Or = Intent+Approval, Claude = Executor"
+
 ### 2025-11-14 (v1.0.2)
-- **Added screenshot capability to ps_exec MCP server** ⭐
+- **Added screenshot capability to ps_exec MCP server**
 - Section 2.2: Expanded PowerShell MCP table with screenshot row
 - Updated whitelisted commands: 10 → 11 (added `screenshot`)
 - Added screenshot details subsection with implementation specifics
