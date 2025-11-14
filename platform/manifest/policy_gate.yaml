@@ -1,0 +1,9 @@
+auto:
+  - "gh.pr.create"
+  - "google.project.info"
+requires_approval:
+  - "local.install"
+  - "iam_change"
+blocked:
+  - "force_push"
+  - "repo_delete"

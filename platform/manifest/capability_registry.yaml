@@ -1,0 +1,31 @@
+version: 1
+owners:
+  planner: "chatgpt"
+  executor: "claude"
+drivers:
+  github:
+    current: "rob_mcp"           # זמני; יעד: owned_github_app
+    future: "owned_github_app"
+  google:
+    current: "api_first"
+  local:
+    current: "signed_scripts"
+intents:
+  gh.pr.create:
+    driver: "github"
+    safety: "auto"
+  google.project.info:
+    driver: "google"
+    safety: "auto"
+  local.install:
+    driver: "local"
+    safety: "approval"
+  iam_change:
+    driver: "local"
+    safety: "approval"
+  repo_delete:
+    driver: "github"
+    safety: "approval"
+  force_push:
+    driver: "github"
+    safety: "approval"

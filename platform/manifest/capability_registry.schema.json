@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Capability Registry v1",
+  "type": "object",
+  "required": [
+    "version",
+    "owners",
+    "drivers",
+    "intents"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "owners": {
+      "type": "object",
+      "required": [
+        "planner",
+        "executor"
+      ],
+      "properties": {
+        "planner": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "drivers": {
+      "type": "object",
+      "properties": {
+        "github": {
+          "type": "object",
+          "properties": {
+            "current": {
+              "type": "string"
+            },
+            "future": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "google": {
+          "type": "object",
+          "properties": {
+            "current": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "local": {
+          "type": "object",
+          "properties": {
+            "current": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "intents": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "type": "object",
+          "required": [
+            "driver",
+            "safety"
+          ],
+          "properties": {
+            "driver": {
+              "type": "string",
+              "enum": [
+                "github",
+                "google",
+                "local"
+              ]
+            },
+            "safety": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "approval"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
