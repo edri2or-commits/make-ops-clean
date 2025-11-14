@@ -4,7 +4,7 @@
 
 **Created**: 2025-11-14  
 **Last Updated**: 2025-11-14  
-**Version**: 1.0.1
+**Version**: 1.0.2
 
 ---
 
@@ -98,7 +98,8 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 
 | From | To | Capability | Status | Details | Limitations |
 |------|----|-----------| -------|---------|-------------|
-| Claude MCP | PowerShell | Execute commands | ✅ Verified | 10 whitelisted commands | Whitelist only |
+| Claude MCP | PowerShell | Execute commands | ✅ Verified | 11 whitelisted commands | Whitelist only |
+| Claude MCP | PowerShell | Screenshot capture | ✅ Verified | Primary display capture | PNG format only |
 
 **Whitelisted Commands**:
 1. `dir` - List directory
@@ -111,9 +112,18 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 8. `test_connection` - Test network connectivity
 9. `get_item_property` - Get registry/file properties
 10. `measure_object` - Count/measure objects
+11. `screenshot` - Capture primary display screenshot ⭐ **NEW**
+
+**Screenshot Details**:
+- **Output Directory**: `C:\Users\edri2\Work\AI-Projects\Claude-Ops\screenshots\`
+- **Filename Format**: `screenshot_YYYYMMDD_HHmmss.png`
+- **Technology**: .NET System.Drawing (System.Windows.Forms + System.Drawing)
+- **Capture**: Primary display, full resolution
+- **Returns**: JSON with filepath, filename, timestamp, resolution
 
 **Server**: `mcp-servers/ps_exec/` (Node.js + dispatcher.ps1)  
-**SDK**: `@modelcontextprotocol/sdk`
+**SDK**: `@modelcontextprotocol/sdk`  
+**Version**: 0.2.0
 
 ### 2.3 Local CLI Tools
 
@@ -305,7 +315,7 @@ Claude → GitHub (create workflow/trigger)
 
 ### 7.2 Claude → Local Scripts (Indirect)
 
-**Problem**: PowerShell MCP only supports 10 whitelisted commands, not full script execution
+**Problem**: PowerShell MCP only supports 11 whitelisted commands, not full script execution
 
 **Solution**: Create wrapper scripts that use whitelisted commands
 
@@ -358,7 +368,7 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 ### 8.2 PowerShell Limitations
 
-**Issue**: Only 10 whitelisted commands available
+**Issue**: Only 11 whitelisted commands available (was 10, now 11 with screenshot)
 
 **Impact**: ❌ Cannot execute arbitrary scripts, ❌ Cannot run gcloud locally
 
@@ -474,6 +484,16 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 ---
 
 ## 📝 Update Log
+
+### 2025-11-14 (v1.0.2)
+- **Added screenshot capability to ps_exec MCP server** ⭐
+- Section 2.2: Expanded PowerShell MCP table with screenshot row
+- Updated whitelisted commands: 10 → 11 (added `screenshot`)
+- Added screenshot details subsection with implementation specifics
+- Updated version in section 2.2: ps_exec now 0.2.0
+- Updated section 7.2: PowerShell limitation note (10 → 11 commands)
+- Updated section 8.2: PowerShell limitation note (10 → 11 commands)
+- Commit evidence: 1580581a2c8fc6dfd1325ec94202d2be350f0ce0
 
 ### 2025-11-14 (v1.0.1)
 - Added section 2.3: Local CLI Tools (gcloud)
