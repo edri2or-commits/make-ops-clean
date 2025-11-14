@@ -2,6 +2,8 @@ name: Google MCP - Enable APIs
 
 on:
   push:
+    branches:
+      - main
     paths:
       - '.ops/triggers/google-mcp-enable-apis.flag'
 
