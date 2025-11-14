@@ -1,0 +1,49 @@
+name: Heartbeat - Verify Scheduled Workflows Work
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Create heartbeat
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          RUN_NUM=${{ github.run_number }}
+          
+          mkdir -p .ops/results
+          
+          # Create timestamped file
+          echo "Heartbeat from GitHub Actions" > ".ops/results/heartbeat-${TIMESTAMP}.txt"
+          
+          # Update main heartbeat file
+          cat > .ops/results/heartbeat.json <<EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "run_number": $RUN_NUM,
+            "run_id": "${{ github.run_id }}",
+            "workflow": "heartbeat-verify-schedule",
+            "status": "alive"
+          }
+          EOF
+          
+          echo "✅ Heartbeat created at $TIMESTAMP (run #$RUN_NUM)"
+      
+      - name: Commit heartbeat
+        run: |
+          git config user.name "GitHub Actions Heartbeat"
+          git config user.email "heartbeat@claude-ops.local"
+          git add .ops/results/heartbeat*.txt .ops/results/heartbeat.json
+          git commit -m "Heartbeat: workflow alive at $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes"
+          git push || echo "Nothing to push"
