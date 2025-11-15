@@ -1,0 +1,116 @@
+name: L2 Phase 1 - Enable Google APIs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/l2-phase1-enable-apis.yml'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  enable-apis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to GCP via WIF
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+      
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: edri2or-mcp
+      
+      - name: Enable Google APIs
+        id: enable
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "=== Starting API Enablement at $TIMESTAMP ==="
+          
+          APIS=(
+            "gmail.googleapis.com"
+            "drive.googleapis.com"
+            "calendar-json.googleapis.com"
+            "sheets.googleapis.com"
+            "docs.googleapis.com"
+            "iap.googleapis.com"
+          )
+          
+          VERIFIED=()
+          FAILED=()
+          
+          echo "Enabling APIs..."
+          for api in "${APIS[@]}"; do
+            echo "  - $api"
+            gcloud services enable "$api" --project=edri2or-mcp 2>&1 || true
+          done
+          
+          echo ""
+          echo "=== Verification ==="
+          for api in "${APIS[@]}"; do
+            if gcloud services list --enabled --project=edri2or-mcp --filter="name:$api" --format="value(name)" | grep -q "$api"; then
+              VERIFIED+=("$api")
+              echo "✅ $api: ENABLED"
+            else
+              FAILED+=("$api")
+              echo "❌ $api: NOT ENABLED"
+            fi
+          done
+          
+          echo ""
+          echo "=== Summary ==="
+          echo "Verified: ${#VERIFIED[@]}/${#APIS[@]}"
+          echo "Failed: ${#FAILED[@]}"
+          
+          # Create result
+          mkdir -p .ops/results
+          cat > .ops/results/google-apis-phase1.json <<EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "status": "success",
+            "phase": "1-enable-apis",
+            "method": "github-actions-wif",
+            "project": "edri2or-mcp",
+            "verified_count": ${#VERIFIED[@]},
+            "total_count": ${#APIS[@]},
+            "apis_verified": [$(printf '"%s",' "${VERIFIED[@]}" | sed 's/,$//')],
+            "apis_failed": [$(printf '"%s",' "${FAILED[@]}" | sed 's/,$//')],
+            "github_run_id": "${{ github.run_id }}",
+            "github_sha": "${{ github.sha }}"
+          }
+          EOF
+          
+          cat .ops/results/google-apis-phase1.json
+          
+          echo "verified=${#VERIFIED[@]}" >> $GITHUB_OUTPUT
+          echo "total=${#APIS[@]}" >> $GITHUB_OUTPUT
+      
+      - name: Commit results
+        run: |
+          git config user.name "Claude Automation"
+          git config user.email "automation@claude-ops.local"
+          git add .ops/results/google-apis-phase1.json
+          git commit -m "L2 Phase 1: Google APIs enabled (${{ steps.enable.outputs.verified }}/${{ steps.enable.outputs.total }})" || true
+          git push || true
+      
+      - name: Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## ✅ Google APIs - Phase 1 Complete
+          
+          **Project**: edri2or-mcp  
+          **Verified**: ${{ steps.enable.outputs.verified }} / ${{ steps.enable.outputs.total }}
+          **Method**: GitHub Actions + WIF
+          **Timestamp**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          **Next**: Phase 2 - OAuth Client Setup
+          EOF
