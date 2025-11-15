@@ -1,6 +1,6 @@
 # Windows MCP Safety Policy
 
-**Version**: 1.2  
+**Version**: 1.3  
 **Last Updated**: 2025-11-15  
 **Purpose**: Define safety boundaries for PowerShell/gcloud execution via MCP
 
@@ -27,13 +27,14 @@ This policy defines:
 
 **This is by design** - ps_exec remains a minimal, audited tool.
 
-### Windows-MCP (Filesystem + Shell) ✅ ACTIVE
+### Windows Shell MCP ✅ ACTIVE
 
-**Purpose**: File operations + controlled shell execution  
+**Purpose**: Policy-enforced shell execution (JEA-style)  
 **Capabilities**:
-- ✅ Filesystem operations (read, write, create, delete)
-- ✅ Shell command execution (with policy constraints)
-- ✅ Script execution (with whitelist)
+- ✅ gcloud command execution (with constraints)
+- ✅ Secret Manager operations (with constraints)
+- ✅ Config file management (with backup)
+- ✅ Full audit logging
 
 **This is the execution layer for approved operations.**
 
@@ -41,7 +42,7 @@ This policy defines:
 
 ## 📋 Command Categories
 
-### Category: READ_ONLY ✅ ALLOWED (No Approval Required)
+### Category: OS_SAFE ✅ ALLOWED (No Approval Required)
 
 **ps_exec Commands** (11 whitelisted):
 - `dir` - List directory contents
@@ -56,12 +57,12 @@ This policy defines:
 - `measure_object` - Count/measure objects
 - `screenshot` - Capture display screenshot
 
-**Windows-MCP.SHELL (read-only)**:
-- `gcloud projects list`
-- `gcloud services list --enabled`
-- `gcloud services list --available`
-- `gcloud config get-value project`
-- `gcloud auth list`
+**Windows Shell MCP Tools**:
+- `check_gcloud_version` - Get gcloud version info
+- `check_powershell_version` - Get PowerShell version info
+- `get_execution_log` - Read audit trail
+- `read_secret` - Read from Secret Manager (read-only)
+- `backup_claude_config` - Backup Claude config file
 
 **Risk**: None - read-only operations  
 **Approval**: Not required  
@@ -73,10 +74,12 @@ This policy defines:
 
 **Purpose**: Enable Google APIs for MCP integration
 
-**Execution Layer**: Windows-MCP.SHELL (NOT ps_exec)
+**Execution Layer**: Windows Shell MCP
+
+**Tool**: `enable_google_apis`
 
 **Allowed Operations**:
-```powershell
+```bash
 gcloud services enable gmail.googleapis.com --project=edri2or-mcp
 gcloud services enable drive.googleapis.com --project=edri2or-mcp
 gcloud services enable calendar-json.googleapis.com --project=edri2or-mcp
@@ -84,10 +87,6 @@ gcloud services enable sheets.googleapis.com --project=edri2or-mcp
 gcloud services enable docs.googleapis.com --project=edri2or-mcp
 gcloud services enable iap.googleapis.com --project=edri2or-mcp
 ```
-
-**Can be executed via**:
-- ✅ Direct shell commands (Windows-MCP)
-- ✅ PowerShell script (Windows-MCP runs script)
 
 **Constraints**:
 - ✅ ONLY `gcloud services enable`
@@ -104,23 +103,92 @@ gcloud services enable iap.googleapis.com --project=edri2or-mcp
 - Read/write scopes require separate OAuth consent
 - Reversible (can disable APIs)
 
-**Approval**: Required via Hebrew phrase  
 **Approval Phrase**: "מאשר הפעלת Google APIs דרך Windows-MCP"  
-**Execution**: Via Windows-MCP.SHELL
+**Execution**: Via Windows Shell MCP  
+**Status**: ✅ Phase 1 COMPLETE (2025-11-15)
 
 **Audit Trail**:
-- Script: `scripts/enable_google_apis.ps1` (if used)
-- Log: `logs/google_apis_enable.log`
-- Commit to Git for full audit
+- MCP log: `mcp-servers/windows-shell/logs/execution.log`
+- Detailed log: `logs/google_apis_enable.log`
+
+---
+
+### Category: CLOUD_OPS_HIGH ⚠️ ALLOWED (Approval Required)
+
+**Purpose**: OAuth credentials and full Google access management
+
+**Execution Layer**: Windows Shell MCP
+
+**Tools**:
+1. **store_secret** - Store OAuth credentials in Secret Manager
+2. **update_claude_config** - Update Claude Desktop with Google MCP
+
+**Allowed Operations**:
+
+**store_secret**:
+```bash
+gcloud secrets create google-mcp-client-id --data-file=- --project=edri2or-mcp
+gcloud secrets create google-mcp-client-secret --data-file=- --project=edri2or-mcp
+gcloud secrets versions add google-mcp-client-id --data-file=- --project=edri2or-mcp
+gcloud secrets versions add google-mcp-client-secret --data-file=- --project=edri2or-mcp
+```
+
+**update_claude_config**:
+- Backup existing claude_desktop_config.json
+- Add 'google-full' MCP server entry
+- Configure with OAuth credentials
+- Only allowed scopes: gmail.modify, drive, calendar, spreadsheets, documents
+
+**Constraints**:
+
+**store_secret**:
+- ✅ ONLY project: edri2or-mcp
+- ✅ ONLY secret names starting with: google-mcp-
+- ✅ ONLY creates or updates (no deletions)
+- ❌ NO other projects
+- ❌ NO other secret prefixes
+- ❌ NO IAM operations
+
+**update_claude_config**:
+- ✅ ONLY allowed OAuth scopes (5 specific scopes)
+- ✅ ONLY adds 'google-full' MCP server
+- ✅ Creates backup before modification
+- ❌ NO scope expansion beyond approved list
+- ❌ NO removal of existing MCP servers
+
+**Risk**: HIGH
+- Credentials grant full Gmail/Drive/Calendar/Sheets/Docs access
+- Can send emails, modify files, create events
+- Stored securely in Secret Manager (encrypted at rest)
+- OAuth consent still required (user-controlled)
+- Reversible (can delete secrets, remove MCP config, revoke OAuth)
+
+**Approval Phrases**:
+- store_secret: "מאשר אחסון credentials ב-Secret Manager"
+- update_claude_config: "מאשר עדכון Claude config עם Google MCP"
+
+**Execution**: Via Windows Shell MCP  
+**Status**: ⏸️ Tools built, awaiting execution approval
+
+**Audit Trail**:
+- MCP execution log: `mcp-servers/windows-shell/logs/execution.log`
+- Config backup: `claude_desktop_config.backup.{timestamp}.json`
+- Secret Manager audit logs (GCP)
+
+**Why HIGH Risk**:
+- Full Google account access via OAuth
+- Credentials with broad scopes
+- Persistent access (stored credentials)
+- Requires strict approval gates
 
 ---
 
 ### Category: CLOUD_OPS_MODERATE ⚠️ REVIEW REQUIRED
 
 **Not Yet Approved** - requires separate approval:
-- OAuth client creation
-- Secret Manager operations
+- OAuth client creation (manual Console path approved)
 - Cloud Shell execution
+- Additional Secret Manager operations
 - Service account operations
 
 **These will be addressed in future phases with explicit approval.**
@@ -171,24 +239,32 @@ gcloud services enable iap.googleapis.com --project=edri2or-mcp
    - Approval is time-bounded (single session)
    - Approval covers specific operation only
 
-3. **Claude executes via Windows-MCP**:
-   - Direct shell commands OR script execution
+3. **Claude executes via Windows Shell MCP**:
+   - Tool calls with validated parameters
    - Logs all output
    - Reports results
-   - Commits evidence
+   - Updates documentation
 
 4. **Claude updates documentation**:
    - CAPABILITIES_MATRIX
    - Relevant plan files
    - Audit logs
 
+### For CLOUD_OPS_HIGH Operations
+
+**Same as CLOUD_OPS_SAFE, plus**:
+- Full transparency on credentials being stored
+- Explicit scope listing
+- Confirmation of reversibility
+- Tool-specific approval phrases
+
 ---
 
 ## 📊 Safety Checklist
 
-Before executing ANY gcloud command via Windows MCP:
+Before executing ANY Windows Shell MCP tool:
 
-- [ ] Command matches allowed category exactly
+- [ ] Tool matches allowed category exactly
 - [ ] Approval obtained (if required)
 - [ ] Operation creates audit log
 - [ ] Operation is reversible OR low-risk
@@ -221,24 +297,30 @@ If at ANY point during execution:
 
 ## 📝 Update Log
 
+### 2025-11-15 (v1.3)
+- **Added CLOUD_OPS_HIGH category** ⭐
+- Added store_secret tool (Secret Manager)
+- Added update_claude_config tool (Claude Desktop config)
+- Defined HIGH risk level for OAuth credentials
+- Tool-specific approval phrases
+- Updated OS_SAFE category with new tools
+- Commit: "Add CLOUD_OPS_HIGH category for OAuth credentials"
+
 ### 2025-11-15 (v1.2)
-- **Distinguished ps_exec from Windows-MCP.SHELL**
+- Distinguished ps_exec from Windows Shell MCP
 - ps_exec: NO_SCRIPT_EXECUTION - commands whitelist only
-- Windows-MCP.SHELL: CLOUD_OPS_SAFE execution layer
-- Clarified that script execution happens via Windows-MCP, not ps_exec
-- Updated approval flow to specify Windows-MCP as execution layer
-- Commit: "Separate ps_exec (read-only) from Windows-MCP.SHELL (execution)"
+- Windows Shell MCP: Policy-enforced execution layer
+- Clarified execution layers
 
 ### 2025-11-15 (v1.1)
 - Added CLOUD_OPS_SAFE category
 - Approved `gcloud services enable` for 6 Google APIs
 - Defined project constraint (edri2or-mcp only)
 - Specified audit trail requirements
-- Added FORBIDDEN category for dangerous ops
 
 ### 2025-11-14 (v1.0)
 - Initial version
-- Defined READ_ONLY category (11 ps_exec commands)
+- Defined OS_SAFE category (11 ps_exec commands)
 - Established approval flow
 - Created safety checklist
 
