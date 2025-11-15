@@ -1,0 +1,24 @@
+name: GPT Tasks Executor
+
+on
+  push:
+    paths: 
+      - ".chatops/gpt_tasks/*.ymil"
+  workflow_dispatch: {}
+
+permissions: 
+  contents: write
+  pull-requests: write
+
+job:
+  run:
+    name: run tasks
+    steps:
+      - name: Checkout
+        use: actions/checkout@v4
+      - name: Run Script
+        run: |
+            name: run
+          shell: python3 -m scripts/run_tasks.py
+            env..env:
+              GITHUB_TOKEN: ${${secrets.GITHEB_TOKEN}}
