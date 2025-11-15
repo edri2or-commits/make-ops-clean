@@ -1,3 +1,6 @@
+> NOTE: The up-to-date canonical state for GPT is now in:
+> `DOCS/STATE_FOR_GPT_SNAPSHOT.md` (this file is kept for legacy/backup only).
+
 # STATE FOR GPT (Snapshot)
 
 ** 1. Repo Overview**
