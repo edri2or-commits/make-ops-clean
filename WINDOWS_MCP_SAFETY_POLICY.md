@@ -1,6 +1,6 @@
 # Windows MCP Safety Policy
 
-**Version**: 1.1  
+**Version**: 1.2  
 **Last Updated**: 2025-11-15  
 **Purpose**: Define safety boundaries for PowerShell/gcloud execution via MCP
 
@@ -17,11 +17,33 @@ This policy defines:
 
 ---
 
+## 🛠️ MCP Tools Available
+
+### ps_exec MCP ✅ ACTIVE
+
+**Purpose**: Read-only system inspection  
+**Capability**: 11 whitelisted commands ONLY  
+**Script Execution**: ❌ NO - Commands whitelist only
+
+**This is by design** - ps_exec remains a minimal, audited tool.
+
+### Windows-MCP (Filesystem + Shell) ✅ ACTIVE
+
+**Purpose**: File operations + controlled shell execution  
+**Capabilities**:
+- ✅ Filesystem operations (read, write, create, delete)
+- ✅ Shell command execution (with policy constraints)
+- ✅ Script execution (with whitelist)
+
+**This is the execution layer for approved operations.**
+
+---
+
 ## 📋 Command Categories
 
 ### Category: READ_ONLY ✅ ALLOWED (No Approval Required)
 
-**PowerShell Commands** (11 whitelisted via ps_exec):
+**ps_exec Commands** (11 whitelisted):
 - `dir` - List directory contents
 - `type` - Read file contents
 - `test_path` - Check if path exists
@@ -34,7 +56,7 @@ This policy defines:
 - `measure_object` - Count/measure objects
 - `screenshot` - Capture display screenshot
 
-**gcloud Commands** (read-only):
+**Windows-MCP.SHELL (read-only)**:
 - `gcloud projects list`
 - `gcloud services list --enabled`
 - `gcloud services list --available`
@@ -51,6 +73,8 @@ This policy defines:
 
 **Purpose**: Enable Google APIs for MCP integration
 
+**Execution Layer**: Windows-MCP.SHELL (NOT ps_exec)
+
 **Allowed Operations**:
 ```powershell
 gcloud services enable gmail.googleapis.com --project=edri2or-mcp
@@ -60,6 +84,10 @@ gcloud services enable sheets.googleapis.com --project=edri2or-mcp
 gcloud services enable docs.googleapis.com --project=edri2or-mcp
 gcloud services enable iap.googleapis.com --project=edri2or-mcp
 ```
+
+**Can be executed via**:
+- ✅ Direct shell commands (Windows-MCP)
+- ✅ PowerShell script (Windows-MCP runs script)
 
 **Constraints**:
 - ✅ ONLY `gcloud services enable`
@@ -78,10 +106,10 @@ gcloud services enable iap.googleapis.com --project=edri2or-mcp
 
 **Approval**: Required via Hebrew phrase  
 **Approval Phrase**: "מאשר הפעלת Google APIs דרך Windows-MCP"  
-**Execution**: Via script + Windows MCP
+**Execution**: Via Windows-MCP.SHELL
 
 **Audit Trail**:
-- Script: `scripts/enable_google_apis.ps1`
+- Script: `scripts/enable_google_apis.ps1` (if used)
 - Log: `logs/google_apis_enable.log`
 - Commit to Git for full audit
 
@@ -143,8 +171,8 @@ gcloud services enable iap.googleapis.com --project=edri2or-mcp
    - Approval is time-bounded (single session)
    - Approval covers specific operation only
 
-3. **Claude executes**:
-   - Via script (auditable)
+3. **Claude executes via Windows-MCP**:
+   - Direct shell commands OR script execution
    - Logs all output
    - Reports results
    - Commits evidence
@@ -162,7 +190,7 @@ Before executing ANY gcloud command via Windows MCP:
 
 - [ ] Command matches allowed category exactly
 - [ ] Approval obtained (if required)
-- [ ] Script creates audit log
+- [ ] Operation creates audit log
 - [ ] Operation is reversible OR low-risk
 - [ ] Project constraint verified (`edri2or-mcp` only)
 - [ ] No IAM/destructive operations
@@ -193,13 +221,20 @@ If at ANY point during execution:
 
 ## 📝 Update Log
 
+### 2025-11-15 (v1.2)
+- **Distinguished ps_exec from Windows-MCP.SHELL**
+- ps_exec: NO_SCRIPT_EXECUTION - commands whitelist only
+- Windows-MCP.SHELL: CLOUD_OPS_SAFE execution layer
+- Clarified that script execution happens via Windows-MCP, not ps_exec
+- Updated approval flow to specify Windows-MCP as execution layer
+- Commit: "Separate ps_exec (read-only) from Windows-MCP.SHELL (execution)"
+
 ### 2025-11-15 (v1.1)
 - Added CLOUD_OPS_SAFE category
 - Approved `gcloud services enable` for 6 Google APIs
 - Defined project constraint (edri2or-mcp only)
 - Specified audit trail requirements
 - Added FORBIDDEN category for dangerous ops
-- Commit: "Add CLOUD_OPS_SAFE category for Google APIs enablement"
 
 ### 2025-11-14 (v1.0)
 - Initial version
