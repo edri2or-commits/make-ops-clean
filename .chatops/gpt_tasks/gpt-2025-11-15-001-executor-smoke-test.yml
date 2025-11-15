@@ -1,0 +1,23 @@
+task_id: "gpt-2025-11-15-001-executor-smoke-test"
+intent: "יצירת קובץ בדיקה כדי לוודא שה-GPT Tasks Executor פועל כמצור אבירייותה .github/workflows/gpt_tasks_executor.yml
+risk_level: "OS_SAFE"
+
+actions:
+  - type: "create_file"
+    path: "DOCS/GPT_EXECUTOR_TEST.md"
+    mode: "full"
+    content: |
+      # GPT Executor Smoke Test
+
+      ורו ילויר אבדיקה ור ורל GPT ‘Yml’ וריר ר ותוב אול GitHub Actions.
+
+      Хםיה: 
+      - task_id: gpt-2025-11-15-001-executor-smoke-test
+      - שיוннески .javascript/wub/gpt_tasks
+      - ידלות צל 🚓 .github/workflows/gpt_tasks_executor.yml
+
+  - type: "open_pr"
+    title: "chore: add GPT executor smoke test doc"
+    body: |
+      ידלות DOCS/GPT_EXECUTOR_TEST.md אביר נירש וריש GDT Tasks Executor.
+      ויש .YAML | ‘GPT_TASKS_SPEC.md’
