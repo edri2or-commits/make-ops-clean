@@ -1,8 +1,8 @@
-# Google MCP Automation Plan - Revised
+# Google MCP Automation Plan - BLOCKED
 
-**Version**: 2.0  
-**Last Updated**: 2025-11-14  
-**Status**: ACTIVE - Ready for Execution
+**Version**: 2.1  
+**Last Updated**: 2025-11-15  
+**Status**: ❌ BLOCKED - Awaiting GitHub Actions Fix
 
 ---
 
@@ -12,6 +12,8 @@ Enable **full Google capabilities** (Gmail, Drive, Calendar, Sheets, Docs) via d
 - **Full Read/Write permissions** (send email, create docs, edit sheets, etc.)
 - **Approval Gates** for HIGH RISK operations
 - **100% automated setup** - zero manual steps from Or
+
+**Current Status**: **Cannot proceed** - See "Known Limitations" section below
 
 ---
 
@@ -41,7 +43,7 @@ Claude reads results via GitHub API (file content)
 
 ## 📋 Execution Phases
 
-### PHASE 1: Enable Google APIs (Automated)
+### PHASE 1: Enable Google APIs (Automated) ❌ BLOCKED
 
 **State File**: `.ops/triggers/google-mcp-enable-apis.flag`
 
@@ -71,7 +73,9 @@ on:
 
 **Approval Required**: ✅ Yes - HIGH RISK (Or approves before Phase 1 trigger)
 
-**Result File Format**:
+**Current Status**: ❌ **BLOCKED** - Workflow does not trigger (Step 3 fails)
+
+**Result File Format** (when unblocked):
 ```json
 {
   "timestamp": "2025-11-14T23:00:00Z",
@@ -89,146 +93,77 @@ on:
 
 ---
 
-### PHASE 2: Create OAuth Client (Automated)
+### PHASE 2-6: ❌ BLOCKED (Depend on Phase 1)
 
-**State File**: `.ops/triggers/google-mcp-create-oauth.flag`
+All subsequent phases require Phase 1 completion.
 
-**Trigger Workflow**: `.github/workflows/google-mcp-create-oauth.yml`
-```yaml
-on:
-  push:
-    paths:
-      - '.ops/triggers/google-mcp-create-oauth.flag'
+**Phase 2**: Create OAuth Client → BLOCKED  
+**Phase 3**: Store Credentials → BLOCKED  
+**Phase 4**: Generate MCP Config → BLOCKED  
+**Phase 5**: OAuth Consent → BLOCKED  
+**Phase 6**: Verification → BLOCKED
+
+---
+
+## ⚠️ Known Limitations
+
+### GitHub Actions Workflow Triggering
+
+**Issue**: Workflows created by Claude via GitHub MCP do not trigger automatically on `on: push` events.
+
+**Evidence**: 
+- 7+ workflows created with various trigger patterns
+- 0 automated executions observed over 90+ minutes
+- Existing workflows (created manually or via other means) work fine
+- One modified workflow (health.yml) RAN but FAILED
+
+**Impact**: **HARD BLOCKER for all phases (1-6)**
+- Phase 1 (Enable APIs) cannot execute → all subsequent phases blocked
+- Cannot enable Google APIs → cannot create OAuth client → cannot expand MCP scopes
+
+**Root Cause**: Unknown - likely permission/approval requirement for API-created workflows
+
+**Contract Compliance**: Manual execution (Or runs `gcloud` commands or clicks "Run workflow") violates automation-first contract:
+```
+Or = Intent + Approval ONLY
+Claude = Technical Execution via Automation
+Manual execution is NOT acceptable
 ```
 
-**Flow**:
-1. Claude writes: `create-oauth-client` → `.ops/triggers/google-mcp-create-oauth.flag`
-2. Claude commits + pushes
-3. GitHub Actions runs automatically
-4. Workflow executes:
-   ```bash
-   PROJECT_NUM=$(gcloud projects describe edri2or-mcp --format='value(projectNumber)')
-   
-   # Create OAuth brand (if needed)
-   gcloud alpha iap oauth-brands create \
-     --application_title="Claude MCP Google Full" \
-     --support_email=edri2or@gmail.com \
-     --project=edri2or-mcp
-   
-   # Create OAuth client
-   gcloud alpha iap oauth-clients create \
-     --brand=projects/$PROJECT_NUM/brands/$PROJECT_NUM \
-     --display_name="claude-mcp-google-full" \
-     --project=edri2or-mcp
-   ```
-5. Workflow extracts client_id and client_secret
-6. Workflow writes → `.ops/results/oauth-client-created.json`
-7. Workflow commits results
-8. Claude reads results
+**Current Status**: ❌ **BLOCKED**
 
-**Approval Required**: ✅ Yes - HIGH RISK (Or approves before Phase 2 trigger)
+**Documentation**:
+- Technical details: `GITHUB_ACTIONS_TRIGGER_BUG.md`
+- Comprehensive analysis: `L2_PHASE1_BLOCKED.md`
+- Capability matrix: `CAPABILITIES_MATRIX.md` (section 3.5)
 
-**Result File Format**:
-```json
-{
-  "timestamp": "2025-11-14T23:05:00Z",
-  "status": "success",
-  "client_id": "123456789-abc.apps.googleusercontent.com",
-  "client_secret_stored": "google-mcp-client-secret",
-  "run_id": "12345679"
-}
-```
+### Mitigation Strategy
+
+**Short-term**: Continue with other high-value work
+- Windows MCP hardening (ps_exec expansion)
+- Governance framework development
+- Policy documentation
+- Agent architecture design
+- Other automation paths (non-Google-dependent)
+
+**Long-term**: Investigate and fix workflow triggering
+- Research GitHub Actions permissions
+- Check repository/organization settings
+- Consider GitHub support escalation
+- Explore alternative automation infrastructure
+
+**Alternative Paths Considered**:
+1. ❌ Manual execution by Or → violates contract
+2. ❌ `workflow_dispatch` with Or clicking → violates contract
+3. ❌ Cloud Shell with Or → violates contract
+4. ⏳ Fix workflow triggering → under investigation
+5. ⏳ Infrastructure change → requires Or's strategic decision
+
+**This is a BLOCKER, not a limitation we can work around while maintaining contract compliance.**
 
 ---
 
-### PHASE 3: Store Credentials in Secret Manager (Automated)
-
-**State File**: `.ops/triggers/google-mcp-store-secrets.flag`
-
-**Flow**:
-1. Claude writes: `store-secrets` → flag file
-2. Workflow reads client_id/secret from Phase 2 results
-3. Workflow executes:
-   ```bash
-   echo -n "$CLIENT_ID" | gcloud secrets create google-mcp-client-id \
-     --data-file=- --project=edri2or-mcp
-   
-   echo -n "$CLIENT_SECRET" | gcloud secrets create google-mcp-client-secret \
-     --data-file=- --project=edri2or-mcp
-   ```
-4. Workflow writes → `.ops/results/secrets-stored.json`
-
-**Approval Required**: ✅ Yes - HIGH RISK
-
----
-
-### PHASE 4: Generate MCP Config (Automated)
-
-**No workflow needed** - Claude does this directly via filesystem MCP
-
-**Flow**:
-1. Claude reads results from Phases 1-3
-2. Claude generates `google-mcp-config.json`:
-   ```json
-   {
-     "mcpServers": {
-       "google-mcp-full": {
-         "command": "npx",
-         "args": [
-           "-y",
-           "@modelcontextprotocol/server-google-workspace"
-         ],
-         "env": {
-           "GOOGLE_CLIENT_ID": "{{FROM_SECRET_MANAGER}}",
-           "GOOGLE_CLIENT_SECRET": "{{FROM_SECRET_MANAGER}}",
-           "GOOGLE_SCOPES": "gmail.full,drive.full,calendar.full,sheets.full,docs.full"
-         }
-       }
-     }
-   }
-   ```
-3. Claude writes file to local filesystem via MCP
-4. Claude commits to repo for backup
-
-**Approval Required**: ❌ No - just config generation
-
----
-
-### PHASE 5: OAuth Consent (ONE-TIME HUMAN ACTION)
-
-**This is the ONLY step requiring Or's manual action**
-
-**Why**: Google OAuth consent screen requires a human click
-
-**What Or Does**:
-1. Claude Desktop restarts (auto-detects new MCP server)
-2. MCP server requests OAuth
-3. Browser opens OAuth consent screen
-4. **Or clicks "Allow"** ← ONLY MANUAL STEP
-5. Token stored automatically
-
-**Approval Required**: N/A - this is an OAuth requirement, not our approval gate
-
----
-
-### PHASE 6: Verification (Automated)
-
-**State File**: `.ops/triggers/google-mcp-verify.flag`
-
-**Flow**:
-1. Claude triggers verification workflow
-2. Workflow tests all scopes:
-   - Gmail: send test email to self
-   - Drive: create test doc
-   - Calendar: create test event
-   - Sheets: write test row
-3. Workflow writes → `.ops/results/verification-complete.json`
-
-**Approval Required**: ❌ No - read-only tests
-
----
-
-## 🔐 Approval Gates
+## 🔐 Approval Gates (When Unblocked)
 
 ### HIGH RISK Operations (Require Approval)
 
@@ -259,30 +194,6 @@ on:
 
 ---
 
-## 📊 Progress Tracking
-
-Claude tracks progress via:
-1. **State files**: `.ops/triggers/*.flag` (what to execute)
-2. **Result files**: `.ops/results/*.json` (what was executed)
-3. **CAPABILITIES_MATRIX.md**: Overall status
-
-**Reading Results**:
-```javascript
-// Claude reads via GitHub API
-const result = await github.get_file_contents({
-  owner: "edri2or-commits",
-  repo: "make-ops-clean",
-  path: ".ops/results/google-apis-enabled.json"
-});
-
-const data = JSON.parse(base64_decode(result.content));
-if (data.status === "success") {
-  // Proceed to next phase
-}
-```
-
----
-
 ## 🚫 What This Plan Does NOT Require
 
 ❌ Or opening GCP console  
@@ -294,18 +205,19 @@ if (data.status === "success") {
 
 ---
 
-## ✅ What This Plan DOES Require
+## ✅ What This Plan DOES Require (When Unblocked)
 
 ✅ Or's approval (3 approval phrases)  
 ✅ Or's OAuth consent click (one-time, mandatory by Google)  
 ✅ Claude writing state files via GitHub MCP  
-✅ GitHub Actions running automatically on push  
+✅ GitHub Actions running automatically on push ← **CURRENTLY BLOCKED**  
 ✅ Claude reading result files via GitHub API  
 
 ---
 
 ## 🎬 Execution Checklist
 
+- [ ] **BLOCKER**: Fix GitHub Actions workflow triggering
 - [ ] Phase 1: Enable APIs (approval + auto-execute)
 - [ ] Phase 2: Create OAuth (approval + auto-execute)
 - [ ] Phase 3: Store Secrets (approval + auto-execute)
@@ -316,4 +228,5 @@ if (data.status === "success") {
 
 ---
 
-**This plan respects the contract**: Or = Intent + Approval, Claude = Executor
+**This plan respects the contract**: Or = Intent + Approval, Claude = Executor  
+**This plan is BLOCKED**: Cannot proceed until GitHub Actions triggering is fixed
