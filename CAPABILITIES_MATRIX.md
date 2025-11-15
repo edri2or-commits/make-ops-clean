@@ -679,3 +679,23 @@ When a capability changes:
 **Maintained by**: Claude (with אור's approval)  
 **Last Verified**: 2025-11-14  
 **Next Review**: As capabilities change
+
+## 9. GPT / Agent Runtime Notes – GitHub Layer
+
+- Direct GitHub writes via GPT Agent Mode  
+  - Status: ✅ Verified (Implemented & Tested, scope: OS_SAFE – Docs/MD/State בלבד)  
+  - Evidence (branch main):  
+    - commit 1c64fd5 – יצירת DOCS/GPT_EXECUTOR_TEST.md כ-smoke test  
+    - commit 81cba22 – יצירת DOCS/STATE_FOR_GPT_SNAPSHOT.md  
+    - commit 52e5e39 – עדכון STATE_FOR_GPT.md עם הפניה ל-SNAPSHOT  
+
+- GPT Tasks Executor (GitHub Actions workflow)  
+  - Files:  
+    - .github/workflows/gpt_tasks_executor.yml  
+    - .chatops/gpt_tasks/gpt-2025-11-15-001-executor-smoke-test.yml  
+  - Status: 🟡 Partial / Broken Runtime  
+    - Design קיים (פורמט משימות, workflow, YAML).  
+    - נעשו ניסיונות להריץ דרך workflow_dispatch, התקבלה הודעת "successfully requested" אך אין runs בפועל (0 runs).  
+  - Backlog:  
+    - לאבחן למה ה-workflow לא יוצר ריצות (events/permissions/config).  
+    - לאחר תיקון והרצה מוצלחת – לעדכן סטטוס ל-✅ במטריצה.
