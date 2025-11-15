@@ -107,6 +107,7 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | GitHub API | Search code | ✅ Verified | Full code search | None |
 | Claude MCP | GitHub API | List commits | ✅ Verified | Access commit history | None |
 | Claude MCP | GitHub API | Fork repos | ✅ Verified | Can fork to account | None |
+| | GPT Agent Mode | GitHub Repo (main) | Direct writes (docs/state) | ✅ Verified | Files created directly via Agent Mode (commits 1c64fd5, 81cba22, 52e5e39); OS_SAFE for docs/state | CLOUD_OPS_HIGH for code/workflows |OS_SAFE for docs/state; CLOUD_OPS_HIGH for code/workflows 
 
 **Authentication**: GitHub Personal Access Token (via MCP)  
 **Scope**: Full access to `edri2or-commits` repositories
@@ -145,6 +146,8 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 ## 2️⃣ Local Layer (Claude's Computer → User's Computer)
 
 ### 2.1 Filesystem Access
+| GitHub Actions | GitHub Repo (main) | GPT Tasks Executor (run GPT task YAMLs) | 🟡 Partial | Design exists (.github/workflows/gpt_tasks_executor.yml & example task); runtime broken: manual dispatch returns success but no runs; smoke test created via Agent Mode | Requires debugging; do not rely on YAML->Executor loop yet |
+
 
 | From | To | Capability | Status | Details | Limitations |
 |------|----|-----------| -------|---------|-------------|
