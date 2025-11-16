@@ -1,0 +1,28 @@
+name: GPT GitHub Agent Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      intent:
+        description: "High-level task for GPT-Agent"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run GPT-Agent dry run
+        run: |
+          python gpt_agent/github_agent.py --intent "${{ inputs.intent }}"
