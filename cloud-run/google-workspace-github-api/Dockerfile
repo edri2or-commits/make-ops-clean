@@ -1,13 +1,18 @@
-FROM node:18
+FROM node:18-slim
 
+# מתקינים אפליקציית Node/Express
 WORKDIR /usr/src/app
 
-COPY package.json ./
-RUN npm install --only=production
+# מתקינים תלות
+COPY package*.json ./
+RUN npm install --omit=dev
 
-COPY index.js ./
+# מעתיקים את שאר הקבצים (index.js וכו')
+COPY . .
 
+# Cloud Run מקשיב על PORT שמוזרק, ברירת מחדל 8080
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["npm", "start"]
+# הפעלת השרת
+CMD ["node", "index.js"]
