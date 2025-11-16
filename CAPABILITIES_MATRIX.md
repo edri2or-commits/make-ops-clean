@@ -699,3 +699,17 @@ When a capability changes:
   - Backlog:  
     - לאבחן למה ה-workflow לא יוצר ריצות (events/permissions/config).  
     - לאחר תיקון והרצה מוצלחת – לעדכן סטטוס ל-✅ במטריצה.
+
+## GPT / Agent Runtime Notes – GitHub DRY RUN
+
+- Capability: **GPT GitHub Agent DRY RUN (local Python + optional GitHub Actions workflow)**
+- Status: ✅ Implemented — OS_SAFE only (Docs/Plans, no direct code/config changes)
+- Evidence:
+  - Commit `1c64fd5` – DOCS/GPT_EXECUTOR_TEST.md
+  - Commit `81cba22` – DOCS/STATE_FOR_GPT_SNAPSHOT.md
+  - Commit `52e5e39` – STATE_FOR_GPT.md note to snapshot
+  - Commit `047eea8` – gpt_agent/github_agent.py + github_agent_dry_run.yml
+- Risk & Policy:
+  - OS_SAFE: מותר להריץ לוקלית ודרך Agents לצורך תכנון ותיעוד בלבד.
+  - CLOUD_OPS_HIGH (שינויים בקוד/קונפיג) יישמרו לסוכנים/Workflows אחרים, דרך PR ו-Approval מפורש של Or.
+

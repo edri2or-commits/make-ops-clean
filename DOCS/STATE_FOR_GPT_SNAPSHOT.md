@@ -1,109 +1,126 @@
-# STATE FOR GPT – SNAPSHOT (Canonical)
+# STATE FOR GPT (Snapshot) – v2 (GitHub Layer + Agent DRY RUN)
 
 ## 1. Repo Overview
 
-- owner/repo: `edri2or-commits/make-ops-clean`
-- default_branch: `main`
-- visibility: `public`
+- owner/repo: **edri2or-commits/make-ops-clean**
+- default_branch: **main**
+- visibility: public
+- purpose: תשתית MCP + GPT-Agent לאוטונומיה (GitHub + GCP + Google + Windows)
 
-This repo is the Source of Truth for the MCP/GPT automation system.
-
-## 2. Key Files
+## 2. Key Files (GPT-facing)
 
 - `CAPABILITIES_MATRIX.md`  
-  Single source of truth for all MCP / Claude / GPT capabilities and integrations
-  (GitHub, Google, GCP, Windows MCP, etc.).
+  מפת היכולות והרמות (OS_SAFE / CLOUD_OPS_HIGH) לכל שכבה (GitHub, Google, GCP, Windows/MCP וכו’).
 
 - `MCP_GPT_CAPABILITIES_BRIDGE.md`  
-  Bridge between the capabilities matrix and concrete agents (Claude, GPT Agents, Agent Mode).
+  מדריך עבודה לסוכני GPT: איך לקרוא את המטריצה, איך לגזור ממנה החלטות, ואיך לעדכן אותה.
 
 - `GPT_REPO_ACCESS_BRIDGE.md`  
-  Describes how GPT/Agents are expected to access this repo (branches, workflows, policies).
+  מידע על החיבור של GPT/Agents לריפו (`make-ops-clean`) – מה מותר לעשות, איך לגשת, ומה הנתיב המועדף.
 
-- `STATE_FOR_GPT.md`  
-  Legacy high-level state file. The canonical, up-to-date state is now this file:
-  `DOCS/STATE_FOR_GPT_SNAPSHOT.md`.
+- `DOCS/STATE_FOR_GPT_SNAPSHOT.md` (הקובץ הזה)  
+  צילום מצב קנוני ל-GPT על הריפו, היכולות, וה-Backlog.
+
+- `DOCS/AGENT_GPT_MASTER_DESIGN.md`  
+  Design ראשי ל-GPT-Agent בשכבת GitHub:
+  - תפקידים: Or / GPT-Agent / Claude / Agents אחרים
+  - מקורות אמת: Snapshot, Matrix, Bridge
+  - מודל תהליך: Intent → Plan → Approval → Execute → Reflect
+  - הבחנה בין OS_SAFE (Docs/State) ל-CLOUD_OPS_HIGH (קוד/קונפיג).
 
 - `DOCS/GPT_TASKS_SPEC.md`  
-  Specification for GPT task files (YAML) under `.chatops/gpt_tasks/`.
-
-- `DOCS/GPT_EXECUTOR_TEST.md`  
-  Smoke-test file created directly by GPT Agent Mode, committed to `main`
-  (commit `1c64fd5`) to prove direct write access.
+  פורמט משימות YAML ל-GPT Tasks Executor (עדיין ברמת Design; runtime בעייתי).
 
 - `.github/workflows/gpt_tasks_executor.yml`  
-  Intended GitHub Actions workflow to execute GPT task YAMLs.
+  Workflow שמיועד להריץ משימות YAML מ-`.chatops/gpt_tasks/` – כרגע מעוצב אבל runtime בפועל לא יציב, לא נחשב אמין.
 
-- `.chatops/gpt_tasks/`  
-  Folder for GPT tasks in YAML format, e.g.:
-  - `gpt-2025-11-15-001-executor-smoke-test.yml`
+- `DOCS/GPT_EXECUTOR_TEST.md`  
+  קובץ smoke-test שנוצר מ-flow קודם (commit `1c64fd5`) כדי לאמת כתיבה ישירה לריפו.
 
-## 3. GitHub Capabilities Status (High-level)
+- `gpt_agent/github_agent.py`  
+  סוכן GitHub Agent **DRY RUN**:
+  - קורא את:
+    - `DOCS/AGENT_GPT_MASTER_DESIGN.md`
+    - `DOCS/STATE_FOR_GPT_SNAPSHOT.md`
+    - `CAPABILITIES_MATRIX.md`
+  - מקבל `--intent`
+  - מחזיר Plan טקסטואלי בלבד (ללא כתיבה לקבצים).
 
-- **Direct writes via Agent Mode**:  
-  - CONFIRMED WORKING – Agent Mode can create and update files on `main`
-    (for example `DOCS/GPT_EXECUTOR_TEST.md`, commit `1c64fd5`).
+- `.github/workflows/github_agent_dry_run.yml`  
+  Workflow ל-GitHub Actions (כשיעבוד) שמריץ את `gpt_agent/github_agent.py` עם `workflow_dispatch` ו-input בשם `intent`.
 
-- **Existing GitHub Actions workflows**:  
-  - `codeql.yml`, `python-app.yml`, `release.yml`: regular CI/automation flows.
-  - `gpt_tasks_executor.yml`: design exists, runtime currently BROKEN (see below).
+## 3. Current Capabilities Status (High Level)
 
-## 4. GPT Tasks Executor – Design vs Runtime
+### GitHub – Direct Writes / Docs
 
-- **Design:**
-  - `DOCS/GPT_TASKS_SPEC.md` defines the format for GPT tasks as YAML.
-  - `.chatops/gpt_tasks/gpt-2025-11-15-001-executor-smoke-test.yml` is an example task
-    intended to create `DOCS/GPT_EXECUTOR_TEST.md` and optionally open a PR.
+- Direct writes (Docs/State) דרך GPT/Agents (כולל Agent Mode + הפעלה ידנית שלך) → ✅ **Verified (OS_SAFE)**
+- ראיות:
+  - `1c64fd5` – יצירת `DOCS/GPT_EXECUTOR_TEST.md`
+  - `81cba22` – יצירת `DOCS/STATE_FOR_GPT_SNAPSHOT.md`
+  - `52e5e39` – עדכון `STATE_FOR_GPT.md` להפניה לסנאפשוט
+  - `92de8df` – יצירת `MCP_GPT_CAPABILITIES_BRIDGE.md` + עדכון במטריצה
+  - `b10769b` – `DOCS/AGENT_GPT_MASTER_DESIGN.md`
+  - `047eea8` – `gpt_agent/github_agent.py` + `.github/workflows/github_agent_dry_run.yml`
 
-- **Runtime (actual behavior today):**
-  - The workflow `gpt_tasks_executor.yml` is configured with `workflow_dispatch`
-    and triggers on changes in `.chatops/gpt_tasks/*.yml`.
-  - Attempts to trigger it from the GitHub UI report
-    “Workflow run was successfully requested”, but **no runs actually appear**
-    (0 runs in the Actions UI).
-  - The task `gpt-2025-11-15-001-executor-smoke-test.yml` did NOT run to completion
-    via Actions (no PR created, and the test file was not created by the executor).
+### GitHub – GPT GitHub Agent DRY RUN
 
-- **Workaround in use now:**
-  - `DOCS/GPT_EXECUTOR_TEST.md` was created directly by GPT Agent Mode
-    via a direct commit to `main` (commit `1c64fd5`),
-    without relying on the GPT Tasks Executor workflow.
-  - Therefore, the GPT Tasks Executor is currently considered **BROKEN at runtime**.
-  - Until it is debugged and fixed, GPT/Agents should assume direct writes to the repo
-    (under Or’s approval) are the primary mechanism.
+- קיים Agent בסיסי ב-Python:
+  - קובץ: `gpt_agent/github_agent.py`
+  - מצב: ✅ **Implemented (OS_SAFE, DRY RUN בלבד)**
+  - מריץ Plan על בסיס Snapshot + Matrix + Design.
+  - נוסה לוקלית בפקודה:
 
-## 5. GPT / Agent Control Model
+    ```bash
+    python gpt_agent/github_agent.py \
+      --intent "Map current GitHub capabilities and propose next OS_SAFE documentation updates only."
+    ```
 
-- **Or (human owner):**
-  - Defines high-level intent and goals.
-  - Gives explicit “מאשר” / approval before any strong or risky change.
-  - Does NOT perform technical actions: no GitHub editing, no commands, no secrets.
+- אין כתיבה אוטומטית לקבצים, אין commits, אין שינוי Workflows → רק Plan בטקסט.
 
-- **GPT strategic (MCP מלא):**
-  - Designs the autonomy layers, policies and loops.
-  - Produces canonical content for state files and specs
-    (like this snapshot and future design docs).
-  - Coordinates agents and keeps `CAPABILITIES_MATRIX` and state files consistent.
+### GitHub – GPT Tasks Executor (YAML דרך Actions)
 
-- **Execution Agents (Agent Mode / future GPT Agents / MCP tools):**
-  - Hold actual technical access (GitHub write, future Google/GCP/Windows operations).
-  - Execute file changes, PRs, and automations **only after** Or’s explicit approval.
-  - Must first read state files (`STATE_FOR_GPT_SNAPSHOT`, `CAPABILITIES_MATRIX`, bridges),
-    then present a plan, wait for approval, and only then act.
+- Design קיים (`DOCS/GPT_TASKS_SPEC.md` + `.github/workflows/gpt_tasks_executor.yml`)
+- Runtime: 🟡 **Partial/Broken**
+  - הפעלה דרך UI/CLI נותנת "successfully requested" אבל ריצות לא מופיעות בפועל.
+  - לא להסתמך כרגע על `.chatops/gpt_tasks/*.yml` כערוץ ביצוע אמין.
+- עד להודעה חדשה:
+  - **Direct writes (Docs/State) + Git Bash + Agents** = נתיב עיקרי.
+  - GPT Tasks Executor נשאר Backlog לתיקון ודיבאג.
 
-## 6. Known Issues / Backlog
+### Google / GCP / Windows MCP (תמציתי בלבד)
 
-1. **GPT Tasks Executor (GitHub Actions) – Runtime BROKEN**
-   - Needs systematic debugging of `gpt_tasks_executor.yml` and GitHub Actions state
-     to understand why `workflow_dispatch` creates no runs.
-   - Until fixed, no agent should rely on the YAML→Executor loop.
+- קיים תיעוד ו-Design ב-`CAPABILITIES_MATRIX.md` ו-`MCP_GPT_CAPABILITIES_BRIDGE.md`.
+- מצב בפועל:
+  - חיבורים קיימים/קיימו ברמת Claude + MCP + GCP (WIF, Secret Manager, APIs) – אבל ה-runtime לא מנוהל דרך הריפו הזה.
+- עבור GPT-Agent:
+  - הריפו משמש כ-Design + Docs + חלק GitHub בלבד.
+  - חיבור מלא ל-Google/GCP/Windows MCP יגיע בשכבות הבאות.
 
-2. **Alignment between CAPABILITIES_MATRIX and this snapshot**
-   - For every capability/integration listed in the matrix,
-     the corresponding status should either be reflected here,
-     or this file should explicitly point to the matrix as the full source.
+## 4. Open TODOs / Backlog (GitHub-oriented)
 
-3. **Future GPT-Agent service**
-   - This snapshot is the basis for a future standalone GPT-Agent (Cloud Run or similar)
-     that will orchestrate GitHub, Google, GCP and Windows MCP using the same model:
-     Or = intent + approval, agents = execution.
+- לתקן/להחליף את GPT Tasks Executor (YAML via Actions) כך שיהיה:
+  - either: מתוקן ועובד,  
+  - or: מוחלף במנגנון אחר (שירות חיצוני / Agent Service).
+- לחבר את `gpt_agent/github_agent.py` ל-GPT אמיתי (LLM) במקום Planner סטטי.
+- להרחיב את ה-Agent:
+  - ליצירת PRים במקום commits ישירים לשינויים מסוכנים (CLOUD_OPS_HIGH).
+  - ליכולת עדכון חכם של Docs/Matrix בהתאם לפעולות שבוצעו.
+- לסנכרן תמיד:
+  - `STATE_FOR_GPT_SNAPSHOT.md`
+  - `CAPABILITIES_MATRIX.md`
+  - `MCP_GPT_CAPABILITIES_BRIDGE.md`
+  עם כל שינוי משמעותי.
+
+## 5. GPT GitHub Agent – DRY RUN (Current Contract)
+
+- תפקיד:
+  - לקרוא Design + Snapshot + Matrix.
+  - לבנות Plan טקסטואלי ברוח החוקה (AGENT_GPT_MASTER_DESIGN).
+- מגבלות:
+  - לא כותב קבצים.
+  - לא יוצר commits.
+  - לא מפעיל Workflows נוספים.
+- שימוש:
+  - לניתוח מצבים ו-What-If לפני שנכנסים לשינוי אמיתי.
+  - להפקת תוכניות פעולה ש-Or יכול לאשר, ולאחר מכן Agent אחר יבצע (או אותו Agent בגרסה מתקדמת).
+
