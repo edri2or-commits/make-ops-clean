@@ -5,14 +5,14 @@ steps:
     args: 
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/edri22or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
+      - 'us-central-docker.pkg.dev/edri2or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-image'
-    args:
+    args: 
       - 'push'
-      - 'us-central1-docker.pkg.dev/edri22or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
+      - 'us-central-docker.pkg.dev/edri2or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-cloud-run'
@@ -22,12 +22,12 @@ steps:
       - 'deploy'
       - 'github-executor-api'
       - '--image'
-      - 'us-central1-docker.pkg.dev/edri22or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
+      - 'us-central-docker.pkg.dev/edri2or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
       - '--region'
-      - 'us-central1'
+      - 'us-central'
       - '--platform'
       - 'managed'
       - '--quiet'
 
 images:
-  - 'us-central1-docker.pkg.dev/edri22or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
+  - 'us-central-docker.pkg.dev/edri2or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA'
