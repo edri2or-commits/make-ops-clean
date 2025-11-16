@@ -1,15 +1,14 @@
-name: GPT GitHub Agent Dry Run
+name: GPT GitHub Agent DRY RUN
 
 on:
-  workflow_dispatch:
-    inputs:
-      intent:
-        description: "High-level task for GPT-Agent"
-        required: true
-        type: string
-
-permissions:
-  contents: read
+  push:
+    branches:
+      - gpt-agent-playground
+    paths:
+      - 'gpt_agent/**'
+      - 'DOCS/AGENT_GPT_MASTER_DESIGN.md'
+      - 'DOCS/STATE_FOR_GPT_SNAPSHOT.md'
+      - 'CAPABILITIES_MATRIX.md'
 
 jobs:
   dry-run:
@@ -19,10 +18,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.x'
 
-      - name: Run GPT-Agent dry run
+      - name: Run GitHub Agent (DRY RUN)
         run: |
-          python gpt_agent/github_agent.py --intent "${{ inputs.intent }}"
+          python gpt_agent/github_agent.py --intent "Auto dry-run on push to gpt-agent-playground"
