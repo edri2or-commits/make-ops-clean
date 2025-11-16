@@ -9,6 +9,7 @@ on:
       - 'DOCS/AGENT_GPT_MASTER_DESIGN.md'
       - 'DOCS/STATE_FOR_GPT_SNAPSHOT.md'
       - 'CAPABILITIES_MATRIX.md'
+  workflow_dispatch:
 
 jobs:
   dry-run:
