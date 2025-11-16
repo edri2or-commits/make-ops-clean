@@ -1,16 +1,93 @@
-// index.js - Cloud Run API for Google Sheets BUS + GitHub Executor
-const express=require('express');
-const axios=require('axios');
-const { google }=require('googleapis');
-const app=express();
+const express = require('express');
+const axios = require('axios');
+const { google } = require('googleapis');
+
+const app = express();
 app.use(express.json());
-const GITHUB_TOKEN=process.env.GITHUB_TOKEN;
-const SPREADSHEET_ID='1xv0ECUV7pEpqE0wphF3I_xelquHzrS40YJmmN4_5uKw';
-const SHEET_NAME='Sheet1';
-async function getSheetsClient(){const auth=await google.auth.getClient({scopes:['https://www.googleapis.com/auth/spreadsheets']});return google.sheets({version:'v4',auth});}
-async function getBusSheetRows(){const sheets=await getSheetsClient();const result=await sheets.spreadsheets.values.get({spreadsheetId:SPREADSHEET_ID,range:SHEET_NAME});const rows=result.data.values;if(!rows||rows.length<2)return[];const headers=rows[0];return rows.slice(1).map((row,i)=>{const obj={};headers.forEach((key,j)=>{obj[key]=row[j]||'';});obj._rowIndex=i+2;return obj;});}
-async function updateBusRow(id,fields){const sheets=await getSheetsClient();const rows=await getBusSheetRows();const target=rows.find(r=>r.id===id);if(!target)throw new Error('Row with id='+id+' not found in BUS');const rowIndex=target._rowIndex;const headers=Object.keys(target).filter(k=>k!=='_rowIndex');const updatedRow=headers.map(header=>Object.prototype.hasOwnProperty.call(fields,header)?fields[header]:target[header]);await sheets.spreadsheets.values.update({spreadsheetId:SPREADSHEET_ID,range:SHEET_NAME+'!A'+rowIndex,valueInputOption:'RAW',requestBody:{values:[updatedRow]}});}
-app.post('/github/update-file',async(req,res)=>{const {repo,branch,path,content,message}=req.body||{};if(!GITHUB_TOKEN)return res.status(500).json({error:'GITHUB_TOKEN env var is missing'});if(!repo||!branch||!path||!content||!message)return res.status(400).json({error:'Missing required fields'});try{const getUrl=`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;let sha=null;try{const getRes=await axios.get(getUrl,{headers:{Authorization:`Bearer ${GITHUB_TOKEN}`,Accept:'application/vnd.github.v3+json'}});sha=getRes.data.sha;}catch(err){if(!err.response||err.response.status!==404)throw err;}const putUrl=`https://api.github.com/repos/${repo}/contents/${path}`;const putRes=await axios.put(putUrl,{message,content:Buffer.from(content,'utf8').toString('base64'),branch,...(sha?{sha}:{})},{headers:{Authorization:`Bearer ${GITHUB_TOKEN}`,Accept:'application/vnd.github.v3+json'}});const result=putRes.data;return res.json({commit_sha:result.commit.sha,url:result.commit.html_url,raw_result:result});}catch(error){console.error('GitHub update failed:',error.response?.data||error.message);return res.status(500).json({error:'GitHub update failed',details:error.response?.data||error.message});}});
-app.post('/bus/process-next-task',async(req,res)=>{try{const rows=await getBusSheetRows();const task=rows.find(row=>row.status==='NEW');if(!task)return res.json({status:'idle',message:'no NEW tasks'});const body={repo:task.repo,branch:task.branch,path:task.file,content:task.patch_content,message:'BUS: '+task.intent};try{const response=await axios.post('https://google-workspace-api-212701048029.us-central1.run.app/github/update-file',body,{headers:{'Content-Type':'application/json'}});const data=response.data;await updateBusRow(task.id,{status:'DONE',result_json:JSON.stringify(data)});return res.json({status:'done',id:task.id,repo:task.repo,branch:task.branch,file:task.file,commit_sha:data.commit_sha,url:data.url,raw_result:data});}catch(error){const errorInfo={message:error.message,data:error.response?.data||null};await updateBusRow(task.id,{status:'FAILED',result_json:JSON.stringify(errorInfo)});return res.json({status:'failed',id:task.id,error:errorInfo});}}catch(fatal){console.error('Fatal executor error:',fatal);return res.status(500).json({error:'internal executor error'});}});
-const PORT=process.env.PORT||8080;
-app.listen(PORT,()=>{console.log('Listening on port '+PORT);});
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({ service: 'google-workspace-github-api', status: 'ok' });
+});
+
+// Simple helper to log without crashing
+function log(...args) {
+  try {
+    console.log(...args);
+  } catch (e) {}
+}
+
+/**
+ * POST /github/update-file
+ * Body: { repo, branch, path, content, message }
+ *
+ * Uses GITHBUB_TOKEN (env) to call GitHub REST API.
+ */
+app.post('/github/update-file', async (req, res) => {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    return res.status(500).json({ error: 'GITHUB_TOKEN not configured' });
+  }
+
+  const { repo, branch, path, content, message } = req.body || {};
+  if (!repo || !branch || !path || !content || !message) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const apiBase = 'https://api.github.com';
+    const headers = {
+      Authorization: `token ${token}`,
+      'User-Agent': 'google-workspace-github-api',
+      Accept: 'application/vund.github+json',
+    };
+
+    // Get file SHA if exists
+    let sha = undefined;
+    try {
+      const getResp = await axios.get(
+        `${apiBase}/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`,
+        { headers }
+      );
+      if (getResp && getResp.data && getResp.data.sha) {
+        sha = getResp.data.sha;
+      }
+    } catch (e) {
+      if (e.response && e.response.status !== 404) {
+        throw e;
+      }
+    }
+
+    const putResp = await axios.put(
+      `${ apiBase }/repos/${repo}/contents/${encodeURIComponent(path)}`,
+      {
+        message,
+        content: Buffer.from(content, "utf8").toString('base64'),
+        branch,
+        sha,
+      },
+      { headers }
+    );
+
+    return res.json({
+      status: 'ok',
+      action: sha ? 'update' : 'create',
+      commit_sha: putResp.data.commit.sha,
+      content: {
+        path: putResp.data.content.path,
+        sha: putResp.data.content.sha,
+      },
+    });
+  } catch (err) {
+    log('Error in /github/update-file:', err.response?.status, err.response?.data || err.message);
+    return res.status(500).json({
+      error: 'github_update_failed',
+      details: err.response?.data || err.message,
+    });
+  }
+});
+
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+  log(`google-workspace-github-api listening on port ${port}`);
+});
