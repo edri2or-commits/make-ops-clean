@@ -39,7 +39,7 @@ app.post('/github/update-file', async (req, res) => {
     const headers = {
       Authorization: `token ${token}`,
       'User-Agent': 'google-workspace-github-api',
-      Accept: 'application/vund.github+json',
+      Accept: 'application/vnd.github+json', // Fixed: was 'vund.github', now 'vnd.github'
     };
 
     // Get file SHA if exists
