@@ -1,0 +1,115 @@
+name: Verify Cloud Run Service - github-executor-api
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: 'Cloud Run service name'
+        required: false
+        default: 'github-executor-api'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify-service:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER_PATH }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify service exists
+        id: verify
+        continue-on-error: true
+        run: |
+          echo "Checking if service exists..."
+          gcloud run services describe ${{ inputs.service_name }} \
+            --region=us-central1 \
+            --project=edri2or-mcp \
+            --format=json > service-info.json
+          
+          if [ $? -eq 0 ]; then
+            echo "service_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Service found"
+            
+            # Extract key information
+            SERVICE_URL=$(jq -r '.status.url // "N/A"' service-info.json)
+            LAST_UPDATE=$(jq -r '.metadata.annotations."serving.knative.dev/lastModifier" // "N/A"' service-info.json)
+            REVISION=$(jq -r '.status.latestReadyRevisionName // "N/A"' service-info.json)
+            
+            echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+            echo "last_update=$LAST_UPDATE" >> $GITHUB_OUTPUT
+            echo "revision=$REVISION" >> $GITHUB_OUTPUT
+            
+            echo "Service URL: $SERVICE_URL"
+            echo "Last Update: $LAST_UPDATE"
+            echo "Latest Revision: $REVISION"
+          else
+            echo "service_exists=false" >> $GITHUB_OUTPUT
+            echo "❌ Service NOT found"
+            echo "This is expected if service was never deployed"
+          fi
+
+      - name: Extract environment variables (names only)
+        if: steps.verify.outputs.service_exists == 'true'
+        run: |
+          echo "Environment variables configured:"
+          jq -r '.spec.template.spec.containers[0].env[]? | .name' service-info.json || echo "No env vars found"
+
+      - name: Create summary
+        run: |
+          {
+            echo "# Cloud Run Service Verification"
+            echo ""
+            echo "**Service**: github-executor-api"
+            echo "**Project**: edri2or-mcp"
+            echo "**Region**: us-central1"
+            echo ""
+            
+            if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
+              echo "## ✅ Service Found"
+              echo ""
+              echo "- **URL**: ${{ steps.verify.outputs.service_url }}"
+              echo "- **Latest Revision**: ${{ steps.verify.outputs.revision }}"
+              echo "- **Last Modified**: ${{ steps.verify.outputs.last_update }}"
+              echo ""
+              echo "### Environment Variables"
+              echo '```'
+              jq -r '.spec.template.spec.containers[0].env[]? | .name' service-info.json || echo "None"
+              echo '```'
+            else
+              echo "## ❌ Service Not Found"
+              echo ""
+              echo "The service 'github-executor-api' is not deployed in Cloud Run."
+              echo "This means we need to proceed with Task 2.3 (Deploy Service)."
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload service info artifact
+        if: steps.verify.outputs.service_exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-run-service-info
+          path: service-info.json
+          retention-days: 30
+
+      - name: Final status
+        run: |
+          if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
+            echo "✅ Verification complete - service is deployed"
+            exit 0
+          else
+            echo "ℹ️ Verification complete - service needs deployment"
+            exit 0
+          fi
