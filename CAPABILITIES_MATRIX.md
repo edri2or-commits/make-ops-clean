@@ -3,8 +3,8 @@
 **Single Source of Truth for Claude's Operational Capabilities**
 
 **Created**: 2025-11-14  
-**Last Updated**: 2025-11-14  
-**Version**: 1.1.0
+**Last Updated**: 2025-11-17  
+**Version**: 1.2.0
 
 ---
 
@@ -90,6 +90,7 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 - ⚠️ **Planned** - Defined but not yet implemented
 - ❌ **Blocked** - Cannot be done (technical/security constraint)
 - 🔄 **In Progress** - Currently being built
+- 🔍 **Unverified** - Code exists but deployment/runtime status unknown
 
 ---
 
@@ -107,7 +108,7 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | GitHub API | Search code | ✅ Verified | Full code search | None |
 | Claude MCP | GitHub API | List commits | ✅ Verified | Access commit history | None |
 | Claude MCP | GitHub API | Fork repos | ✅ Verified | Can fork to account | None |
-| | GPT Agent Mode | GitHub Repo (main) | Direct writes (docs/state) | ✅ Verified | Files created directly via Agent Mode (commits 1c64fd5, 81cba22, 52e5e39); OS_SAFE for docs/state | CLOUD_OPS_HIGH for code/workflows |OS_SAFE for docs/state; CLOUD_OPS_HIGH for code/workflows 
+| GPT Agent Mode | GitHub Repo (main) | Direct writes (docs/state) | ✅ Verified | Files created directly via Agent Mode (commits 1c64fd5, 81cba22, 52e5e39); OS_SAFE for docs/state | CLOUD_OPS_HIGH for code/workflows |
 
 **Authentication**: GitHub Personal Access Token (via MCP)  
 **Scope**: Full access to `edri2or-commits` repositories
@@ -146,8 +147,6 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 ## 2️⃣ Local Layer (Claude's Computer → User's Computer)
 
 ### 2.1 Filesystem Access
-| GitHub Actions | GitHub Repo (main) | GPT Tasks Executor (run GPT task YAMLs) | 🟡 Partial | Design exists (.github/workflows/gpt_tasks_executor.yml & example task); runtime broken: manual dispatch returns success but no runs; smoke test created via Agent Mode | Requires debugging; do not rely on YAML->Executor loop yet |
-
 
 | From | To | Capability | Status | Details | Limitations |
 |------|----|-----------| -------|---------|-------------|
@@ -156,6 +155,7 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude (local) | User filesystem | Directory operations | ✅ Verified | List, create, search | Allowed dirs only |
 | Claude (local) | User filesystem | File metadata | ✅ Verified | Get info, sizes, dates | None |
 | Claude (local) | User filesystem | Read images | ✅ Verified | Base64 image reading | Allowed dirs only |
+| GitHub Actions | GitHub Repo (main) | GPT Tasks Executor (run GPT task YAMLs) | 🟡 Partial | Design exists (.github/workflows/gpt_tasks_executor.yml & example task); runtime broken: manual dispatch returns success but no runs; smoke test created via Agent Mode | Requires debugging; do not rely on YAML->Executor loop yet |
 
 **Allowed Directories**:
 - `C:\\Users\\edri2` (primary)
@@ -390,6 +390,103 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 
 ---
 
+## 🔟 Cloud Run APIs (GPTs GO Integration)
+
+### 10.1 Service Overview
+
+**⚠️ CRITICAL NAMING CLARIFICATION**:
+- **Repository directory**: `cloud-run/google-workspace-github-api/`
+- **Deployed service name**: `github-executor-api`
+- **Actual functionality**: GitHub operations only (NO Google Workspace operations)
+
+This is **ONE service**, not two separate services as previously documented.
+
+### 10.2 github-executor-api
+
+| From | To | Capability | Status | Details | Limitations |
+|------|----|-----------| -------|---------|-------------|
+| GPTs GO | Cloud Run | Health check (/) | 🔍 Unverified | Code exists, deployment status unknown | Cannot verify without Cloud Run access |
+| GPTs GO | Cloud Run | GitHub file update (/github/update-file) | 🔍 Unverified | Code exists, GPTs GO reports 404 | Deployment status unknown |
+
+**Code Location**: `cloud-run/google-workspace-github-api/`  
+**Service Name**: `github-executor-api`  
+**Region**: `us-central`  
+**Project**: `edri2or-mcp`  
+**Image**: `us-central-docker.pkg.dev/edri2or-mcp/cloud-run-source-deploy/github-executor-api:$COMMIT_SHA`
+
+**Implemented Endpoints** (verified in code):
+1. `GET /`
+   - Returns: `{ service: 'google-workspace-github-api', status: 'ok' }`
+   - Purpose: Health check
+
+2. `POST /github/update-file`
+   - Purpose: Create or update files in GitHub repositories
+   - Auth: `GITHUB_TOKEN` environment variable
+   - Required params: `repo`, `branch`, `path`, `content`, `message`
+   - Logic: Fetches existing file SHA if exists, then creates/updates via GitHub API
+
+**Known Issues**:
+- ⚠️ **Code typo on line 37**: `Accept: 'application/vund.github+json'` should be `vnd.github`
+- This typo may cause GitHub API request failures
+
+**Unverified Status**:
+Cannot confirm without Cloud Run access:
+- ❓ Is service deployed and running?
+- ❓ What is the public URL?
+- ❓ Is `GITHUB_TOKEN` environment variable configured?
+- ❓ Why does GPTs GO receive 404 on `/github/update-file`?
+
+**Possible 404 Causes** (ranked by likelihood):
+1. Service not deployed
+2. URL mismatch (GPTs GO calling wrong endpoint)
+3. Authentication/routing issue
+4. Missing environment variables
+
+**Evidence**: Code analysis 2025-11-17, see `DOCS/L2_RUNTIME_DIAGNOSIS.md`
+
+### 10.3 BUS Task Queue System
+
+| From | To | Capability | Status | Details | Limitations |
+|------|----|-----------| -------|---------|-------------|
+| GPTs GO | Cloud Run | Task queue (/bus/process-next-task) | ❌ Not Implemented | Documented in architecture but no code exists | BUS is design-only, not implemented |
+
+**Current Reality**:
+- ❌ NO `/bus/process-next-task` endpoint in code
+- ❌ NO Sheet ID for task queue
+- ❌ NO polling mechanism
+- ❌ NO BUS implementation anywhere in codebase
+
+**BUS Status**: **PLANNED, NOT IMPLEMENTED**
+
+BUS appears only in documentation, not in actual code. This is an architectural concept that has not been built.
+
+**Decision Required**: 
+- **Option A**: Build BUS system (high effort, async task queue)
+- **Option B**: Direct Cloud Run calls (low effort, simpler)
+- **Option C**: Abandon github-executor-api, use GitHub API directly
+
+**Recommendation**: Option B (Direct) or C (Abandon) - BUS adds complexity without clear benefit
+
+**Evidence**: Code search 2025-11-17 found ZERO references to BUS in `cloud-run/`, workflows, or Python scripts
+
+### 10.4 Google Workspace Operations
+
+| From | To | Capability | Status | Details | Limitations |
+|------|----|-----------| -------|---------|-------------|
+| GPTs GO | Cloud Run | Google Workspace write ops | ❌ Not Implemented | Despite directory name, NO Google Workspace endpoints exist | Service only implements GitHub operations |
+
+**Clarification**:
+- Directory named `google-workspace-github-api` is misleading
+- Service implements GitHub operations ONLY
+- NO Gmail, Drive, Sheets, Docs, or Calendar endpoints in code
+- Google Workspace operations handled by:
+  1. Existing separate `google-workspace-api` service (not in this repo)
+  2. Claude's MCP Google Workspace server (READ operations only)
+
+**Gap**: Full Google Workspace write operations require separate implementation
+
+---
+
 ## 7️⃣ Integration Bridges
 
 ### 7.1 Claude → GCP (Indirect)
@@ -502,6 +599,16 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 **Status**: ✅ Workaround designed (see 7.3), waiting for implementation
 
+### 8.5 Cloud Run Deployment Verification
+
+**Issue**: Cannot verify if `github-executor-api` is deployed and operational
+
+**Impact**: ❌ Cannot confirm GPTs GO integration works, ❌ Cannot debug 404 errors
+
+**Workaround**: Create verification workflow via GitHub Actions
+
+**Status**: ⚠️ Planned - requires CLOUD_OPS_HIGH approval
+
 ---
 
 ## 9️⃣ Security Posture
@@ -551,7 +658,26 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 **See**: `plans/GOOGLE_MCP_AUTOMATION_PLAN.md` for detailed execution plan
 
-### Priority 1: Cloud Shell via Actions (High Value, Low Risk)
+### Priority 1: github-executor-api Recovery (HIGH VALUE)
+
+**Goal**: Fix GPTs GO → GitHub integration loop
+
+**Tasks**:
+1. ⏳ Verify deployment status (via GitHub Actions workflow)
+2. ⏳ Fix Accept header typo in code
+3. ⏳ Decision: BUS vs Direct vs Abandon
+4. ⏳ Deploy/test service
+5. ⏳ Update OpenAPI for GPTs GO
+
+**Executor**: Claude (via automation)  
+**Or's Role**: Approval for each phase  
+**Effort**: Medium (verification + fixes)  
+**Risk**: Medium (service deployment)  
+**Impact**: Enables GPTs GO → GitHub automation
+
+**See**: `DOCS/GITHUB_EXECUTOR_RECOVERY_PLAN.md` for detailed execution plan (Phase 2)
+
+### Priority 2: Cloud Shell via Actions (High Value, Low Risk)
 
 **Goal**: Enable automated Cloud Shell command execution
 
@@ -567,7 +693,7 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 **Risk**: Low (read operations)  
 **Impact**: Unblocks full GCP automation while respecting contract
 
-### Priority 2: Verification Runners (High Value, Low Risk)
+### Priority 3: Verification Runners (High Value, Low Risk)
 
 **Goal**: Close GitHub Actions → GCP gaps
 
@@ -581,7 +707,7 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 **Effort**: Low (reuse existing WIF)  
 **Risk**: Low (read-only operations)
 
-### Priority 3: OAuth Migration (High Value, Medium Risk)
+### Priority 4: OAuth Migration (High Value, Medium Risk)
 
 **Goal**: Complete secret migration
 
@@ -595,7 +721,7 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 **Effort**: Low (proven process)  
 **Risk**: Medium (requires testing)
 
-### Priority 4: Script Automation (Medium Value, Medium Effort)
+### Priority 5: Script Automation (Medium Value, Medium Effort)
 
 **Goal**: Enable automated script execution
 
@@ -613,6 +739,18 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 
 ## 📝 Update Log
 
+### 2025-11-17 (v1.2.0) ⭐ PHASE 1.2 COMPLETE
+- **Added Section 10: Cloud Run APIs** - Complete service mapping
+- **Critical naming clarification**: ONE service (google-workspace-github-api → github-executor-api), not two
+- **Documented actual endpoints**: Only `/` and `/github/update-file` exist in code
+- **BUS status corrected**: Marked as "PLANNED, NOT IMPLEMENTED" - no code exists
+- **Added code typo note**: Accept header bug (vund.github → vnd.github)
+- **Deployment status**: Marked as 🔍 Unverified (cannot confirm without Cloud Run access)
+- **Evidence**: Based on code analysis in `DOCS/L2_RUNTIME_DIAGNOSIS.md` (2025-11-17)
+- **Roadmap updated**: Added Priority 1 (github-executor-api Recovery)
+- **Gap added**: Section 8.5 (Cloud Run Deployment Verification)
+- **Version bump**: 1.1.0 → 1.2.0
+
 ### 2025-11-14 (v1.1.0)
 - **Added GLOBAL EXECUTION MODEL section** ⭐ CRITICAL
 - Defined contract: Or = Intent + Approval, Claude = Executor
@@ -622,7 +760,6 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 - Added Priority 0: Google MCP Full Setup to roadmap
 - Updated all roadmap items with "Executor: Claude" and "Or's Role: Approval only"
 - Referenced `plans/GOOGLE_MCP_AUTOMATION_PLAN.md` for execution details
-- Commit message: "L0: Add global execution model - Or = Intent+Approval, Claude = Executor"
 
 ### 2025-11-14 (v1.0.2)
 - **Added screenshot capability to ps_exec MCP server**
@@ -630,9 +767,6 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 - Updated whitelisted commands: 10 → 11 (added `screenshot`)
 - Added screenshot details subsection with implementation specifics
 - Updated version in section 2.2: ps_exec now 0.2.0
-- Updated section 7.2: PowerShell limitation note (10 → 11 commands)
-- Updated section 8.2: PowerShell limitation note (10 → 11 commands)
-- Commit evidence: 1580581a2c8fc6dfd1325ec94202d2be350f0ce0
 
 ### 2025-11-14 (v1.0.1)
 - Added section 2.3: Local CLI Tools (gcloud)
@@ -640,8 +774,6 @@ Claude → GitHub (create/trigger cloud-shell-exec workflow)
 - Clarified architectural constraint preventing local gcloud execution
 - Added bridge pattern 7.3 for Cloud Shell via GitHub Actions
 - Updated gap 8.4 with gcloud-specific blocker and workaround
-- Created evidence log: `logs/LOG_LOCAL_GCLOUD_STATUS.md`
-- Updated roadmap: Cloud Shell via Actions now Priority 1
 
 ### 2025-11-14 (v1.0.0)
 - Initial version created
@@ -658,17 +790,17 @@ When adding a new capability:
 1. **Test** the capability thoroughly
 2. **Update** this matrix with:
    - New row in appropriate table
-   - Status (Verified/Partial/Planned)
+   - Status (Verified/Partial/Planned/Unverified)
    - Limitations (if any)
    - Evidence/notes
-3. **Commit** with message: `L0: update capabilities matrix - [capability name]`
+3. **Commit** with message: `Phase X.Y: update capabilities matrix - [capability name]`
 4. **Reference** this file in any documentation about the new capability
 
 When a capability changes:
 1. Update status/limitations
 2. Add note to Update Log
-3. Update version number
-4. Commit with message: `L0: update capabilities matrix - [what changed]`
+3. Update version number (bump minor for new features, patch for corrections)
+4. Commit with message: `Phase X.Y: update capabilities matrix - [what changed]`
 
 ---
 
@@ -677,39 +809,29 @@ When a capability changes:
 ---
 
 **Maintained by**: Claude (with אור's approval)  
-**Last Verified**: 2025-11-14  
+**Last Verified**: 2025-11-17  
 **Next Review**: As capabilities change
 
-## 9. GPT / Agent Runtime Notes – GitHub Layer
+## Appendix: GPT / Agent Runtime Notes
 
-- Direct GitHub writes via GPT Agent Mode  
-  - Status: ✅ Verified (Implemented & Tested, scope: OS_SAFE – Docs/MD/State בלבד)  
-  - Evidence (branch main):  
-    - commit 1c64fd5 – יצירת DOCS/GPT_EXECUTOR_TEST.md כ-smoke test  
-    - commit 81cba22 – יצירת DOCS/STATE_FOR_GPT_SNAPSHOT.md  
-    - commit 52e5e39 – עדכון STATE_FOR_GPT.md עם הפניה ל-SNAPSHOT  
+### GitHub Layer
 
-- GPT Tasks Executor (GitHub Actions workflow)  
-  - Files:  
-    - .github/workflows/gpt_tasks_executor.yml  
-    - .chatops/gpt_tasks/gpt-2025-11-15-001-executor-smoke-test.yml  
-  - Status: 🟡 Partial / Broken Runtime  
-    - Design קיים (פורמט משימות, workflow, YAML).  
-    - נעשו ניסיונות להריץ דרך workflow_dispatch, התקבלה הודעת "successfully requested" אך אין runs בפועל (0 runs).  
-  - Backlog:  
-    - לאבחן למה ה-workflow לא יוצר ריצות (events/permissions/config).  
-    - לאחר תיקון והרצה מוצלחת – לעדכן סטטוס ל-✅ במטריצה.
+**Direct GitHub writes via GPT Agent Mode**  
+- Status: ✅ Verified (Implemented & Tested, scope: OS_SAFE – Docs/MD/State only)  
+- Evidence (branch main):  
+  - commit 1c64fd5 – DOCS/GPT_EXECUTOR_TEST.md  
+  - commit 81cba22 – DOCS/STATE_FOR_GPT_SNAPSHOT.md  
+  - commit 52e5e39 – STATE_FOR_GPT.md reference update  
 
-## GPT / Agent Runtime Notes – GitHub DRY RUN
+**GPT Tasks Executor (GitHub Actions workflow)**  
+- Files: `.github/workflows/gpt_tasks_executor.yml`, `.chatops/gpt_tasks/gpt-2025-11-15-001-executor-smoke-test.yml`
+- Status: 🟡 Partial / Broken Runtime  
+  - Design exists (task format, workflow, YAML)
+  - Manual dispatch returns success but no actual runs (0 runs)
+  - Requires debugging (events/permissions/config)
 
-- Capability: **GPT GitHub Agent DRY RUN (local Python + optional GitHub Actions workflow)**
-- Status: ✅ Implemented — OS_SAFE only (Docs/Plans, no direct code/config changes)
-- Evidence:
-  - Commit `1c64fd5` – DOCS/GPT_EXECUTOR_TEST.md
-  - Commit `81cba22` – DOCS/STATE_FOR_GPT_SNAPSHOT.md
-  - Commit `52e5e39` – STATE_FOR_GPT.md note to snapshot
-  - Commit `047eea8` – gpt_agent/github_agent.py + github_agent_dry_run.yml
-- Risk & Policy:
-  - OS_SAFE: מותר להריץ לוקלית ודרך Agents לצורך תכנון ותיעוד בלבד.
-  - CLOUD_OPS_HIGH (שינויים בקוד/קונפיג) יישמרו לסוכנים/Workflows אחרים, דרך PR ו-Approval מפורש של Or.
-
+**GPT GitHub Agent DRY RUN**  
+- Capability: Local Python + optional GitHub Actions workflow  
+- Status: ✅ Implemented — OS_SAFE only (Docs/Plans, no direct code/config changes)  
+- Evidence: commits 1c64fd5, 81cba22, 52e5e39, 047eea8  
+- Policy: OS_SAFE for planning/documentation; CLOUD_OPS_HIGH for code/config via PR + explicit approval
