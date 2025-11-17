@@ -10,59 +10,48 @@
 - משקף את מצב החיבורים:
   - GitHub
   - Local (Filesystem / PowerShell / Scripts)
-  - **Google MCP** (Gmail / Drive / Calendar / Sheets / Docs) ⭐ **עכשיו בעיצוב (Phase G1)**
+  - **Google MCP** (Gmail / Drive / Calendar / Sheets / Docs) ⭐ **Phase G2.1 הושלם (2025-11-17)**
   - GCP דרך GitHub Actions (WIF / Secret Manager / APIs)
   - ועוד כלים (Canva, Web וכו').
 
 ---
 
-## 🆕 Google MCP Autonomy Layer (2025-11-17)
+## 🆕 Google MCP Autonomy Layer - Phase G2.1 Complete (2025-11-17)
 
 **מה השתנה**:
 
-Claude עכשיו בונה שכבת אוטונומיה על Google Workspace:
+Claude בנה ארכיטקטורה טכנית מלאה ל-OAuth + Google MCP:
 
-### המסמך המרכזי:
-**[`DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md`](DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md)** (28.7KB)
+### המסמכים המרכזיים:
 
-### מה כולל:
-1. **Current State** - מה Claude כבר יכול (read-only)
-2. **Vision** - מה Claude רוצה להיות מסוגל (write, send, create)
-3. **Scopes** - רשימת OAuth scopes מלאה + מטריצת סיכונים
-4. **OS_SAFE vs CLOUD_OPS_HIGH** - גבולות ברורים לכל פעולה
-5. **CAPABILITIES_MATRIX Integration** - איך Claude מעדכן את המטריצה
-6. **Roadmap** - G1 (Design) → G2 (Bootstrap) → G3 (Autonomy) → G4 (Advanced)
+1. **[`DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md`](DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md)** (28.7KB) - Phase G1
+   - חזון, scopes, מודל autonomy
 
-### מודל הפעולה:
-```
-OS_SAFE (Claude alone):
-- Read, analyze, search
-- Create drafts (not sent)
-- Propose actions
-- Generate reports
+2. **[`DOCS/GOOGLE_AGENTS_RACI.md`](DOCS/GOOGLE_AGENTS_RACI.md)** (22.4KB) - Phase G1
+   - חלוקת תפקידים Claude vs GPTs GO
 
-CLOUD_OPS_MEDIUM (Or notified, reversible):
-- Label/organize emails
-- Create calendar events (invites sent automatically)
-- Edit files (version history available)
+3. **[`DOCS/GOOGLE_MCP_OAUTH_ARCH.md`](DOCS/GOOGLE_MCP_OAUTH_ARCH.md)** (52.6KB) ⭐ **NEW - Phase G2.1**
+   - ארכיטקטורה טכנית מלאה
+   - OAuth 2.0 + Service Account + WIF
+   - 3 flows מפורטים
+   - 4 workflow skeletons
+   - Safeguards framework
+   - Observability plan
 
-CLOUD_OPS_HIGH (Or's explicit approval each time):
-- Send emails
-- Share files externally
-- Delete events with attendees
-- Permanent deletions
-```
+### Phase G2.1 Status (COMPLETE):
+- ✅ OAuth Architecture - תכנון מלא
+- ✅ Authentication Pattern - OAuth + SA + WIF (keyless)
+- ✅ Workflow Skeletons - 4 GitHub Actions workflows מעוצבים
+- ✅ Safeguards Framework - 5 layers של הגנה
+- ✅ Observability Plan - status files, health checks, audit trails
+- ✅ CAPABILITIES_MATRIX Section 3 - עודכן עם Safeguards column
+- ✅ MCP_GPT_CAPABILITIES_BRIDGE - עודכן (this file)
 
-### Phase G1 Status (CURRENT):
-- ✅ AUTONOMY_PLAN created (OS_SAFE document)
-- ✅ CAPABILITIES_MATRIX Section 3 updated
-- ⏳ MCP_GPT_CAPABILITIES_BRIDGE update (this file)
-
-### Phase G2 (NEXT):
+### Phase G2.2 (NEXT):
 - Requires **Executor** (not Or, not Claude alone)
 - Requires Or's **one-time OAuth consent click**
-- Technical setup: APIs, credentials, MCP server config
-- All automated except the OAuth click
+- All workflows ready to execute
+- Technical setup automated except OAuth click
 
 ---
 
@@ -71,7 +60,7 @@ CLOUD_OPS_HIGH (Or's explicit approval each time):
 ### 1. להניח ש:
 - **CAPABILITIES_MATRIX** הוא המאסטר למידע על יכולות Claude
 - כל שינוי יכולת אמור להיסגר בלולאה שבה Claude מעדכן את הקובץ
-- **Google MCP** עכשיו ב-Phase G1 (Design) - אין runtime access עדיין
+- **Google MCP** עכשיו ב-Phase G2.1 (OAuth Architecture Complete) - אין runtime access עדיין
 
 ### 2. לעזור לאור:
 - לבחור "מנות" (חיבורים קטנים) לחיזוק יכולות
@@ -79,22 +68,35 @@ CLOUD_OPS_HIGH (Or's explicit approval each time):
 - להקפיד שכל משימה לקלוד כוללת:
   - תכנון → ביצוע → עדכון ב-`CAPABILITIES_MATRIX.md`
 
-### 3. ספציפית ל-Google MCP:
+### 3. ספציפית ל-Google MCP (Phase G2.1+):
 - **לא לבקש מאור** "תוסיף secret" או "תפתח console"
 - **לא להניח** ש-Claude יכול לשלוח מיילים (עדיין read-only)
 - **כן לתכנן** workflows שידרשו:
   - Executor עם גישה (לא אור)
   - אישור CLOUD_OPS_HIGH מאור (רק לפעולות משמעותיות)
   - עדכון CAPABILITIES_MATRIX אחרי כל שינוי
+- **כן להסתכל** ב-GOOGLE_MCP_OAUTH_ARCH.md לפרטים טכניים מלאים
+- **כן להשתמש** ב-GOOGLE_AGENTS_RACI.md לבחירת agent נכון
 
-### 4. לזכור:
+### 4. Safeguards = חובה (Phase G2.1 Decision):
+- כל יכולת חדשה ב-CAPABILITIES_MATRIX **חייבת** לכלול עמודת "Safeguards"
+- לא מספיק "יש יכולת" - צריך "יש יכולת + הגנות"
+- 5 Layers של הגנה:
+  1. Capability Tracking (MATRIX as guardrail)
+  2. Approval Templates (structured, explicit)
+  3. Rate Limiting (hard limits per service)
+  4. Mandatory Logging (audit trail)
+  5. Policy Blocks (technical enforcement)
+
+### 5. לזכור:
 - המטרה הסופית: 100% יכולת בכל כלי (Gmail, Drive, GitHub, GCP, Local וכו')
 - תחת Approval Gate יחיד – אור
 - אבל Or = Intent + Approval בלבד, לא DevOps executor
+- **Preparedness Tracking**: Monthly reviews של autonomy metrics
 
 ---
 
-## דוגמה: איך GPT צריך לעבוד עם Google MCP
+## דוגמה: איך GPT צריך לעבוד עם Google MCP (עדכון Phase G2.1)
 
 ### ❌ לא טוב:
 ```
@@ -105,28 +107,231 @@ GPT: "אור, תוסיף את ה-GMAIL_TOKEN ל-Secret Manager ואז תעדכן
 ```
 GPT: "אני רואה שClaude צריך יכולת לשלוח מיילים.
       
-      לפי CAPABILITIES_MATRIX, Google MCP עכשיו ב-Phase G1 (Design).
+      לפי CAPABILITIES_MATRIX, Google MCP עכשיו ב-Phase G2.1 (OAuth Architecture Complete).
       
-      Claude כבר יצר תכנית מלאה ב-CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md.
+      Claude כבר בנה:
+      1. תכנית מלאה (CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md)
+      2. RACI matrix (GOOGLE_AGENTS_RACI.md)
+      3. ארכיטקטורה טכנית מלאה (GOOGLE_MCP_OAUTH_ARCH.md)
+      4. 4 GitHub Actions workflows מוכנים להרצה
       
-      השלב הבא (G2) דורש:
-      1. Executor שיריץ automation (לא אתה)
-      2. אישור אסטרטגי ממך (כן/לא על הכיוון)
-      3. קליק OAuth אחד ממך (כשה-provider יבקש)
+      השלב הבא (G2.2 - Execution) דורש:
+      1. Executor שיריץ workflows (לא אתה)
+      2. אישור אסטרטגי ממך (כן/לא על התכנון)
+      3. קליק OAuth אחד ממך (כשה-workflow יפיק URL)
       
-      האם אתה רוצה שנתקדם ל-Phase G2?"
+      האם אתה מאשר את התכנון של G2.1 ורוצה שנתקדם ל-G2.2?"
+```
+
+### ✅ טוב יותר - עם Safeguards:
+```
+GPT: "Claude רוצה יכולת לשלוח מיילים.
+      
+      לפי GOOGLE_MCP_OAUTH_ARCH.md, היכולת הזו תבוא עם:
+      
+      Safeguards:
+      1. CLOUD_OPS_HIGH approval (מאשר שליחה) - כל מייל
+      2. Rate limit: 10 מיילים/שעה
+      3. Logging חובה ל-OPS/LOGS/google-operations.jsonl
+      4. Approval TTL: 60 דקות
+      5. Policy block: לא ניתן ליצור forwarding rules
+      
+      Agent Routing (לפי RACI):
+      - Claude: מיילים בודדים, הקשריים, חשובים
+      - GPTs GO: bulk sends, קמפיינים, templated
+      
+      התכנון מלא. האם להתקדם ל-Execution (G2.2)?"
+```
+
+---
+
+## Capability Update Protocol (Phase G2.1+)
+
+**כאשר מוסיפים יכולת חדשה ב-Google**:
+
+### 1. בדוק RACI קודם:
+```
+Is this Claude's responsibility or GPTs GO's?
+→ Check GOOGLE_AGENTS_RACI.md
+→ If Claude: Continue
+→ If GPTs GO: Delegate or consult
+```
+
+### 2. בדוק Safeguards:
+```
+What's the risk level?
+→ OS_SAFE: No safeguards needed
+→ CLOUD_OPS_MEDIUM: Logging + notification
+→ CLOUD_OPS_HIGH: All 5 layers
+
+Document safeguards in CAPABILITIES_MATRIX (new row)
+```
+
+### 3. תכנן Observability:
+```
+How will we know it worked?
+→ Status file path: OPS/STATUS/google-{operation}.json
+→ Log entry format: OPS/LOGS/google-operations.jsonl
+→ Health check: What API call verifies functionality?
+```
+
+### 4. עדכן MATRIX:
+```
+Add row with:
+- Capability name
+- Status (Design/Ready/Verified)
+- Details
+- Safeguards (ALL 5 if CLOUD_OPS_HIGH)
+- Last Verified date
+```
+
+### 5. תעד ב-Phase Tracking:
+```
+Which phase adds this capability?
+→ G2.2: OAuth + base access
+→ G2.3: Advanced features
+→ G3: Autonomy features
+→ G4: Proactive features
+```
+
+---
+
+## דוגמה: Gmail Send Capability Workflow
+
+**User asks**: "Can Claude send emails?"
+
+**GPT Response**:
+```
+Current status (per CAPABILITIES_MATRIX):
+- Gmail send: 🔄 Phase G2.3 (Design Ready)
+- Status: Not available yet (OAuth not configured)
+
+What's ready:
+✅ Full architecture (GOOGLE_MCP_OAUTH_ARCH.md)
+✅ Safeguards defined (5 layers)
+✅ Workflows designed (skeleton ready)
+✅ RACI assignment (Claude responsible for single sends)
+
+What's needed:
+⏳ Phase G2.2: OAuth setup (Executor + Or consent)
+⏳ Phase G2.3: Enable gmail.send scope + verify
+
+Timeline:
+- G2.2: ~30-60 min (mostly automated)
+- G2.3: ~15 min (scope addition + test)
+
+Once ready, sending email will require:
+1. Claude drafts (OS_SAFE)
+2. Or approves: "מאשר שליחה"
+3. Claude sends via MCP
+4. Logged to OPS/LOGS/
+
+Rate limit: 10 emails/hour
+Approval TTL: 60 minutes
+
+Ready to proceed with G2.2?
+```
+
+---
+
+## Phase Tracking Summary
+
+### Phase G1 ✅ (Complete 2025-11-17):
+- Autonomy model
+- Scopes analysis
+- RACI matrix
+- Status: DESIGN_COMPLETE
+
+### Phase G2.1 ✅ (Complete 2025-11-17):
+- OAuth architecture
+- Authentication pattern
+- Workflow skeletons
+- Safeguards framework
+- Observability plan
+- Status: DESIGN_READY
+
+### Phase G2.2 ⏳ (Next):
+- Execute workflows
+- OAuth consent (Or)
+- Verify MCP server
+- Status: Awaiting Executor
+
+### Phase G3 ⏳ (Future):
+- Controlled autonomy
+- Approval gates operational
+- Monthly Preparedness reviews
+- Status: Planned
+
+### Phase G4 ⏳ (Future):
+- Advanced autonomy
+- Proactive suggestions
+- Cross-service orchestration
+- Status: Planned
+
+---
+
+## Critical Reminders for GPTs
+
+### 1. Never Assume Capabilities
+```
+❌ "Claude will send that email for you"
+✅ "Claude can draft that email. Sending requires G2.3 (not yet available)"
+```
+
+### 2. Always Check MATRIX First
+```
+Before planning any Google operation:
+1. Read CAPABILITIES_MATRIX Section 3
+2. Check status (Verified/Design/Planned)
+3. If Verified: Check safeguards
+4. If not Verified: Don't promise capability
+```
+
+### 3. Respect RACI Boundaries
+```
+Before assigning work:
+1. Read GOOGLE_AGENTS_RACI.md
+2. Check who is Responsible (R)
+3. If Claude: Proceed
+4. If GPTs GO: Delegate appropriately
+5. If conflict: Escalate to Or
+```
+
+### 4. Document Safeguards
+```
+When adding capability:
+1. Define risk level (OS_SAFE/MEDIUM/HIGH)
+2. List all safeguards (approval, rate, logging, etc.)
+3. Update CAPABILITIES_MATRIX with Safeguards column
+4. Never mark "Verified" without tested safeguards
+```
+
+### 5. Track Preparedness
+```
+Monthly review questions:
+1. How many Google operations this month?
+2. What % required CLOUD_OPS_HIGH approval?
+3. Any safeguard triggers (rate limits, blocks)?
+4. Emerging patterns or risks?
+5. Should we adjust safeguards?
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17**: נוספה שכבת Google MCP Autonomy (Phase G1)
-- מסמך תכנון: `DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md`
-- CAPABILITIES_MATRIX עודכן (Section 3)
-- הקובץ הזה עודכן עם הנחיות Google MCP
+**2025-11-17 (Phase G2.1 Complete)**:
+- ✅ Google MCP OAuth Architecture (52.6KB) created
+- ✅ Safeguards framework (5 layers) defined
+- ✅ Workflow skeletons (4 files) designed
+- ✅ Observability plan complete
+- ✅ CAPABILITIES_MATRIX Section 3 updated (Safeguards column added)
+- ✅ This file updated with G2.1 guidance
+
+**Next**: Or approves G2.1 → Executor runs G2.2 → Verify → Begin G3
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17
+**עדכון אחרון**: 2025-11-17 (Phase G2.1 Complete)  
+**גרסה**: 2.0 (major update with G2.1 architecture)
