@@ -10,4 +10,4 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-CLM ["npm", "start"]
+CMD ["npm", "start"]  # Fixed: was CLM (typo), now CMD (correct Docker directive)
