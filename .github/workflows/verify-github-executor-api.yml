@@ -12,8 +12,8 @@ on:
       - 'OPS/TRIGGERS/github-executor-verify.trigger'
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write  # Required to commit status file
+  id-token: write  # Required for WIF
 
 jobs:
   verify-service:
@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -55,57 +57,135 @@ jobs:
             SERVICE_URL=$(jq -r '.status.url // "N/A"' service-info.json)
             LAST_UPDATE=$(jq -r '.metadata.annotations."serving.knative.dev/lastModifier" // "N/A"' service-info.json)
             REVISION=$(jq -r '.status.latestReadyRevisionName // "N/A"' service-info.json)
+            IMAGE=$(jq -r '.spec.template.spec.containers[0].image // "N/A"' service-info.json)
             
             echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
             echo "last_update=$LAST_UPDATE" >> $GITHUB_OUTPUT
             echo "revision=$REVISION" >> $GITHUB_OUTPUT
+            echo "image=$IMAGE" >> $GITHUB_OUTPUT
             
             echo "Service URL: $SERVICE_URL"
             echo "Last Update: $LAST_UPDATE"
             echo "Latest Revision: $REVISION"
+            echo "Image: $IMAGE"
+            
+            # Extract env var names
+            ENV_VARS=$(jq -r '.spec.template.spec.containers[0].env[]? | .name' service-info.json | paste -sd "," - || echo "none")
+            echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+            echo "Environment Variables: $ENV_VARS"
           else
             echo "service_exists=false" >> $GITHUB_OUTPUT
             echo "❌ Service NOT found"
             echo "This is expected if service was never deployed"
           fi
 
-      - name: Extract environment variables (names only)
-        if: steps.verify.outputs.service_exists == 'true'
+      - name: Create status file
         run: |
-          echo "Environment variables configured:"
-          jq -r '.spec.template.spec.containers[0].env[]? | .name' service-info.json || echo "No env vars found"
-
-      - name: Create summary
-        run: |
+          mkdir -p OPS/STATUS
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
+            cat > OPS/STATUS/github-executor-api-verify.json <<EOF
           {
-            echo "# Cloud Run Service Verification"
-            echo ""
-            echo "**Service**: github-executor-api"
-            echo "**Project**: edri2or-mcp"
-            echo "**Region**: us-central1"
-            echo "**Triggered**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
-            echo ""
-            
-            if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
-              echo "## ✅ Service Found"
-              echo ""
-              echo "- **URL**: ${{ steps.verify.outputs.service_url }}"
-              echo "- **Latest Revision**: ${{ steps.verify.outputs.revision }}"
-              echo "- **Last Modified**: ${{ steps.verify.outputs.last_update }}"
-              echo ""
-              echo "### Environment Variables"
-              echo '```'
-              jq -r '.spec.template.spec.containers[0].env[]? | .name' service-info.json || echo "None"
-              echo '```'
-            else
-              echo "## ❌ Service Not Found"
-              echo ""
-              echo "The service 'github-executor-api' is not deployed in Cloud Run."
-              echo "This means we need to proceed with Task 2.3 (Deploy Service)."
-            fi
-          } >> $GITHUB_STEP_SUMMARY
+            "task": "2.1",
+            "service_name": "github-executor-api",
+            "timestamp": "$TIMESTAMP",
+            "status": "deployed",
+            "service_url": "${{ steps.verify.outputs.service_url }}",
+            "revision": "${{ steps.verify.outputs.revision }}",
+            "last_update": "${{ steps.verify.outputs.last_update }}",
+            "image": "${{ steps.verify.outputs.image }}",
+            "environment_variables": "${{ steps.verify.outputs.env_vars }}",
+            "workflow_run": "${{ github.run_id }}",
+            "workflow_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          EOF
+          else
+            cat > OPS/STATUS/github-executor-api-verify.json <<EOF
+          {
+            "task": "2.1",
+            "service_name": "github-executor-api",
+            "timestamp": "$TIMESTAMP",
+            "status": "not_deployed",
+            "message": "Service does not exist in Cloud Run",
+            "next_step": "Task 2.3 - Deploy Service",
+            "workflow_run": "${{ github.run_id }}",
+            "workflow_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          EOF
+          fi
+          
+          echo "Status file created:"
+          cat OPS/STATUS/github-executor-api-verify.json
 
-      - name: Upload service info artifact
+      - name: Create human-readable summary
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          cat > OPS/STATUS/github-executor-api-verify.md <<EOF
+          # GitHub Executor API - Verification Status
+          
+          **Task**: 2.1 - Verify Deployment Status  
+          **Timestamp**: $TIMESTAMP  
+          **Workflow Run**: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ---
+          
+          EOF
+          
+          if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
+            cat >> OPS/STATUS/github-executor-api-verify.md <<EOF
+          ## ✅ Service Found
+          
+          The service **github-executor-api** is deployed in Cloud Run.
+          
+          ### Details
+          
+          - **URL**: ${{ steps.verify.outputs.service_url }}
+          - **Latest Revision**: ${{ steps.verify.outputs.revision }}
+          - **Last Modified**: ${{ steps.verify.outputs.last_update }}
+          - **Image**: ${{ steps.verify.outputs.image }}
+          
+          ### Environment Variables
+          
+          \`\`\`
+          ${{ steps.verify.outputs.env_vars }}
+          \`\`\`
+          
+          ### Next Steps
+          
+          1. Review service configuration
+          2. Proceed to Task 2.2 (Fix Accept header typo)
+          3. Test endpoint (Task 2.5)
+          
+          EOF
+          else
+            cat >> OPS/STATUS/github-executor-api-verify.md <<EOF
+          ## ❌ Service Not Found
+          
+          The service **github-executor-api** is NOT deployed in Cloud Run.
+          
+          ### Next Steps
+          
+          1. Proceed to Task 2.3 (Deploy Service)
+          2. Use cloudbuild.yaml to deploy
+          3. Verify deployment with this workflow again
+          
+          EOF
+          fi
+          
+          echo "Human-readable summary created"
+
+      - name: Commit status files to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add OPS/STATUS/github-executor-api-verify.json
+          git add OPS/STATUS/github-executor-api-verify.md
+          git commit -m "Task 2.1: Automated verification status update [skip ci]" || echo "No changes to commit"
+          git push
+
+      - name: Upload service info artifact (if exists)
         if: steps.verify.outputs.service_exists == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -113,12 +193,25 @@ jobs:
           path: service-info.json
           retention-days: 30
 
-      - name: Final status
+      - name: Create workflow summary
         run: |
-          if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
-            echo "✅ Verification complete - service is deployed"
-            exit 0
-          else
-            echo "ℹ️ Verification complete - service needs deployment"
-            exit 0
-          fi
+          {
+            echo "# Task 2.1 - Verification Complete"
+            echo ""
+            echo "**Status File Created**: \`OPS/STATUS/github-executor-api-verify.json\`"
+            echo ""
+            
+            if [ "${{ steps.verify.outputs.service_exists }}" == "true" ]; then
+              echo "## ✅ Service Deployed"
+              echo ""
+              echo "- URL: ${{ steps.verify.outputs.service_url }}"
+              echo "- Revision: ${{ steps.verify.outputs.revision }}"
+            else
+              echo "## ❌ Service Not Deployed"
+              echo ""
+              echo "Next: Task 2.3 (Deploy Service)"
+            fi
+            
+            echo ""
+            echo "**Claude can now read**: \`OPS/STATUS/github-executor-api-verify.json\`"
+          } >> $GITHUB_STEP_SUMMARY
