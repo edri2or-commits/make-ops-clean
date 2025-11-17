@@ -1,8 +1,8 @@
 # GitHub Executor Recovery Plan
 
-**Phase**: 2 (PLANNING ONLY - NO EXECUTION YET)  
+**Phase**: 2 (EXECUTION APPROVED - Task 2.1 Ready)  
 **Date Created**: 2025-11-17  
-**Status**: 📋 PLAN - Awaiting Or's Approval  
+**Status**: ✅ APPROVED BY OR - Ready for Task 2.1 execution  
 **Risk Level**: CLOUD_OPS_HIGH (when executed)
 
 ---
@@ -22,7 +22,7 @@
 - GPTs GO can successfully call `/github/update-file`
 - Commits appear in GitHub repositories
 - CAPABILITIES_MATRIX updated with ✅ Verified status
-- Clear decision on BUS (build/abandon)
+- **BUS decision: DEFERRED** ✅
 
 **Approach**: Fix and deploy (Option A), NOT build BUS in Phase 2
 
@@ -72,15 +72,25 @@ Success criteria:
 4. Test commit appears in a GitHub repository
 5. CAPABILITIES_MATRIX updated to ✅ Verified
 
-### Secondary Goal
-**Clarify BUS decision**
+### BUS Decision ✅ APPROVED BY OR
 
-Options:
-- **Option A**: Defer BUS to future phase (RECOMMENDED)
-- **Option B**: Build BUS system (high effort, questionable value)
-- **Option C**: Document BUS as abandoned
+**Decision**: **DEFERRED (Option A)**
 
-Recommendation: **Option A** (defer) - Focus on core GitHub operations first
+**Status**: Deferred to future phase  
+**Decision Owner**: Or (approved 2025-11-17)  
+**Rationale**:
+- Core GitHub operations work without BUS
+- BUS adds complexity without immediate benefit
+- Can be revisited if async queue becomes necessary
+
+**Revisit Criteria**:
+- When there's a clear need for task queuing
+- When GPTs GO requires async operation patterns
+- When we see performance/scaling issues with direct calls
+
+**Documentation Updated**: 
+- CAPABILITIES_MATRIX Section 10.3: BUS marked as "Deferred"
+- STATE_FOR_GPT_SNAPSHOT: BUS status = Deferred
 
 ---
 
@@ -107,11 +117,11 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 **Rollback**: N/A (read-only)  
 **Evidence**: Workflow run logs + artifact
 
-**Approval Required**: ✅ Yes (CLOUD_OPS_HIGH - GCP operation)
+**Approval Status**: ✅ APPROVED (2025-11-17)
 
 ---
 
-### Task 2.2: Fix Accept Header Typo ✅ APPROVED BY OR
+### Task 2.2: Fix Accept Header Typo ⏳ PENDING
 
 **Purpose**: Correct code bug that may cause API failures
 
@@ -132,11 +142,11 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 **Rollback**: Revert commit  
 **Evidence**: PR link, commit SHA
 
-**Approval Required**: ✅ Yes (CLOUD_OPS_HIGH - code change in production service)
+**Approval Status**: ⏳ Awaiting approval after Task 2.1 results
 
 ---
 
-### Task 2.3: Deploy or Redeploy Service
+### Task 2.3: Deploy or Redeploy Service ⏳ PENDING
 
 **Purpose**: Ensure service is running with latest code
 
@@ -159,11 +169,11 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 
 **Evidence**: Cloud Build logs, service URL, revision ID
 
-**Approval Required**: ✅ Yes (CLOUD_OPS_HIGH - service deployment)
+**Approval Status**: ⏳ Awaiting approval after Task 2.1/2.2
 
 ---
 
-### Task 2.4: Verify Environment Variables
+### Task 2.4: Verify Environment Variables ⏳ PENDING
 
 **Purpose**: Confirm `GITHUB_TOKEN` is configured
 
@@ -178,11 +188,11 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 **Rollback**: Remove environment variable if added  
 **Evidence**: Service configuration output
 
-**Approval Required**: ✅ Yes (CLOUD_OPS_HIGH - secret configuration)
+**Approval Status**: ⏳ Awaiting approval after Task 2.3
 
 ---
 
-### Task 2.5: Test Service Endpoint
+### Task 2.5: Test Service Endpoint ⏳ PENDING
 
 **Purpose**: Verify `/github/update-file` works
 
@@ -210,11 +220,11 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 **Rollback**: Delete test branch  
 **Evidence**: API response, commit SHA
 
-**Approval Required**: ✅ Yes (CLOUD_OPS_HIGH - API call with GitHub write)
+**Approval Status**: ⏳ Awaiting approval after Task 2.4
 
 ---
 
-### Task 2.6: Update GPTs GO Configuration
+### Task 2.6: Update GPTs GO Configuration ⏳ PENDING
 
 **Purpose**: Ensure GPTs GO calls correct URL
 
@@ -232,13 +242,13 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 **Rollback**: Revert to previous configuration  
 **Evidence**: GPTs GO test results
 
-**Approval Required**: ✅ Yes (CLOUD_OPS_HIGH - external system configuration)
+**Approval Status**: ⏳ Awaiting approval after Task 2.5
 
 **Note**: This task may require Or's input on where GPTs GO config lives
 
 ---
 
-### Task 2.7: Update Documentation
+### Task 2.7: Update Documentation ⏳ PENDING
 
 **Purpose**: Mark capability as ✅ Verified
 
@@ -259,78 +269,47 @@ Recommendation: **Option A** (defer) - Focus on core GitHub operations first
 **Rollback**: N/A  
 **Evidence**: Updated documentation commits
 
-**Approval Required**: ❌ No (OS_SAFE)
+**Approval Status**: ⏳ Will execute after Task 2.6 completes
 
 ---
 
 ## 🔄 Execution Flow
 
 ```
-Phase 2.1: Verify (LOW RISK)
+Phase 2.1: Verify (LOW RISK) ✅ APPROVED
     │
     ├─ Is service deployed?
     │  ├─ YES → Skip to 2.2
     │  └─ NO  → Continue to 2.3
     │
-Phase 2.2: Fix Typo (LOW RISK, optional if deploying new)
+Phase 2.2: Fix Typo (LOW RISK, optional if deploying new) ⏳ PENDING
     │
     └─ PR → Merge
     │
-Phase 2.3: Deploy/Redeploy (MEDIUM RISK)
+Phase 2.3: Deploy/Redeploy (MEDIUM RISK) ⏳ PENDING
     │
     ├─ Deployment successful?
     │  ├─ YES → Continue to 2.4
     │  └─ NO  → STOP, debug, get Or approval to continue
     │
-Phase 2.4: Verify Env Vars (MEDIUM RISK)
+Phase 2.4: Verify Env Vars (MEDIUM RISK) ⏳ PENDING
     │
     └─ GITHUB_TOKEN configured?
     │
-Phase 2.5: Test Endpoint (LOW RISK)
+Phase 2.5: Test Endpoint (LOW RISK) ⏳ PENDING
     │
     ├─ Test successful?
     │  ├─ YES → Continue to 2.6
     │  └─ NO  → STOP, debug, iterate 2.3-2.5
     │
-Phase 2.6: Update GPTs GO (MEDIUM RISK)
+Phase 2.6: Update GPTs GO (MEDIUM RISK) ⏳ PENDING
     │
     └─ GPTs GO can call service?
     │
-Phase 2.7: Update Docs (OS_SAFE)
+Phase 2.7: Update Docs (OS_SAFE) ⏳ PENDING
     │
     └─ ✅ COMPLETE
 ```
-
----
-
-## ⚠️ Decision Point: BUS System
-
-**Question**: Should we build BUS in Phase 2?
-
-**Analysis**:
-
-| Aspect | BUS System | Direct Calls |
-|--------|-----------|--------------|
-| Effort | HIGH (new Sheet, polling, schema) | NONE (already works with fix) |
-| Complexity | HIGH (async queue, error handling) | LOW (synchronous) |
-| Benefit | Async task queue | Simple, direct |
-| Maintenance | Ongoing | Minimal |
-| Time to complete | 3-5 sessions | Already done after Phase 2 |
-
-**Recommendation**: **Defer BUS to future phase**
-
-**Reasoning**:
-1. Core need is GitHub file updates - this works without BUS
-2. BUS adds architectural complexity without clear immediate benefit
-3. Can always add BUS later if async queue becomes necessary
-4. Focus on making simple thing work first
-
-**Options**:
-- **A) Defer BUS** (recommended) - Document as "Planned for Phase 3+"
-- **B) Build BUS now** - Only if Or sees specific need for async queue
-- **C) Abandon BUS** - Remove from documentation entirely
-
-**Approval Required**: Or's decision on BUS direction
 
 ---
 
@@ -376,7 +355,7 @@ If anything goes wrong:
 4. ✅ Test commit appears in GitHub
 5. ✅ GPTs GO can successfully call the service (no 404)
 6. ✅ CAPABILITIES_MATRIX updated to Verified
-7. ✅ Clear decision made on BUS (defer/build/abandon)
+7. ✅ BUS decision made and documented (DEFERRED - approved 2025-11-17)
 
 **Evidence of Success**:
 - Service URL documented
@@ -387,27 +366,17 @@ If anything goes wrong:
 
 ---
 
-## 📝 Next Steps
-
-**After Plan Approval**:
-1. Or reviews this plan
-2. Or approves/adjusts BUS decision (recommend: defer)
-3. Or approves overall Phase 2 approach
-4. Claude executes Task 2.1 (verification workflow)
-5. Based on results, proceed through tasks 2.2-2.7
-6. Each CLOUD_OPS_HIGH task gets separate approval
-
-**Timeline Estimate**: 2-3 sessions (assuming no major issues)
-
-**Dependencies**:
-- Or's approval on this plan
-- Or's decision on BUS
-- Access to Cloud Run via GitHub Actions (we have WIF)
-- Access to GPTs GO configuration (may need Or's help)
-
----
-
 ## 🔄 Updates Log
+
+### 2025-11-17 - BUS Decision Approved
+- **BUS Status**: DEFERRED (Option A)
+- **Approved by**: Or
+- **Rationale**: Focus on core GitHub operations; can revisit if async queue needed
+- **Documentation**: Updated PLAN, MATRIX, and STATE
+
+### 2025-11-17 - Task 2.1 Approved
+- **Approval**: Or approved execution of Task 2.1
+- **Next Step**: Create verification workflow (YAML review before execution)
 
 ### 2025-11-17 - Initial Plan
 - Created recovery plan based on Phase 1.1 diagnosis
@@ -417,6 +386,6 @@ If anything goes wrong:
 
 ---
 
-**Status**: 📋 PLAN READY - Awaiting Or's approval to begin Phase 2 execution
+**Status**: ✅ APPROVED - Task 2.1 ready for execution
 
-**Next Action**: Or reviews and approves/adjusts this plan
+**Next Action**: Claude presents Task 2.1 workflow YAML for Or's final review before execution
