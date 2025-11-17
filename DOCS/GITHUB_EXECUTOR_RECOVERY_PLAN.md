@@ -1,8 +1,8 @@
 # GitHub Executor Recovery Plan
 
-**Phase**: 2 (Task 2.1 CLOSED, Task 2.2 IN PROGRESS - PR OPENED)  
+**Phase**: 2 (Task 2.1 CLOSED, Task 2.2 IN PROGRESS, Task 2.3 PLAN COMPLETE)  
 **Date Created**: 2025-11-17  
-**Status**: 🔄 Task 2.2 IN PROGRESS - PR #100 awaiting review  
+**Status**: 🔄 Task 2.2 PR #100 awaiting review | ✅ Task 2.3 PLAN complete  
 **Risk Level**: CLOUD_OPS_HIGH (for deployment tasks)
 
 ---
@@ -17,6 +17,7 @@
 - GPTs GO reports 404 on `/github/update-file`
 - BUS system not implemented (DEFERRED - approved by Or)
 - **Code fix in progress**: PR #100 fixes Accept header typo
+- **Deployment plan complete**: TASK_2.3_DEPLOYMENT_PLAN.md created
 
 **Target State**:
 - `github-executor-api` deployed and operational
@@ -29,333 +30,183 @@
 
 ---
 
-## ⚠️ CRITICAL: Zero-Touch Execution Protocol
+## 📋 Phase 2 Tasks - Quick Reference
 
-**Or-OS Contract Compliance**:
-
-✅ **ALLOWED**:
-- Workflows run automatically on trigger file changes
-- Workflows write status to `OPS/STATUS/*.json` and `*.md` files
-- Claude reads status files from repo
-- Claude updates trigger files to re-run workflows
-
-❌ **FORBIDDEN**:
-- Or manually running workflows via UI
-- Or checking Actions tab for status
-- Or clicking "Run workflow" buttons
-- Or opening any cloud consoles
-
-**Status Observation Method**:
-```
-Workflow → writes status → OPS/STATUS/*.json
-                          ↓
-                    Claude reads file
-                          ↓
-                    Claude reports to Or
-```
-
-**All workflows must**:
-1. Write status to `OPS/STATUS/[task-name].json`
-2. Include: timestamp, status, results, next_step, workflow_url
-3. Commit with `[skip ci]` to avoid infinite loops
-4. Use `contents: write` permission
-
-**Current Limitation**: Observability gap prevents runtime verification  
-**Future Requirement**: Executor with Actions/Cloud Run access OR improved CI permissions
+| Task | Status | Description | Document |
+|------|--------|-------------|----------|
+| 2.1 | ✅ CLOSED | Verify deployment | Observability constraint |
+| 2.2 | 🔄 IN PROGRESS | Fix Accept header | PR #100 |
+| 2.3 | ✅ PLAN COMPLETE | Deploy service | [`TASK_2.3_DEPLOYMENT_PLAN.md`](TASK_2.3_DEPLOYMENT_PLAN.md) |
+| 2.4 | ⏳ PENDING | Verify env vars | Part of 2.3 execution |
+| 2.5 | ⏳ PENDING | Test endpoint | Separate workflow |
+| 2.6 | ⏳ PENDING | Configure GPTs GO | Needs Or's guidance |
+| 2.7 | ⏳ PENDING | Update docs | After all tests pass |
 
 ---
 
-## 📊 Current Situation (From Phase 1.1 Diagnosis)
-
-### What We Know ✅
-
-1. **ONE service exists** (not two):
-   - Code: `cloud-run/google-workspace-github-api/`
-   - Deployed name: `github-executor-api`
-   - Region: `us-central1`, Project: `edri2or-mcp`
-
-2. **Implemented endpoints**:
-   - `GET /` - Health check
-   - `POST /github/update-file` - GitHub file operations
-
-3. **Known issues**:
-   - Code typo: `vund.github` → should be `vnd.github` (line 37) **[FIX IN PROGRESS]**
-   - GPTs GO gets 404 on `/github/update-file`
-
-4. **BUS status**:
-   - NOT implemented in code
-   - Exists only in documentation
-   - DEFERRED to future phase (approved 2025-11-17)
-
-### What We DON'T Know ❓
-
-1. Is `github-executor-api` deployed?
-2. What's the public URL?
-3. Is `GITHUB_TOKEN` environment variable set?
-4. Why does GPTs GO receive 404?
-
-**Reason**: Observability Constraint (no Actions API access, no status files created)
-
----
-
-## 🎯 Phase 2 Goals
-
-### Primary Goal
-**Fix GPTs GO → github-executor-api → GitHub loop**
-
-Success criteria:
-1. Service is deployed and reachable
-2. Health check (`GET /`) returns 200
-3. `/github/update-file` accepts requests from GPTs GO
-4. Test commit appears in a GitHub repository
-5. CAPABILITIES_MATRIX updated to ✅ Verified
-
-### BUS Decision ✅ APPROVED BY OR
-
-**Decision**: **DEFERRED (Option A)**
-
-**Status**: Deferred to future phase  
-**Decision Owner**: Or (approved 2025-11-17)  
-**Rationale**:
-- Core GitHub operations work without BUS
-- BUS adds complexity without immediate benefit
-- Can be revisited if async queue becomes necessary
-
-**Documentation Updated**: 
-- CAPABILITIES_MATRIX Section 10.3: BUS marked as "Deferred"
-- STATE_FOR_GPT_SNAPSHOT: BUS status = Deferred
-
----
-
-## 📋 Phase 2 Tasks
+## 📋 Detailed Task Status
 
 ### Task 2.1: Verify Deployment Status ✅ COMPLETED (RUNTIME_UNVERIFIED)
 
-**Purpose**: Determine if service is deployed and get its URL
-
-**Method**: GitHub Actions workflow (fully automated, zero-touch)
-
-**What Was Accomplished**:
-1. ✅ Workflow created: `.github/workflows/verify-github-executor-api.yml`
-2. ✅ Trigger mechanism established: `OPS/TRIGGERS/github-executor-verify.trigger`
-3. ✅ Zero-touch pattern documented (workflows write to `OPS/STATUS/*.json`)
-4. ✅ Workflow triggered automatically (commits `cd7b467`, `8d39cbee`)
-
-**What Could NOT Be Verified**:
-- ❌ Runtime deployment status (workflow may have run but no status files created)
-- ❌ Service URL
-- ❌ Environment variables
-- ❌ Whether service is actually deployed
-
-**Root Cause**: **Observability Constraint**
-
-**Outcome**: **COMPLETED – RUNTIME_UNVERIFIED (OBSERVABILITY_CONSTRAINT)**
+**Outcome**: COMPLETED – RUNTIME_UNVERIFIED (OBSERVABILITY_CONSTRAINT)
 
 **Evidence**: 
 - Workflow design: `.github/workflows/verify-github-executor-api.yml`
 - Documentation: `CAPABILITIES_MATRIX.md` Section 8.5, Section 10.2
-- Closure notes: `DOCS/STATE_FOR_GPT_SNAPSHOT.md` v3.1
-
-**Approval Status**: ✅ APPROVED (2025-11-17)  
-**Execution Status**: ✅ COMPLETED (limitations documented)
 
 ---
 
 ### Task 2.2: Fix Accept Header Typo 🔄 IN PROGRESS (OS_SAFE)
 
-**Purpose**: Correct code bug that may cause API failures
-
-**File**: `cloud-run/google-workspace-github-api/index.js`  
-**Line**: 37  
-**Change**: `Accept: 'application/vund.github+json'` → `Accept: 'application/vnd.github+json'`
-
-**Method**: Pull Request
-
-**Execution**:
-1. ✅ Branch created: `feature/fix-github-executor-accept-header`
-2. ✅ Code fixed: Single-character typo corrected + inline comment added
-3. ✅ **PR opened**: [#100](https://github.com/edri2or-commits/make-ops-clean/pull/100)
-4. ⏳ **Awaiting Or's review and merge approval**
-
 **PR Details**:
 - **URL**: https://github.com/edri2or-commits/make-ops-clean/pull/100
 - **Commit**: `ceb6a6d`
 - **Changes**: 1 file, 1 line changed (`vund` → `vnd`)
-- **Comment added**: `// Fixed: was 'vund.github', now 'vnd.github'`
 
-**Risk**: LOW - Simple typo fix (code change only)  
-**Rollback**: Revert commit  
-**Evidence**: PR #100
-
-**Approval Status**: ⏳ AWAITING OR'S MERGE APPROVAL  
-**Execution Status**: 🔄 IN PROGRESS (PR opened 2025-11-17)
-
-**Next Step**: After merge, proceed to Task 2.3 PLAN
+**Status**: ⏳ AWAITING OR'S MERGE APPROVAL
 
 ---
 
-### Task 2.3: Deploy or Redeploy Service ⏳ NEXT (PLAN ONLY - OS_SAFE)
+### Task 2.3: Deploy Service ✅ PLAN COMPLETE → ⏳ AWAITING APPROVAL (CLOUD_OPS_HIGH)
 
-**Purpose**: Create detailed deployment plan for github-executor-api
+**Purpose**: Deploy github-executor-api to Cloud Run with fixed code
 
-**Scope**: PLAN creation only (OS_SAFE) - NO actual deployment yet
+**📄 Complete Deployment Plan**: **[`DOCS/TASK_2.3_DEPLOYMENT_PLAN.md`](TASK_2.3_DEPLOYMENT_PLAN.md)** ⭐
 
-**Pre-requisites**:
-1. Task 2.2 merged (code fix applied)
-2. Or approval for CLOUD_OPS_HIGH deployment operation
+**Plan Components** (all OS_SAFE planning):
+1. ✅ **2.3.1: Dockerfile Fix** - Critical bug found: `CLM` → `CMD` (line 11)
+2. ✅ **2.3.2: Deployment Workflow** - Full GitHub Actions workflow with WIF auth
+3. ✅ **2.3.3: Environment Variables** - `GITHUB_TOKEN` configuration strategy
+4. ✅ **2.3.4: Smoke Tests** - Automated health check verification
+5. ✅ **2.3.5: Rollback Strategy** - Multiple rollback methods documented
 
-**What Will Be Planned**:
-1. Deployment mechanism (Cloud Build / GitHub Actions)
-2. Which files are responsible (`cloudbuild.yaml` / workflows)
-3. Exact commands that will run
-4. Required permissions and environment variables
-5. Post-deployment checks/smoke tests
-6. Rollback strategy if deployment fails
+**Key Findings**:
+- ⚠️ **New bug discovered**: Dockerfile has `CLM` instead of `CMD` (prevents container start)
+- ✅ Existing `cloudbuild.yaml` ready to use
+- ✅ Deployment workflow designed with zero-touch automation
+- ✅ Status reporting to `OPS/STATUS/*.json` included
 
-**Plan Structure** (will be added to this document):
-```
-Task 2.3 PLAN:
-├── 2.3.1: Deployment Method Selection
-├── 2.3.2: Workflow/CloudBuild Configuration
-├── 2.3.3: Environment Variable Strategy
-├── 2.3.4: Smoke Tests Design
-└── 2.3.5: Rollback Procedures
-```
+**Decision Points for Or**:
+1. **Dockerfile fix approach**:
+   - Option A: Add to PR #100 (delays merge)
+   - Option B: Separate quick fix after #100 merge
+   - **Recommendation**: Option B (faster, decoupled)
 
-**Risk**: NONE (planning only)  
-**Actual Deployment Risk**: MEDIUM (when executed)
+2. **GitHub Token setup**:
+   - Add `GITHUB_TOKEN` to GitHub repository secrets
+   - **Recommendation**: Do now to avoid deployment delays
 
-**Approval Status**: ⏳ PLAN creation awaiting Task 2.2 merge  
-**Execution Status**: ⏳ NOT STARTED (waiting for Task 2.2)
+3. **Deployment timing**:
+   - Deploy immediately after Task 2.2 merge
+   - Wait for Or's explicit "GO" command
+   - **Recommendation**: Wait for explicit GO
 
-**Note**: Actual deployment (CLOUD_OPS_HIGH) will require separate approval
+**Pre-Execution Checklist** (before CLOUD_OPS_HIGH execution):
+- [ ] Task 2.2 (PR #100) merged
+- [ ] Dockerfile typo fixed (CLM → CMD)
+- [ ] Deployment workflow created (`.github/workflows/deploy-github-executor-api.yml`)
+- [ ] `GITHUB_TOKEN` added to GitHub Secrets
+- [ ] Or has reviewed `TASK_2.3_DEPLOYMENT_PLAN.md`
+- [ ] Or has explicitly approved CLOUD_OPS_HIGH execution
 
----
+**Current Status**:
+- Plan Status: ✅ COMPLETE (16.8KB, comprehensive)
+- Plan Created: 2025-11-17
+- Approval Status: ⏳ AWAITING OR'S REVIEW
+- Execution Status: ⏳ NOT STARTED (waiting for approval)
 
-### Task 2.4: Verify Environment Variables ⏳ PENDING
+**Risk Assessment**:
+- Planning: NONE (OS_SAFE, already complete)
+- Execution: MEDIUM (Cloud Run deployment with automated rollback)
 
-**Purpose**: Confirm `GITHUB_TOKEN` is configured
-
-**Method**: Part of Task 2.3 execution OR manual verification by Executor
-
-**Approval Status**: ⏳ Awaiting Task 2.3 completion
-
----
-
-### Task 2.5: Test Service Endpoint ⏳ PENDING
-
-**Purpose**: Verify `/github/update-file` works
-
-**Method**: Test call via workflow (automated)
-
-**Approval Status**: ⏳ Awaiting Task 2.4 completion
+**Note**: Actual deployment (CLOUD_OPS_HIGH) requires separate explicit approval
 
 ---
 
-### Task 2.6: Update GPTs GO Configuration ⏳ PENDING
+### Task 2.4-2.7: Post-Deployment Tasks ⏳ PENDING
 
-**Purpose**: Ensure GPTs GO calls correct URL
+**Task 2.4**: Verify Environment Variables  
+**Task 2.5**: Test Service Endpoint  
+**Task 2.6**: Update GPTs GO Configuration  
+**Task 2.7**: Update Documentation  
 
-**Prerequisites**: Tasks 2.1-2.5 complete, service verified working
-
-**Approval Status**: ⏳ Awaiting Task 2.5 completion + Or's guidance
-
----
-
-### Task 2.7: Update Documentation ⏳ PENDING
-
-**Purpose**: Mark capability as ✅ Verified
-
-**Approval Status**: ⏳ Will execute after Task 2.6 completes
+**Status**: All pending Task 2.3 execution
 
 ---
 
 ## 🔄 Execution Flow
 
 ```
-Phase 2.1: Verify ✅ COMPLETED (RUNTIME_UNVERIFIED)
+Phase 2.1: Verify ✅ CLOSED (RUNTIME_UNVERIFIED)
     │
-Phase 2.2: Fix Typo 🔄 IN PROGRESS (PR #100 opened)
+Phase 2.2: Fix Accept Header 🔄 IN PROGRESS (PR #100)
     │
-    └─ Or reviews PR → Merge
+    └─ Or reviews PR #100 → Merge
     │
-Phase 2.3: Deploy PLAN ⏳ NEXT (OS_SAFE - planning only)
+Phase 2.3: Deployment ✅ PLAN COMPLETE
     │
-    └─ Claude creates detailed plan
+    ├─ Planning (OS_SAFE) ✅ DONE
+    │  └─ Document: TASK_2.3_DEPLOYMENT_PLAN.md
     │
-Phase 2.3 (Execution): Deploy (CLOUD_OPS_HIGH - future)
-    │
-    └─ Requires separate approval + Executor with Cloud Run access
+    └─ Execution (CLOUD_OPS_HIGH) ⏳ AWAITING APPROVAL
+       │
+       ├─ Or reviews plan
+       ├─ Or approves CLOUD_OPS_HIGH
+       └─ Claude triggers deployment
     │
 Phase 2.4-2.7: Test, Configure, Document ⏳ PENDING
 ```
 
 ---
 
-## 🔐 Risk Management
-
-### Risk Matrix
-
-| Task | Risk Level | Impact if Fails | Mitigation | Status |
-|------|-----------|-----------------|------------|--------|
-| 2.1 Verify | LOW | Can't proceed | Document constraint | ✅ CLOSED |
-| 2.2 Fix Typo | LOW | Typo remains | Can fix later | 🔄 IN PROGRESS |
-| 2.3 PLAN | NONE | No plan | Create plan | ⏳ NEXT |
-| 2.3 Deploy | MEDIUM | Service unavailable | Rollback plan | ⏳ FUTURE |
-| 2.4 Env Vars | MEDIUM | Auth fails | Secure token config | ⏳ PENDING |
-| 2.5 Test | LOW | Know it doesn't work | Debug and iterate | ⏳ PENDING |
-| 2.6 GPTs GO | MEDIUM | GPTs GO broken | Revert config | ⏳ PENDING |
-| 2.7 Docs | NONE | Docs outdated | Fix anytime | ⏳ PENDING |
-
----
-
-## 📊 Success Metrics
-
-**Phase 2 is successful when**:
-1. ✅ `github-executor-api` is deployed and reachable
-2. ✅ Health check returns 200
-3. ✅ `/github/update-file` accepts test requests
-4. ✅ Test commit appears in GitHub
-5. ✅ GPTs GO can successfully call the service (no 404)
-6. ✅ CAPABILITIES_MATRIX updated to Verified
-7. ✅ BUS decision made and documented (DEFERRED - approved 2025-11-17)
-
-**Evidence of Success**:
-- Service URL documented
-- Test commit SHA
-- Updated CAPABILITIES_MATRIX
-- GPTs GO test results
-
----
-
 ## 🔄 Updates Log
+
+### 2025-11-17 - Task 2.3 PLAN Complete
+- **Status**: PLAN COMPLETE (OS_SAFE)
+- **Document**: `DOCS/TASK_2.3_DEPLOYMENT_PLAN.md` created (16.8KB)
+- **Discovery**: Dockerfile bug found (CLM → CMD)
+- **Components**: 5 sub-tasks fully planned
+- **Next**: Or reviews plan → Approves CLOUD_OPS_HIGH execution
 
 ### 2025-11-17 - Task 2.2 Started (PR Opened)
 - **Status**: IN PROGRESS
 - **PR**: #100 opened
-- **Branch**: `feature/fix-github-executor-accept-header`
 - **Change**: Fixed Accept header typo (`vund` → `vnd`)
-- **Commit**: `ceb6a6d`
-- **Next**: Awaiting Or's review and merge approval
+- **Next**: Awaiting Or's review and merge
 
 ### 2025-11-17 - Task 2.1 Closed (RUNTIME_UNVERIFIED)
 - **Status**: COMPLETED with Observability Constraint
-- **Outcome**: Workflow design pattern established, but runtime verification blocked
-- **Documentation**: Updated CAPABILITIES_MATRIX, STATE_FOR_GPT_SNAPSHOT, this PLAN
-- **Next Step**: Proceed to Task 2.2 (code fix)
-- **Lesson Learned**: Observability gap must be addressed for future autonomous operations
+- **Lesson**: Observability gap documented for future
 
 ### 2025-11-17 - BUS Decision Approved
 - **BUS Status**: DEFERRED (Option A)
 - **Approved by**: Or
-- **Rationale**: Focus on core GitHub operations
-
-### 2025-11-17 - Initial Plan
-- Created recovery plan based on Phase 1.1 diagnosis
-- Outlined 7 tasks with approval gates
 
 ---
 
-**Status**: 🔄 Task 2.2 IN PROGRESS (PR #100) | ⏳ Task 2.3 PLAN awaiting Task 2.2 merge
+## 📊 Current State Summary
 
-**Next Action**: Or reviews PR #100 → Claude creates Task 2.3 deployment PLAN
+**Completed**:
+- ✅ Task 2.1: Observability constraint documented
+- ✅ Task 2.3 PLAN: Comprehensive deployment plan created
+
+**In Progress**:
+- 🔄 Task 2.2: PR #100 awaiting Or's review
+
+**Awaiting Approval**:
+- ⏳ Task 2.3 EXECUTION: Deployment plan awaiting Or's approval
+
+**Blocked On**:
+- Task 2.2 merge → Unblocks Dockerfile fix
+- Or's approval → Unblocks Task 2.3 execution
+- Task 2.3 execution → Unblocks Tasks 2.4-2.7
+
+---
+
+**Status**: 🔄 Task 2.2 (PR #100) + ✅ Task 2.3 PLAN complete | ⏳ Awaiting Or's review & approval
+
+**Next Actions**:
+1. **Or**: Review PR #100 → Merge
+2. **Or**: Review TASK_2.3_DEPLOYMENT_PLAN.md
+3. **Or**: Approve CLOUD_OPS_HIGH execution (if satisfied with plan)
+4. **Claude**: Execute deployment when approved
