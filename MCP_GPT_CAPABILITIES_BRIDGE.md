@@ -16,334 +16,414 @@
 
 ---
 
-## 🆕 Google MCP - Phase G2.1-Pilot Complete (2025-11-17)
+## 🆕 AUTOMATION_PLAYBOOK_TEMPLATE - Universal (2025-11-17)
 
-**מה השתנה**:
+**מה חדש**:
 
-Claude בנה **פיילוט מלא** ל-Gmail Drafts - template לכל היכולות הבאות:
+Claude יצר **template אוניברסלי** לכל האוטומציות במערכת:
 
-### המסמכים המרכזיים:
+### 📋 AUTOMATION_PLAYBOOK_TEMPLATE.md
 
-1. **[`DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md`](DOCS/CLAUDE_GOOGLE_MCP_AUTONOMY_PLAN.md)** (28.7KB) - Phase G1
-   - חזון, scopes, מודל autonomy
+**קישור**: [`DOCS/AUTOMATION_PLAYBOOK_TEMPLATE.md`](DOCS/AUTOMATION_PLAYBOOK_TEMPLATE.md) (43.7KB)
 
-2. **[`DOCS/GOOGLE_AGENTS_RACI.md`](DOCS/GOOGLE_AGENTS_RACI.md)** (22.4KB) - Phase G1
-   - חלוקת תפקידים Claude vs GPTs GO
+**מה זה**:
+- Template חובה לכל automation במערכת (לא רק Google)
+- כולל כל התחומים: Gmail, Drive, GitHub, GCP, Local, Make.com, עתידיים
+- מבנה של 11 סעיפים מפורטים
+- דוגמה ממולאת מלאה: Gmail Drafts (Section 8, 6.5KB)
 
-3. **[`DOCS/GOOGLE_MCP_OAUTH_ARCH.md`](DOCS/GOOGLE_MCP_OAUTH_ARCH.md)** (52.6KB) - Phase G2.1
-   - ארכיטקטורה טכנית מלאה
+**11 סעיפים**:
+1. **Intent & Classification** - הצהרת intent + רמת סיכון
+2. **Actors & RACI** - מי עושה מה (Or, Claude, GPTs GO, Executors)
+3. **Plan** - צעדים לוגיים, risk לכל צעד
+4. **Execution Skeleton** - trigger, flow, tools, approval gates
+5. **Safeguards** - 5 שכבות חובה (approval, rate, log, scope, blocks)
+6. **Observability** - logs, status files, success indicators
+7. **CAPABILITIES_MATRIX Entry** - שורה מלאה עם כל safeguards
+8. **Example** - Gmail Drafts מלא (worked example)
+9. **Template Usage** - איך למלא, מתי להשתמש, checklist
+10. **Integration** - קישור ל-MATRIX, RACI, BRIDGE
+11. **Appendix** - quick reference (decision trees, templates)
 
-4. **[`DOCS/PILOT_GMAIL_DRAFTS_FLOW.md`](DOCS/PILOT_GMAIL_DRAFTS_FLOW.md)** (22.3KB) ⭐ **NEW - Phase G2.1-Pilot**
-   - פיילוט מלא: Intent → Plan → Execution → Report → Logs
-   - Template לכל היכולות הבאות
-
-### Phase G2.1-Pilot Status (COMPLETE):
-- ✅ Gmail Drafts flow - תכנון מלא (OS_SAFE)
-- ✅ End-to-end playbook - Intent עד Logs
-- ✅ RACI integration - Claude (R) for contextual drafts
-- ✅ Safeguards defined - 5 layers
-- ✅ CAPABILITIES_MATRIX updated - Gmail Drafts row added
-- ✅ MCP_GPT_CAPABILITIES_BRIDGE updated (this file)
-- ✅ Template established - copy for Gmail Send, Drive, Calendar, Sheets
-
----
-
-## 🎯 Gmail Drafts Pilot - Use Case Recognition
-
-**כשהמשתמש מבקש**: "Draft an email to X about Y"
-
-**GPT צריך**:
-
-### 1. זיהוי Use Case
-```
-Request matches Gmail Drafts pilot:
-✅ "Draft email" / "Create draft" / "Write draft"
-✅ Has recipient
-✅ Has context/purpose
-→ This is PILOT_GMAIL_DRAFTS_FLOW territory
-```
-
-### 2. בדיקת RACI
-```
-Check: GOOGLE_AGENTS_RACI.md Section 1.2
-→ Contextual drafts = Claude (R)
-→ Template-based drafts = GPTs GO (R)
-
-If contextual/researched/unique:
-→ Claude is Responsible
-→ Proceed with Claude
-
-If template/bulk/standard:
-→ GPTs GO is Responsible
-→ Delegate or consult
-```
-
-### 3. בדיקת MATRIX
-```
-Check: CAPABILITIES_MATRIX Section 3.1 Gmail
-→ "Create drafts" capability
-→ Status: PILOT_DESIGNED (or VERIFIED after G2.2)
-→ Risk: OS_SAFE
-→ Safeguards: Content approval, no send, logging
-```
-
-### 4. הפעלת Flow
-```
-If Status = VERIFIED (after G2.2):
-→ Follow PILOT_GMAIL_DRAFTS_FLOW.md
-→ Intent → Plan → Execution → Report → Logs
-
-If Status = PILOT_DESIGNED (before G2.2):
-→ Claude can draft text
-→ Save to local file
-→ Offer to proceed with G2.2 setup
-```
+**למה זה חשוב**:
+- ✅ סטנדרט אחיד לכל האוטומציות
+- ✅ מונע שכחת safeguards
+- ✅ מבטיח CAPABILITIES_MATRIX עדכני
+- ✅ מאלץ תיעוד לפני execution
+- ✅ דוגמה מלאה (Gmail Drafts) להדרכה
 
 ---
 
-## Pilot Flow Pattern (הנחיות ל-GPTs)
+## 🎯 MANDATORY: Template Before Automation
 
-**כשרואים Use Case דומה לפיילוט**:
+**חוק חדש** (החל מ-2025-11-17):
 
-### Phase 1: Intent Recognition
+### כל automation חדשת חייבת playbook
+
+**לפני יצירת automation**:
 ```
-User says:
-"Draft an email to sarah@example.com about project delay"
+1. Copy AUTOMATION_PLAYBOOK_TEMPLATE.md
+   → DOCS/[NAME]_PLAYBOOK.md
 
-GPT recognizes:
-→ Use Case: Gmail Draft
-→ Agent: Claude (contextual)
-→ Phase: Check MATRIX status
+2. Fill ALL 9 sections
+   - Use Gmail Drafts (Section 8) as guide
+   - All 5 safeguards mandatory
+   - Complete RACI matrix
+
+3. Create CAPABILITIES_MATRIX entry
+   - Row with all safeguards
+   - Status: PILOT_DESIGNED (before execution)
+
+4. Get Or's approval
+   - Show complete playbook
+   - Explain intent, risk, safeguards
+
+5. ONLY THEN execute
+   - If CLOUD_OPS_HIGH: Executor runs
+   - Log to OPS/LOGS/
+   - Update MATRIX status
 ```
 
-### Phase 2: Route to Claude
+**אין automation בלי playbook** = אין execution
+
+---
+
+## 📋 Template Checklist (חובה)
+
+**לפני marking automation כ-"documented"**:
+
+- [ ] כל 9 סעיפים מלאים
+- [ ] RACI matrix מראה מי עושה מה
+- [ ] רמת risk נקבעה + הצדקה
+- [ ] כל 5 safeguards מתועדות
+- [ ] פורמט logging מוגדר
+- [ ] CAPABILITIES_MATRIX entry מוכן
+- [ ] Or reviewed + approved (לפני CLOUD_OPS_HIGH)
+
+**אם missing אפילו אחד** → Playbook לא complete
+
+---
+
+## 🔄 Gmail Drafts - הדוגמה הרשמית
+
+**Gmail Drafts (Section 8 in template)**:
+- ✅ Intent מלא + classification (Expansion, OS_SAFE)
+- ✅ RACI matrix (10 tasks, roles clear)
+- ✅ Plan (14 steps, risk per step)
+- ✅ Execution flow (pseudo-schema מלא)
+- ✅ All 5 safeguards documented
+- ✅ Logging format (JSON example)
+- ✅ CAPABILITIES_MATRIX row ready
+
+**למה Gmail Drafts דוגמה טובה**:
+- OS_SAFE (קל להבין)
+- Complete flow (Intent עד Logs)
+- כל הelement מתוך template
+- שימושי (drafts = use case נפוץ)
+
+**איך להשתמש**:
 ```
+Creating new automation?
+→ Open AUTOMATION_PLAYBOOK_TEMPLATE.md
+→ Go to Section 8 (Gmail Drafts example)
+→ Copy structure
+→ Adjust: operation, scope, risk, safeguards
+→ Your automation now has complete playbook
+```
+
+---
+
+## 🎯 כאשר GPT מתכנן אוטומציה חדשה
+
+### Protocol חובה:
+
+**Step 1: בדיקת MATRIX**
+```
+User requests automation: "Send email to X"
+
+GPT checks CAPABILITIES_MATRIX:
+→ Does "Gmail Send" exist?
+   - YES + VERIFIED → Use it
+   - YES + BROKEN → Fix it
+   - NO → Must create playbook first
+```
+
+**Step 2: אם לא קיים - יצירת Playbook**
+```
+Automation not in MATRIX:
+
 GPT → Claude:
-"User wants to draft email to sarah@example.com about project delay.
+"User wants Gmail Send capability.
 
-Per GOOGLE_AGENTS_RACI.md:
-- This is contextual drafting
-- Claude is Responsible (R)
+Per AUTOMATION_PLAYBOOK_TEMPLATE requirement:
+1. Copy template: AUTOMATION_PLAYBOOK_TEMPLATE.md
+2. Use Gmail Drafts (Section 8) as guide
+3. Adjust for Gmail Send:
+   - Risk: OS_SAFE → CLOUD_OPS_HIGH
+   - Safeguards: Add approval phrase, rate limits, TTL
+   - Scope: gmail.compose → gmail.send
 
-Per CAPABILITIES_MATRIX:
-- Gmail Drafts: PILOT_DESIGNED (or VERIFIED)
-- Risk: OS_SAFE
-- Playbook: PILOT_GMAIL_DRAFTS_FLOW.md
+4. Create CAPABILITIES_MATRIX entry
+5. Get Or approval before execution
 
-Please execute draft flow."
+Please create playbook first, then we'll execute."
 ```
 
-### Phase 3: Claude Executes
+**Step 3: אישור Or**
 ```
-Claude follows PILOT_GMAIL_DRAFTS_FLOW.md:
-1. Check MATRIX (capability status)
-2. Check RACI (confirm responsibility)
-3. Gather context (thread, docs, calendar, local, web)
-4. Draft content
-5. Present for Or's review
-6. If approved:
-   - Create draft via MCP (if G2.2 done)
-   - Or save to file (if before G2.2)
-7. Log operation
-8. Report to Or
-```
+Claude creates playbook:
+→ DOCS/PILOT_GMAIL_SEND_FLOW.md
 
-### Phase 4: GPT Tracks
-```
-GPT observes:
-→ Claude created draft successfully
-→ Logged to OPS/LOGS/google-operations.jsonl
-→ Or received draft ID
+GPT → Or:
+"Claude created complete playbook for Gmail Send.
 
-GPT can now:
-→ Offer next steps (edit, send, discard)
-→ Track pattern (how often this use case happens)
-→ Suggest automation (if repetitive)
+Intent: Send emails via Claude with approval
+Risk: CLOUD_OPS_HIGH
+Safeguards:
+1. Explicit approval: 'מאשר שליחה'
+2. Rate limit: 10/hour
+3. Logging: OPS/LOGS/
+4. TTL: 60 minutes
+5. Policy blocks: No forwarding rules
+
+Playbook: [link to PILOT_GMAIL_SEND_FLOW.md]
+
+Approve design before execution?"
 ```
 
----
-
-## Pilot הוא Template - איך להעתיק
-
-**כאשר Or מבקש יכולת חדשה** (למשל: Gmail Send):
-
-### 1. GPT בודק אם יש Pilot
+**Step 4: רק אחרי אישור - Execution**
 ```
-Request: "Send email to customer@example.com"
-
-GPT checks:
-→ Is there a PILOT for "Gmail Send"?
-→ Check: DOCS/PILOT_GMAIL_SEND_FLOW.md exists?
-
-If NO:
-→ Suggest creating pilot using Gmail Drafts template
-→ Ask Or: "Should Claude create PILOT_GMAIL_SEND_FLOW?"
-```
-
-### 2. יצירת Pilot חדש (Copy Pattern)
-```
-GPT → Claude:
-"Create new pilot: Gmail Send
-
-Template: PILOT_GMAIL_DRAFTS_FLOW.md
-Changes:
-- Section 1: Scope = send emails (not just drafts)
-- Section 2.3: operation = gmail.send
-- Section 3: Risk = CLOUD_OPS_HIGH (was OS_SAFE)
-- Section 5: Add 5 safeguards:
-  1. CLOUD_OPS_HIGH approval ('מאשר שליחה')
-  2. Rate limit: 10 emails/hour
-  3. Logging enabled
-  4. Approval TTL: 60 minutes
-  5. Policy block: no forwarding rules
-
-Output: PILOT_GMAIL_SEND_FLOW.md"
-```
-
-### 3. עדכון MATRIX + BRIDGE
-```
-After pilot created:
-1. Add row to CAPABILITIES_MATRIX:
-   - Gmail Send capability
-   - Status: PILOT_DESIGNED
-   - Risk: CLOUD_OPS_HIGH
-   - All 5 safeguards documented
-
-2. Update this BRIDGE file:
-   - Add Gmail Send use case recognition
-   - Add RACI routing (Claude for single, GPTs GO for bulk)
+Or approves → Phase G2.2 execution
+Or declines → Revise playbook
+Or wants changes → Update playbook, re-approve
 ```
 
 ---
 
-## דוגמה: Gmail Send Capability (עתידי)
+## 📊 Governance Documents Hierarchy
 
-**User asks**: "Send this email draft to customer"
+**מבנה התיעוד**:
 
-**GPT Response** (after Gmail Send pilot exists):
 ```
-Current status (per CAPABILITIES_MATRIX):
-- Gmail Send: PILOT_DESIGNED (or VERIFIED)
-- Playbook: PILOT_GMAIL_SEND_FLOW.md
-- Risk: CLOUD_OPS_HIGH
+CAPABILITIES_MATRIX.md (SSOT)
+  ├─ MCP_GPT_CAPABILITIES_BRIDGE.md (this file)
+  │
+  ├─ AUTOMATION_PLAYBOOK_TEMPLATE.md (universal template)
+  │   └─ Gmail Drafts (Section 8 - worked example)
+  │
+  ├─ Domain-specific docs:
+  │   ├─ GOOGLE_AGENTS_RACI.md (Google operations)
+  │   ├─ GOOGLE_MCP_OAUTH_ARCH.md (Google auth)
+  │   └─ (future) GITHUB_AGENTS_RACI.md
+  │
+  └─ Capability playbooks:
+      ├─ PILOT_GMAIL_DRAFTS_FLOW.md (complete)
+      ├─ PILOT_GMAIL_SEND_FLOW.md (future)
+      ├─ PILOT_DRIVE_CREATE_FLOW.md (future)
+      └─ ... (all future automations)
+```
 
-This requires:
-1. Claude presents draft for final review
-2. Or approves with: "מאשר שליחה"
-3. Approval valid for 60 minutes
-4. Claude sends via MCP
-5. Logged to OPS/LOGS/
-6. Rate limit: 10 sends/hour
+**כל playbook חייב להישען על template**
 
-Ready to proceed?
+---
+
+## ⚠️ Enforcement: No Playbook = No Execution
+
+**החל מעכשיו**:
+
+### Rule 1: Claude checks template first
+```
+Before planning ANY automation:
+1. Read CAPABILITIES_MATRIX
+2. If capability missing → Check if playbook exists
+3. If no playbook → Create using AUTOMATION_PLAYBOOK_TEMPLATE
+4. Never execute CLOUD_OPS_HIGH without complete playbook
+```
+
+### Rule 2: GPTs enforce template
+```
+When GPT plans automation:
+1. Check MATRIX (capability exists?)
+2. Check playbook (DOCS/[NAME]_PLAYBOOK.md?)
+3. If missing → Guide Claude to create from template
+4. If exists but incomplete → Request completion
+5. Only suggest execution after playbook approved
+```
+
+### Rule 3: Or's approval gate includes playbook
+```
+Or reviewing automation:
+- "Does this have complete playbook?" ← mandatory question
+- "Are all 5 safeguards documented?" ← mandatory check
+- "Is MATRIX entry ready?" ← mandatory check
+
+If any NO → Send back for playbook completion
 ```
 
 ---
 
-## Phase Tracking Summary (עדכון)
+## 📐 Risk Decision Tree (Quick Reference)
+
+**איך לקבוע risk level**:
+
+```
+Does operation affect external parties/systems?
+  ├─ NO → Can it be undone easily?
+  │      ├─ YES → OS_SAFE
+  │      └─ NO → CLOUD_OPS_MEDIUM
+  └─ YES → Is it reversible within 24 hours?
+         ├─ YES → CLOUD_OPS_MEDIUM
+         └─ NO → CLOUD_OPS_HIGH
+
+Examples:
+- Create draft (not sent) → OS_SAFE
+- Edit shared doc (version history) → CLOUD_OPS_MEDIUM
+- Send email (irreversible) → CLOUD_OPS_HIGH
+- Share file externally → CLOUD_OPS_HIGH
+```
+
+**Template has full decision tree** (Section 11)
+
+---
+
+## 🔄 Phase Tracking Summary (עדכון)
 
 ### Phase G1 ✅ (Complete 2025-11-17):
 - Autonomy model
 - Scopes analysis
 - RACI matrix
-- Status: DESIGN_COMPLETE
 
 ### Phase G2.1 ✅ (Complete 2025-11-17):
 - OAuth architecture
-- Authentication pattern
-- Workflow skeletons
 - Safeguards framework
-- Observability plan
-- Status: DESIGN_READY
+- Workflow skeletons
 
 ### Phase G2.1-Pilot ✅ (Complete 2025-11-17):
-- **Gmail Drafts pilot** - complete end-to-end flow
-- **Template established** - copy for all future capabilities
-- **CAPABILITIES_MATRIX** - Gmail Drafts row added
-- **MCP_GPT_CAPABILITIES_BRIDGE** - pilot guidance added
-- Status: PILOT_DESIGNED
+- **Gmail Drafts pilot** - complete playbook
+- **AUTOMATION_PLAYBOOK_TEMPLATE** - universal template ⭐ NEW
+- **Template established** - all future automations use this
 
 ### Phase G2.2 ⏳ (Next):
 - Execute OAuth workflows (Executor)
-- Or's one-time consent (includes gmail.compose)
-- Test Gmail Drafts pilot
+- Or's consent (gmail.compose)
+- Test Gmail Drafts
 - Status: PILOT_DESIGNED → VERIFIED
-- Status: Awaiting Executor
 
-### Phase G2.3 ⏳ (Future):
-- Copy pilot template for Gmail Send
-- Copy pilot template for Drive operations
-- Copy pilot template for Calendar
-- Status: Planned
+---
+
+## ✅ Template Benefits
+
+**מה הTemplate נותן**:
+
+1. **Consistency** - כל automation נראית אותו דבר
+2. **Completeness** - אי אפשר לשכוח safeguards
+3. **Traceability** - CAPABILITIES_MATRIX always updated
+4. **Approval clarity** - Or knows exactly what reviewing
+5. **Copy-paste ready** - Gmail Drafts example = template
+6. **Risk management** - explicit risk level per automation
+7. **Audit trail** - logging mandatory in template
+8. **Documentation** - playbook = permanent record
+
+**ללא template**:
+- ❌ Inconsistent documentation
+- ❌ Missing safeguards
+- ❌ MATRIX outdated
+- ❌ Unclear approvals
+- ❌ Weak audit trail
+
+**עם template**:
+- ✅ Every automation documented same way
+- ✅ All safeguards explicit
+- ✅ MATRIX always reflects reality
+- ✅ Clear approval gates
+- ✅ Complete audit trail
+
+---
+
+## 📝 Template Evolution
+
+**Version**: 1.0 (2025-11-17)
+
+**Future**:
+- Template may be extended (sections added)
+- Never reduced (safeguards only increase)
+- Version in template header
+- All automations reference version used
+
+**Feedback loop**:
+- As automations built → lessons learned
+- Lessons → template updates
+- Template becomes more comprehensive
+- Examples added (currently: Gmail Drafts, future: CLOUD_OPS_HIGH examples)
 
 ---
 
 ## Critical Reminders for GPTs (עדכון)
 
-### 1. Gmail Drafts is the Template
+### 1. Template is Mandatory
 ```
-✅ "Use PILOT_GMAIL_DRAFTS_FLOW as template for all Google capabilities"
-✅ "Copy structure: Intent → Plan → Execution → Report → Logs"
-✅ "Adjust only: operation, scope, risk, safeguards"
-```
-
-### 2. Always Check Pilot Status
-```
-Before routing to Claude:
-1. Check if pilot exists (DOCS/PILOT_[CAPABILITY]_FLOW.md)
-2. Check CAPABILITIES_MATRIX (status: PILOT_DESIGNED or VERIFIED)
-3. Check RACI (who's responsible)
-4. If no pilot: Suggest creating from template
+✅ "Every automation needs playbook using AUTOMATION_PLAYBOOK_TEMPLATE"
+✅ "No exceptions - OS_SAFE through CLOUD_OPS_HIGH all need playbooks"
+✅ "Gmail Drafts (Section 8) shows exactly how to fill template"
 ```
 
-### 3. Gmail Drafts is OS_SAFE
+### 2. Check Template Before Planning
 ```
-✅ "Draft creation requires no CLOUD_OPS_HIGH approval"
-✅ "Drafts never sent automatically"
-✅ "Or reviews content, then approves creation"
-✅ "Fully reversible (Or can delete/edit)"
-```
-
-### 4. Pilot ≠ Operational
-```
-PILOT_DESIGNED status means:
-- Flow is designed
-- Safeguards defined
-- Playbook ready
-- BUT: Not operational yet (OAuth not configured)
-
-VERIFIED status means:
-- OAuth configured (G2.2 executed)
-- MCP server running
-- Tested successfully
-- Operational ✅
+Before suggesting ANY automation:
+1. Check: CAPABILITIES_MATRIX (exists?)
+2. Check: Playbook exists? (DOCS/[NAME]_PLAYBOOK.md)
+3. If no playbook → Claude must create from template first
+4. Only then: Suggest execution
 ```
 
-### 5. Route Smart
+### 3. Template Checklist
 ```
-Contextual draft → Claude (R)
-Template draft → GPTs GO (R)
-Bulk drafts → GPTs GO (R)
-Single draft with research → Claude (R)
+Playbook complete when:
+- [ ] All 9 sections filled
+- [ ] RACI matrix complete
+- [ ] Risk level + justification
+- [ ] All 5 safeguards documented
+- [ ] Logging format defined
+- [ ] CAPABILITIES_MATRIX entry ready
+- [ ] Or reviewed + approved
+```
+
+### 4. No Playbook = No Execution
+```
+❌ "Let's execute this automation"
+✅ "Let's create playbook first using AUTOMATION_PLAYBOOK_TEMPLATE, 
+    then get Or's approval, then execute"
+```
+
+### 5. Gmail Drafts = Reference
+```
+When creating new playbook:
+"Use Gmail Drafts (Section 8 in template) as guide:
+- Copy structure
+- Adjust: operation, scope, risk, safeguards
+- Keep format consistent"
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17 (Phase G2.1-Pilot Complete)**:
-- ✅ PILOT_GMAIL_DRAFTS_FLOW.md created (22.3KB)
-- ✅ Complete end-to-end playbook (Intent → Logs)
-- ✅ CAPABILITIES_MATRIX updated (Gmail Drafts row)
+**2025-11-17 (AUTOMATION_PLAYBOOK_TEMPLATE Created)**:
+- ✅ AUTOMATION_PLAYBOOK_TEMPLATE.md created (43.7KB)
+- ✅ Universal template for ALL automations
+- ✅ Gmail Drafts worked example (Section 8)
+- ✅ CAPABILITIES_MATRIX governance layer updated
 - ✅ MCP_GPT_CAPABILITIES_BRIDGE updated (this file)
-- ✅ Template established for future capabilities
 
-**Total Google MCP Documentation**: 126KB (G1 + G2.1 + G2.1-Pilot)
+**Total Documentation**:
+- Google MCP: 126KB (G1 + G2.1 + G2.1-Pilot)
+- Universal Template: 43.7KB
+- **Total System Documentation: 169.7KB**
 
-**Next**: Or approves pilot → G2.2 execution → Gmail Drafts operational
+**Next**: Or uses template for next automation (any domain)
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17 (Phase G2.1-Pilot Complete)  
-**גרסה**: 2.1 (pilot template added)
+**עדכון אחרון**: 2025-11-17 (AUTOMATION_PLAYBOOK_TEMPLATE added)  
+**גרסה**: 2.2 (universal template added)
