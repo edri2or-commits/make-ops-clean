@@ -4,7 +4,7 @@
 
 **Created**: 2025-11-14  
 **Last Updated**: 2025-11-18  
-**Version**: 1.3.0 (מנה R6: הוספת שדות תפקידים)
+**Version**: 1.3.1 (GPT Agent Mode clarification)
 
 ---
 
@@ -128,7 +128,6 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 | Claude MCP | GitHub API | Search code | ✅ Verified | Yes | Yes | No | Full code search | None |
 | Claude MCP | GitHub API | List commits | ✅ Verified | Yes | Yes | No | Access commit history | None |
 | Claude MCP | GitHub API | Fork repos | ✅ Verified | Yes | Planned | No | Can fork to account | None |
-| GPT Agent Mode | GitHub Repo (main) | Direct writes (docs/state) | ✅ Verified | Yes | Yes | No | Files created directly via Agent Mode (commits 1c64fd5, 81cba22, 52e5e39); OS_SAFE for docs/state | CLOUD_OPS_HIGH for code/workflows |
 
 **Authentication**: GitHub Personal Access Token (via MCP)  
 **Scope**: Full access to `edri2or-commits` repositories
@@ -136,6 +135,63 @@ This is the **master reference** for all capabilities across the Claude-Ops syst
 **Notes on GPT-CEO Readiness**:
 - **Yes**: Basic read/write operations that GPT can perform via Actions or direct API
 - **Planned**: Complex workflows (PRs, branch management) require orchestration design
+
+---
+
+### 1.1.1 GPT Agent Mode - Direct Repository Access ⭐ PRIMARY PATH
+
+**🎯 Status**: ✅ **VERIFIED & ACTIVE** - This is GPT-CEO's primary method of repository access
+
+| Capability | Status | Details | Scope | Approval Required? |
+|-----------|--------|---------|-------|-------------------|
+| **Read Operations** | ✅ Verified | Full read access to all files, commits, issues, PRs | Unlimited | No |
+| **Write - Documentation** | ✅ Verified | Create/update files in `DOCS/`, `logs/`, `OPS/` | OS_SAFE | No |
+| **Write - State Files** | ✅ Verified | Create/update `STATE_FOR_GPT*.md` and similar | OS_SAFE | No |
+| **Write - Code/Workflows** | ✅ Verified | Can technically write, but requires approval | CLOUD_OPS_HIGH | Yes (מאשר כתיבה) |
+| **Write - Infrastructure** | ✅ Verified | Can technically write, but requires approval | CLOUD_OPS_HIGH | Yes (מאשר כתיבה) |
+
+**Access Method**: ChatGPT Agent Mode → Direct GitHub integration  
+**Authentication**: Managed by ChatGPT platform  
+**Evidence**: Commits f6da151, 1c64fd5, 81cba22, 52e5e39, 92de8df, b10769b, 047eea8
+
+**✅ Allowed Without Approval (OS_SAFE)**:
+```
+DOCS/*.md              - All documentation files
+logs/*.md              - Operation logs
+OPS/STATUS/*.json      - Status tracking files
+OPS/EVIDENCE/*.json    - Evidence collection
+STATE_FOR_GPT*.md      - State snapshots
+```
+
+**⚠️ Requires Explicit Approval (CLOUD_OPS_HIGH)**:
+```
+.github/workflows/*.yml           - CI/CD pipelines
+cloud-run/**/*.js                - Service code
+gpt_agent/*.py                   - Agent implementations
+*.py (application code)          - Scripts
+*.json (config files)            - Configurations
+CAPABILITIES_MATRIX.md (major)   - Structural changes only
+```
+
+**🔄 Recommended Workflow**:
+1. **For Documentation**: Create/update directly via Agent Mode
+2. **For Code Changes**: Create plan document → Get approval → Execute via PR or direct commit
+3. **For Infrastructure**: Create detailed plan → Get approval → Execute with rollback plan
+
+**📚 Reference Guide**: See `DOCS/GPT_ACCESS_GUIDE_SIMPLE.md` for complete instructions
+
+**🚫 Alternative Mechanisms (Not Currently Active)**:
+- GPT Tasks Executor (`.github/workflows/gpt_tasks_executor.yml`) - Status: Broken runtime
+- Cloud Run API (`github-executor-api`) - Status: Deployment unverified
+- **Decision**: Use Agent Mode exclusively until alternatives are debugged/verified
+
+**Notes**:
+- This is the **simplest and most reliable** path for GPT-CEO
+- No API setup required - works out of the box
+- Clear separation: OS_SAFE (no approval) vs CLOUD_OPS_HIGH (requires approval)
+- All operations are logged via Git commits (full audit trail)
+
+---
 
 ### 1.2 GitHub Actions Integration
 
@@ -412,6 +468,15 @@ This is **ONE service**, not two separate services as previously documented.
 
 ## 📝 Update Log
 
+### 2025-11-18 (v1.3.1) - GPT Agent Mode Clarification
+- **Added Section 1.1.1**: Dedicated section for GPT Agent Mode capabilities
+- **Clarified primary path**: Agent Mode is GPT-CEO's primary repository access method
+- **Documented scope boundaries**: OS_SAFE vs CLOUD_OPS_HIGH operations
+- **Added file path examples**: Clear allowed/forbidden lists
+- **Linked to guide**: Reference to DOCS/GPT_ACCESS_GUIDE_SIMPLE.md
+- **Evidence added**: Commit f6da151 (guide creation)
+- **Alternative mechanisms**: Marked Tasks Executor and Cloud Run API as inactive
+
 ### 2025-11-18 (v1.3.0) - מנה R6: Role Fields Addition ⭐ MAJOR UPDATE
 - **Added 3 new columns** to all major capability tables:
   1. `Claude at Runtime?` - Clarifies Claude's involvement during execution
@@ -473,6 +538,7 @@ When a capability changes:
 - GPT-CEO Ready: Yes
 - Approval: No (docs), Yes (code/workflows)
 - Evidence (branch main):  
+  - commit f6da151 – DOCS/GPT_ACCESS_GUIDE_SIMPLE.md (guide creation)
   - commit 1c64fd5 – DOCS/GPT_EXECUTOR_TEST.md  
   - commit 81cba22 – DOCS/STATE_FOR_GPT_SNAPSHOT.md  
   - commit 52e5e39 – STATE_FOR_GPT.md reference update  
