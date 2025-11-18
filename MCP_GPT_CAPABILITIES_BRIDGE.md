@@ -16,390 +16,283 @@
 
 ---
 
-## 🆕 Gmail Send - CLOUD_OPS_HIGH Pilot (2025-11-17)
+## 🆕 THREE Pilots Complete (2025-11-17)
 
-**מה חדש**:
+Claude בנה **3 פיילוטים מלאים** המוכיחים את הtemplate האוניברסלי:
 
-Claude בנה **פיילוט מלא** ל-Gmail Send - הדוגמה הראשונה ל-CLOUD_OPS_HIGH:
+### 1. Gmail Drafts (OS_SAFE, Gmail)
+- **קישור**: [`DOCS/PILOT_GMAIL_DRAFTS_FLOW.md`](DOCS/PILOT_GMAIL_DRAFTS_FLOW.md) (22KB)
+- **Risk**: OS_SAFE (draft not sent, reversible)
+- **Approval**: Conversational ("Create draft")
+- **Use Case**: Draft emails without sending
 
-### 📧 PILOT_GMAIL_SEND_FLOW.md
+### 2. Gmail Send (CLOUD_OPS_HIGH, Gmail)
+- **קישור**: [`DOCS/PILOT_GMAIL_SEND_FLOW.md`](DOCS/PILOT_GMAIL_SEND_FLOW.md) (46KB)
+- **Risk**: CLOUD_OPS_HIGH (irreversible, external impact)
+- **Approval**: Explicit phrase ("מאשר שליחה") + 60min TTL
+- **Use Case**: Send emails with heavy safeguards
 
-**קישור**: [`DOCS/PILOT_GMAIL_SEND_FLOW.md`](DOCS/PILOT_GMAIL_SEND_FLOW.md) (46KB)
+### 3. Drive Create Strategy Doc (OS_SAFE, Drive) ⭐ NEW
+- **קישור**: [`DOCS/PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md`](DOCS/PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md) (43KB)
+- **Risk**: OS_SAFE (private doc, reversible)
+- **Approval**: Outline review (conversational)
+- **Use Case**: Create strategic documents in Drive
 
-**מה זה**:
-- Complete playbook לשליחת מיילים עם אישור מפורש
-- **Risk: CLOUD_OPS_HIGH** (irreversible, external impact)
-- כל 5 הsafeguards ב-full strength (heavy enforcement)
-- 19 צעדים (כולל approval gate מלא)
-- 8 test cases (כולל בדיקות safeguards)
-
-**למה זה שונה מ-Gmail Drafts**:
-- **Drafts = OS_SAFE** (no external impact, reversible)
-- **Send = CLOUD_OPS_HIGH** (cannot unsend, recipient receives)
-- Approval: "מאשר שליחה" (explicit phrase + 60min TTL)
-- Rate limit: 10/hour (hard block, mandatory)
-- Logging: Detailed (includes approval details + rate state)
+**Key insight**: Template works across **domains** (Gmail, Drive) and **risk levels** (OS_SAFE, CLOUD_OPS_HIGH)
 
 ---
 
-## 🎯 Gmail Send - Use Case Recognition
+## 🎯 Drive Create Strategy Doc - Use Case Recognition
 
-**כשהמשתמש מבקש**: "Send email to X"
+**כשהמשתמש מבקש**: "Create strategy doc for X"
 
 **GPT צריך**:
 
-### 1. זיהוי Use Case + Risk Check
+### 1. זיהוי Use Case + Domain
 ```
-Request: "Send email to customer@example.com"
+Request: "Create strategy doc for Q1 planning"
 
 GPT recognizes:
-→ Use Case: Gmail Send
-→ Risk: CLOUD_OPS_HIGH (irreversible, external impact)
-→ Agent: Claude (R) for single sends
+→ Use Case: Drive Create Strategy Doc
+→ Domain: Drive + Docs (not Gmail)
+→ Risk: OS_SAFE (private doc, no external sharing)
+→ Agent: Claude (R) for single strategic docs
 → Phase: Check MATRIX status
 ```
 
 ### 2. בדיקת MATRIX
 ```
-Check: CAPABILITIES_MATRIX Section 3.1 Gmail
-→ "Send email" capability
-→ Status: PILOT_DESIGNED (before G2.3) or VERIFIED (after G2.3)
-→ Risk: CLOUD_OPS_HIGH
-→ Safeguards: ALL 5 layers (heavy)
+Check: CAPABILITIES_MATRIX Section 3.2 Drive
+→ "Create strategy doc" capability
+→ Status: PILOT_DESIGNED (before G2.4) or VERIFIED (after G2.4)
+→ Risk: OS_SAFE
+→ Safeguards: 5 layers (light)
 ```
 
 ### 3. בדיקת RACI
 ```
-Check: GOOGLE_AGENTS_RACI.md Section 1.3
-→ Single contextual send = Claude (R)
-→ Bulk/campaign sends = GPTs GO (R)
+Check: GOOGLE_AGENTS_RACI.md Section 2.2
+→ Single strategic doc = Claude (R)
+→ Bulk doc generation = GPTs GO (R)
 
 If single/contextual:
 → Claude is Responsible
 → Proceed
 
-If bulk (>10 emails):
+If bulk (>20 docs):
 → GPTs GO is Responsible
 → Delegate or consult
 ```
 
 ### 4. הפעלת Flow
 ```
-If Status = VERIFIED (after G2.3):
-→ Follow PILOT_GMAIL_SEND_FLOW.md
-→ Intent → Plan → Context → Draft → Preview
-→ **Approval Gate** (CLOUD_OPS_HIGH):
-    - Check rate limit (< 10/hour?)
-    - Request: "מאשר שליחה"
-    - Verify: exact phrase + within 60min TTL
-    - Send → Log (detailed) → Report
+If Status = VERIFIED (after G2.4):
+→ Follow PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md
+→ Gather context (repos, emails, meetings, files, web)
+→ Synthesize (key themes, decisions, data)
+→ Propose outline (structure + sections + sources)
+→ Present to Or (full structure)
+→ **Outline Approval** (OS_SAFE, conversational):
+    - Or reviews structure
+    - Or approves: "Looks good" / "Create it" (any positive)
+    - No exact phrase, no TTL
+→ Create doc in dedicated folder
+→ Populate sections (content + formatting)
+→ Log (standard) → Share link with Or
 
-If Status = PILOT_DESIGNED (before G2.3):
-→ Claude: "Gmail Send is designed but not operational.
+If Status = PILOT_DESIGNED (before G2.4):
+→ Claude: "Drive Create Doc is designed but not operational.
            Current status: PILOT_DESIGNED
            
-           To make this work, need Phase G2.3:
-           - Expand OAuth scope (add gmail.send)
-           - Configure rate limiting
+           To make this work, need Phase G2.4:
+           - Expand OAuth scope (drive.file + docs.file)
+           - Set up dedicated folder
            - Test and verify
            
-           For now, I can create a draft instead.
-           Would you like to save as draft?"
-→ Offer draft alternative (OS_SAFE)
+           For now, I can create outline in markdown file.
+           Would you like to proceed with G2.4 setup?"
+→ Offer local text file alternative
 ```
 
 ---
 
-## 🔐 CLOUD_OPS_HIGH - What It Means
+## 📊 Three Pilots - Complete Comparison
 
-**Definition**:
-> Operations with **high external impact** and **irreversibility** - cannot be undone, affects others
+**Template universality proven**:
 
-**Examples**:
-- ✅ Send email (Gmail Send) - recipient receives, cannot unsend
-- ✅ Share file externally (Drive) - others gain access
-- ✅ Delete event with attendees (Calendar) - notifies everyone
-- ✅ Permanent delete (any service) - cannot recover
+| Aspect | Gmail Drafts | Gmail Send | Drive Create Doc |
+|--------|--------------|------------|------------------|
+| **Domain** | Gmail | Gmail | Drive + Docs |
+| **Risk** | OS_SAFE | CLOUD_OPS_HIGH | OS_SAFE |
+| **External impact** | None | High | None |
+| **Reversibility** | Full | None | Full |
+| **Approval** | Conversational | "מאשר שליחה" + TTL | Outline review |
+| **Approval style** | Casual | Strict | Conversational |
+| **TTL** | None | 60 minutes | None |
+| **Rate limit** | 50/h (optional) | 10/h (hard) | 20/h (optional) |
+| **Logging** | Standard | Detailed | Standard |
+| **Scope** | gmail.compose | gmail.send | drive.file + docs.file |
+| **Policy blocks** | No send | No forward/BCC/bulk | No share/delete existing |
+| **Test cases** | 5 | 8 | 8 |
+| **Phase** | G2.2 | G2.3 | G2.4 |
+| **Playbook size** | 22KB | 46KB | 43KB |
 
-**Comparison with other risk levels**:
+**Pattern**:
+- **OS_SAFE** (Drafts, Drive Doc): Light safeguards, conversational, no TTL
+- **CLOUD_OPS_HIGH** (Send): Heavy safeguards, explicit approval, TTL
 
-| Risk Level | External Impact | Reversibility | Approval | Rate Limit | Example |
-|-----------|-----------------|---------------|----------|------------|---------|
-| **OS_SAFE** | None | Full | Content review | Optional | Gmail Drafts |
-| **CLOUD_OPS_MEDIUM** | Low-Medium | Partial (24h) | Or notification | Recommended | Edit shared doc |
-| **CLOUD_OPS_HIGH** | High | None | Explicit phrase + TTL | Mandatory | Gmail Send |
+**Domains**:
+- **Gmail** (Drafts, Send): Communication domain
+- **Drive** (Create Doc): Documentation domain
 
----
-
-## 🛡️ CLOUD_OPS_HIGH Safeguards (Heavy)
-
-**All 5 layers - MANDATORY and STRICT**:
-
-### Layer 1: Approval Gate (STRICT)
-```
-Type: Explicit phrase + TTL
-Phrase: "מאשר שליחה" (must be exact)
-TTL: 60 minutes from preview
-Process:
-1. Claude shows FULL preview (every word)
-2. Or reviews thoroughly
-3. Or types exact phrase: "מאשר שליחה"
-4. Claude verifies: phrase + TTL + rate limit
-5. Claude sends immediately after verification
-
-Why strict:
-- Cannot unsend → Must prevent wrong sends
-- Explicit phrase → No accidental approvals
-- TTL → No stale approvals (context changes)
-```
-
-### Layer 2: Rate Limiting (HARD BLOCK)
-```
-Limit: 10 sends per 60-minute rolling window
-Tracking: OPS/STATE/gmail-send-rate.json
-Enforcement: Hard block at 10 (cannot send more)
-Alert: Warning at 8 sends (80%)
-Override: Separate approval phrase required
-
-Why mandatory:
-- Prevents runaway sending
-- Protects reputation
-- Forces deliberate pace
-```
-
-### Layer 3: Logging (DETAILED)
-```
-Location: OPS/LOGS/google-operations.jsonl
-Format: JSON (~1000 bytes per send)
-Content:
-- Full metadata (timestamp, actor, status)
-- Recipients (to, cc, bcc)
-- Subject + body preview (100 chars)
-- **Approval details** (phrase, who, when, TTL)
-- **Rate limit state** (before/after counts)
-- Context gathered (threads, docs, meetings)
-- Delivery status
-
-Why detailed:
-- Forensics (if email causes issue)
-- Compliance (audit trail)
-- Anomaly detection (spot patterns)
-- Learning (how capability used)
-```
-
-### Layer 4: Scope Limitation
-```
-Scope: gmail.send ONLY
-Cannot:
-- Modify settings (gmail.settings.*)
-- Create filters/forwarding
-- Access admin APIs
-
-Why minimal:
-- Least privilege principle
-- Reduces attack surface
-```
-
-### Layer 5: Policy Blocks (TECHNICAL)
-```
-Blocked operations (cannot bypass):
-1. Auto-forwarding rules (data exfiltration)
-2. BCC hijacking (all BCC must be approved)
-3. Bulk sending (>10/hour blocked)
-4. Scheduled sends (separate automation)
-5. Settings modification (use Gmail directly)
-6. Sending without approval (mandatory gate)
-
-Enforcement: MCP server + Claude logic + API scopes
-Prompt injection proof: Technical blocks
-```
+**Template works** for both!
 
 ---
 
-## 📋 Comparison: Drafts vs Send (Critical Differences)
+## 🎯 Drive Create Doc Flow Pattern (הנחיות ל-GPTs)
 
-**For GPTs to understand the paradigm shift**:
+**כשרואים request ליצירת מסמך**:
 
-| Aspect | Gmail Drafts (OS_SAFE) | Gmail Send (CLOUD_OPS_HIGH) |
-|--------|------------------------|----------------------------|
-| **Phase** | G2.2 (base OAuth) | G2.3 (scope expansion) |
-| **Risk** | OS_SAFE | CLOUD_OPS_HIGH |
-| **Scope** | gmail.compose | gmail.send |
-| **External impact** | None (draft private) | High (recipient receives) |
-| **Reversibility** | Full (delete draft) | None (cannot unsend) |
-| **Approval** | "Create draft" (casual) | "מאשר שליחה" (formal + TTL) |
-| **TTL** | None | 60 minutes |
-| **Rate limit** | 50/hour (optional) | 10/hour (hard block) |
-| **Rate enforcement** | Soft (warning) | Hard (blocks at 10) |
-| **Logging** | Standard (~500 bytes) | Detailed (~1000 bytes) |
-| **Policy blocks** | No send from draft | No forward/BCC/bulk/schedule |
-| **Test cases** | 5 | 8 (includes safeguard tests) |
-| **Steps** | 14 | 19 (+ approval gate) |
-
-**Key insight**: This is NOT just "more safeguards" - it's a **completely different approval model**
-
----
-
-## 🎯 Gmail Send Flow Pattern (הנחיות ל-GPTs)
-
-**כשרואים request לשליחת מייל**:
-
-### Phase 1: Intent Recognition + Risk Assessment
+### Phase 1: Intent Recognition + Domain Check
 ```
 User says:
-"Send email to sarah@example.com about project delay"
+"Create strategy doc for Q1 planning"
 
 GPT recognizes:
-→ Use Case: Gmail Send
-→ Risk: CLOUD_OPS_HIGH (external impact, irreversible)
-→ Agent: Claude (R) for single contextual send
+→ Use Case: Drive Create Strategy Doc
+→ Domain: Drive + Docs (not Gmail)
+→ Risk: OS_SAFE (private, reversible)
+→ Agent: Claude (R) for single docs
 → Phase: Check MATRIX status
-→ Safeguards: ALL 5 layers mandatory
+→ Safeguards: 5 layers (light)
 ```
 
-### Phase 2: Route to Claude with Risk Warning
+### Phase 2: Route to Claude
 ```
 GPT → Claude:
-"User wants to send email to sarah@example.com.
-
-CRITICAL: This is CLOUD_OPS_HIGH operation.
+"User wants to create strategy doc for Q1 planning.
 
 Per CAPABILITIES_MATRIX:
-- Gmail Send: PILOT_DESIGNED (or VERIFIED)
-- Risk: CLOUD_OPS_HIGH (irreversible)
-- Playbook: PILOT_GMAIL_SEND_FLOW.md
+- Drive Create Doc: PILOT_DESIGNED (or VERIFIED)
+- Risk: OS_SAFE (private document)
+- Playbook: PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md
 
 Per GOOGLE_AGENTS_RACI.md:
-- Single contextual send: Claude (R)
+- Single strategic doc: Claude (R)
 
-Safeguards required:
-1. Full preview (every word)
-2. Explicit approval: 'מאשר שליחה'
-3. Rate limit check (< 10/hour)
-4. TTL: 60 minutes
-5. Detailed logging
+Safeguards (OS_SAFE level):
+1. Outline review (conversational approval)
+2. Rate limit: 20 docs/hour (soft, optional)
+3. Logging: Standard to OPS/LOGS/
+4. Private only (no external sharing)
+5. Dedicated folder only
 
-Please execute Gmail Send flow if operational,
-or offer draft alternative if not ready."
+Please execute Drive Create Doc flow if operational,
+or offer text file alternative if not ready."
 ```
 
-### Phase 3: Claude Executes with Full Safeguards
+### Phase 3: Claude Executes with Light Safeguards
 ```
-Claude follows PILOT_GMAIL_SEND_FLOW.md:
+Claude follows PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md:
 1. Check MATRIX (status: PILOT_DESIGNED or VERIFIED)
 2. If PILOT_DESIGNED:
-   → Offer draft alternative (OS_SAFE)
-   → Explain what's needed for G2.3
+   → Offer text file alternative (local markdown)
+   → Explain what's needed for G2.4
 3. If VERIFIED:
    → Check RACI (confirm Claude R)
-   → Gather context (threads, docs, calendar, local, web)
-   → Draft email
-   → Present FULL preview to Or
-   → Check rate limit (< 10/hour?)
-   → Request approval: "מאשר שליחה"
-   → Or provides phrase
-   → Verify: exact phrase + within TTL + rate OK
-   → Send via MCP (gmail.send)
-   → Log (detailed) to OPS/LOGS/
-   → Report: "✅ Sent, Message ID: m-123"
+   → Gather context:
+       - GitHub repos (commits, issues, PRs, docs)
+       - Gmail threads (discussions, decisions)
+       - Calendar (meetings, planning sessions)
+       - Local files (notes, drafts)
+       - Web research (trends, best practices)
+   → Synthesize context (themes, decisions, data)
+   → Propose outline (structure + sections + sources)
+   → Present to Or (full structure)
+   → Or reviews & approves: "Looks good" (conversational)
+   → Create doc in dedicated folder
+   → Populate sections (content + formatting)
+   → Log (standard) to OPS/LOGS/
+   → Share link: "✅ Created, Doc ID: doc-123"
 ```
 
 ### Phase 4: GPT Tracks Outcome
 ```
 GPT observes:
-→ Email sent successfully
-→ Logged to OPS/LOGS/ (detailed)
-→ Rate limit updated (X+1 of 10)
-→ Or received confirmation
+→ Document created successfully
+→ Logged to OPS/LOGS/ (standard)
+→ Or received link
+→ Document in dedicated folder
 
 GPT can now:
-→ Track pattern (how often this happens)
-→ Suggest improvements (if repetitive)
-→ Monitor rate limit usage
-→ Alert if approaching limit (8-9 sends)
+→ Track docs created (how many, what topics)
+→ Suggest edits (if Or wants changes)
+→ Monitor folder organization
 ```
 
 ---
 
-## ⚠️ Critical: Before Suggesting Gmail Send
+## ⚠️ Critical: Drive Create Doc vs Gmail Send
 
-**GPTs MUST check these before suggesting send**:
+**GPTs must understand the key differences**:
 
-### 1. Is capability operational?
-```
-Check CAPABILITIES_MATRIX:
-- Gmail Send status: PILOT_DESIGNED or VERIFIED?
-- If PILOT_DESIGNED:
-    → NOT operational yet
-    → Suggest draft alternative
-    → Explain G2.3 needed
-- If VERIFIED:
-    → Operational
-    → Proceed with safeguards
-```
+### Approval Style
+| Aspect | Gmail Send (HIGH) | Drive Create Doc (SAFE) |
+|--------|-------------------|------------------------|
+| **Phrase** | "מאשר שליחה" (exact) | "Looks good" (any positive) |
+| **TTL** | 60 minutes | None (no expiry) |
+| **Strictness** | Rigid (must match) | Flexible (conversational) |
+| **Why** | Irreversible send | Reversible document |
 
-### 2. Is this single or bulk?
-```
-Check RACI:
-- Single send (1-3 recipients, contextual) → Claude (R)
-- Bulk send (>10 recipients, templated) → GPTs GO (R)
+### Safeguard Weight
+| Layer | Gmail Send (HIGH) | Drive Create Doc (SAFE) |
+|-------|-------------------|------------------------|
+| 1. Approval | Explicit + TTL | Conversational |
+| 2. Rate Limit | 10/h (hard block) | 20/h (soft, optional) |
+| 3. Logging | Detailed (~1000B) | Standard (~500B) |
+| 4. Scope | gmail.send only | drive.file + docs.file |
+| 5. Policy Blocks | No forward/BCC/bulk | No share/delete existing |
 
-If bulk:
-→ Delegate to GPTs GO
-→ DO NOT use Claude's Gmail Send (rate limit 10/hour)
-```
-
-### 3. Does Or understand risk?
-```
-Before suggesting send:
-"⚠️ Gmail Send is CLOUD_OPS_HIGH:
-- Email will be sent (cannot unsend)
-- Requires explicit approval: 'מאשר שליחה'
-- Rate limit: X of 10 used this hour
-- Full logging to OPS/LOGS/
-
-Ready to proceed?"
-```
-
-### 4. Is there a draft alternative?
-```
-Always offer draft option:
-"Would you like to:
-1. Send email now (CLOUD_OPS_HIGH, requires approval)
-2. Create draft first (OS_SAFE, review before sending)
-
-Recommendation: Draft first for review"
-```
+**Key insight**: Same 5 layers, different weights based on risk
 
 ---
 
-## 📐 Risk Decision Tree (Updated with Send)
+## 📐 Risk Decision Tree (Complete)
 
-**מהtemplate, מורחב עם Gmail Send**:
+**מהtemplate, כולל Gmail וDrive**:
 
 ```
-Gmail operation requested:
+Operation requested:
 
-1. What's the operation?
-   ├─ Read (search, list, get) → OS_SAFE
-   ├─ Create draft → OS_SAFE
-   ├─ Label/organize → CLOUD_OPS_MEDIUM
-   └─ **Send email** → **CLOUD_OPS_HIGH** ← WE ARE HERE
+1. Which domain?
+   ├─ Gmail → Continue to Gmail decision tree
+   └─ Drive → Continue to Drive decision tree
 
-2. If Send:
-   - External impact? YES (recipient receives)
-   - Reversible? NO (cannot unsend)
-   - Affects others? YES (recipient, CC, BCC)
-   → CLOUD_OPS_HIGH
+Gmail operations:
+├─ Read/search → OS_SAFE
+├─ Create draft → OS_SAFE
+├─ Label/organize → CLOUD_OPS_MEDIUM
+└─ Send email → CLOUD_OPS_HIGH
 
-3. CLOUD_OPS_HIGH requirements:
-   ✓ Explicit approval phrase
-   ✓ 60-minute TTL
-   ✓ Hard rate limit (10/hour)
-   ✓ Detailed logging
-   ✓ Policy blocks enforced
-   ✓ Full preview mandatory
-   ✓ RACI check (single or bulk?)
+Drive operations:
+├─ Read/search → OS_SAFE
+├─ Create private doc → OS_SAFE ← NEW
+├─ Edit shared doc → CLOUD_OPS_MEDIUM
+└─ Share externally → CLOUD_OPS_HIGH
+
+2. If OS_SAFE:
+   - External impact? NO
+   - Reversible? YES
+   - Approval: Conversational
+   - Rate limit: Optional
+   - Logging: Standard
+
+3. If CLOUD_OPS_HIGH:
+   - External impact? YES
+   - Reversible? NO
+   - Approval: Explicit phrase + TTL
+   - Rate limit: Mandatory (hard)
+   - Logging: Detailed
 ```
 
 ---
@@ -407,108 +300,109 @@ Gmail operation requested:
 ## 🔄 Phase Tracking (עדכון)
 
 ### Phase G1 ✅ (Complete 2025-11-17):
-- Autonomy model
-- RACI matrix
-- Scopes analysis
+- Autonomy model, RACI, Scopes
 
 ### Phase G2.1 ✅ (Complete 2025-11-17):
-- OAuth architecture
-- Safeguards framework
-- Workflow skeletons
+- OAuth architecture, Safeguards
 
 ### Phase G2.1-Pilot ✅ (Complete 2025-11-17):
-- **Gmail Drafts** (OS_SAFE) - complete
-- **AUTOMATION_PLAYBOOK_TEMPLATE** - universal
-- **Gmail Send** (CLOUD_OPS_HIGH) - complete ⭐ NEW
+- **Gmail Drafts** (OS_SAFE, Gmail)
+- **AUTOMATION_PLAYBOOK_TEMPLATE** (Universal)
+- **Gmail Send** (CLOUD_OPS_HIGH, Gmail)
+- **Drive Create Doc** (OS_SAFE, Drive) ⭐ NEW
 
 ### Phase G2.2 ⏳ (Next):
-- Execute base OAuth (gmail.compose)
+- Base OAuth (gmail.compose)
 - Test Gmail Drafts
-- Status: PILOT_DESIGNED → VERIFIED
 
 ### Phase G2.3 ⏳ (Future):
-- Expand OAuth (add gmail.send)
-- Test Gmail Send (8 test cases)
-- Status: PILOT_DESIGNED → VERIFIED
+- Expand OAuth (gmail.send)
+- Test Gmail Send
+
+### Phase G2.4 ⏳ (Future):
+- Expand OAuth (drive.file + docs.file)
+- Test Drive Create Doc
 
 ---
 
 ## Critical Reminders for GPTs (עדכון)
 
-### 1. Gmail Send = CLOUD_OPS_HIGH
+### 1. Three Pilots = Three Patterns
 ```
-✅ "Gmail Send is CLOUD_OPS_HIGH - highest risk level"
-✅ "Requires explicit approval phrase + TTL"
-✅ "Rate limited to 10/hour (hard block)"
-✅ "Cannot unsend - prevention critical"
-```
-
-### 2. Always Check Operational Status
-```
-Before suggesting send:
-1. Check CAPABILITIES_MATRIX (PILOT_DESIGNED or VERIFIED?)
-2. If PILOT_DESIGNED → Offer draft alternative
-3. If VERIFIED → Proceed with full safeguards
-4. Never promise send before checking status
+✅ "Gmail Drafts = OS_SAFE, Gmail domain"
+✅ "Gmail Send = CLOUD_OPS_HIGH, Gmail domain"
+✅ "Drive Create Doc = OS_SAFE, Drive domain"
 ```
 
-### 3. Offer Draft Alternative
+### 2. Domain Matters
 ```
-ALWAYS present draft option:
-"Would you like to:
-1. Send now (CLOUD_OPS_HIGH, explicit approval required)
-2. Create draft (OS_SAFE, review before sending)
+Gmail use cases:
+- Drafts, Send, Search, Organize
+- Domain: Communication
 
-Draft recommended for non-urgent sends."
-```
+Drive use cases:
+- Create Doc, Edit, Share, Search
+- Domain: Documentation
 
-### 4. Check RACI Before Routing
-```
-Single contextual send → Claude (R)
-Bulk/campaign send → GPTs GO (R)
-
-If >10 recipients or templated:
-→ DO NOT route to Claude (rate limit)
-→ Route to GPTs GO instead
+Same template, different domains ✓
 ```
 
-### 5. Warn About Rate Limit
+### 3. Risk Determines Safeguards
 ```
-Before suggesting send:
-"Rate limit status: X of 10 sends used this hour"
+OS_SAFE (Drafts, Drive Create):
+- Light approval (conversational)
+- Optional rate limits
+- Standard logging
 
-If 8-9 sends:
-"⚠️ Approaching rate limit (X of 10).
- Consider spacing out sends or using draft."
+CLOUD_OPS_HIGH (Gmail Send):
+- Strict approval (exact phrase + TTL)
+- Mandatory rate limits (hard)
+- Detailed logging
+```
 
-If 10 sends:
-"❌ Rate limit reached (10/hour).
- Wait Y minutes or use draft instead."
+### 4. Always Check MATRIX First
+```
+Before suggesting ANY automation:
+1. Check CAPABILITIES_MATRIX (exists?)
+2. Check status (PILOT_DESIGNED or VERIFIED?)
+3. Check playbook (reference link)
+4. Only then suggest execution
+```
+
+### 5. Offer Alternatives
+```
+If PILOT_DESIGNED:
+- Gmail Send → Offer Gmail Drafts (OS_SAFE)
+- Drive Create → Offer local text file
+
+Never promise execution before checking status
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17 (Gmail Send CLOUD_OPS_HIGH Pilot Complete)**:
-- ✅ PILOT_GMAIL_SEND_FLOW.md created (46KB)
-- ✅ Complete CLOUD_OPS_HIGH playbook
-- ✅ All 5 safeguards (heavy enforcement)
-- ✅ 19-step flow (includes approval gate)
-- ✅ 8 test cases (safeguard validation)
-- ✅ CAPABILITIES_MATRIX updated (Gmail Send row)
+**2025-11-17 (THREE Pilots Complete)**:
+- ✅ PILOT_GMAIL_DRAFTS_FLOW.md (22KB, OS_SAFE, Gmail)
+- ✅ PILOT_GMAIL_SEND_FLOW.md (46KB, CLOUD_OPS_HIGH, Gmail)
+- ✅ PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md (43KB, OS_SAFE, Drive) ⭐ NEW
+- ✅ AUTOMATION_PLAYBOOK_TEMPLATE (43.7KB, Universal)
+- ✅ CAPABILITIES_MATRIX updated (all 3 pilots)
 - ✅ MCP_GPT_CAPABILITIES_BRIDGE updated (this file)
 
 **Total Documentation**:
-- Google MCP Base: 126KB (G1 + G2.1 + Gmail Drafts)
-- Gmail Send: 46KB (CLOUD_OPS_HIGH pilot)
-- Universal Template: 43.7KB
-- **Grand Total: 215.7KB** של תיעוד OS_SAFE
+- Gmail pilots: 68KB (Drafts 22KB + Send 46KB)
+- Drive pilot: 43KB (Create Doc)
+- Universal template: 43.7KB
+- Architecture: 103.7KB (G1 + G2.1)
+- **Grand Total: 258.4KB** של תיעוד OS_SAFE
 
-**Next**: Or approves Gmail Send design → G2.3 execution (future)
+**Proven**: Template works for multiple domains (Gmail, Drive) and risk levels (OS_SAFE, CLOUD_OPS_HIGH)
+
+**Next**: Or approves designs → Execution phases (G2.2, G2.3, G2.4)
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17 (Gmail Send CLOUD_OPS_HIGH added)  
-**גרסה**: 2.3 (CLOUD_OPS_HIGH template added)
+**עדכון אחרון**: 2025-11-17 (Drive Create Doc added)  
+**גרסה**: 2.4 (multi-domain template proven)
