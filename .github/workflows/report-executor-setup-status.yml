@@ -1,0 +1,53 @@
+name: Report Executor Setup Status
+
+on:
+  push:
+    paths:
+      - '.github/workflows/report-executor-setup-status.yml'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Check recent workflow runs
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "## Workflow Status Report" > WORKFLOW_STATUS.md
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> WORKFLOW_STATUS.md
+          echo "" >> WORKFLOW_STATUS.md
+          
+          # Check if setup-github-executor-complete.yml ran
+          echo "### setup-github-executor-complete.yml" >> WORKFLOW_STATUS.md
+          gh run list --workflow=setup-github-executor-complete.yml --limit 3 --json databaseId,status,conclusion,createdAt,headBranch >> WORKFLOW_STATUS.md || echo "No runs found" >> WORKFLOW_STATUS.md
+          
+          echo "" >> WORKFLOW_STATUS.md
+          
+          # Check if trigger-executor-setup.yml ran
+          echo "### trigger-executor-setup.yml" >> WORKFLOW_STATUS.md
+          gh run list --workflow=trigger-executor-setup.yml --limit 3 --json databaseId,status,conclusion,createdAt,headBranch >> WORKFLOW_STATUS.md || echo "No runs found" >> WORKFLOW_STATUS.md
+          
+          echo "" >> WORKFLOW_STATUS.md
+          echo "### GH_EX Secret Status" >> WORKFLOW_STATUS.md
+          if [ -n "${{ secrets.GH_EX }}" ]; then
+            echo "✅ GH_EX exists (length: ${#GH_EX})" >> WORKFLOW_STATUS.md
+          else
+            echo "❌ GH_EX not found" >> WORKFLOW_STATUS.md
+          fi
+      
+      - name: Commit status report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add WORKFLOW_STATUS.md
+          git commit -m "📊 Update workflow status report" || echo "No changes"
+          git push || echo "Nothing to push"
