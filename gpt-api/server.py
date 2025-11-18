@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
 import subprocess
 import os
+import sys
 import json
 from datetime import datetime
 import base64
+from token_automation import TokenAutomation, TokenScheduler
 
 app = Flask(__name__)
 
@@ -512,6 +514,304 @@ def ops_status():
         return jsonify({"error": str(e)}), 500
 
 # ============================================
+# TOKEN AUTOMATION
+# ============================================
+
+# Initialize token automation
+sys.path.append(os.path.join(REPO_PATH, 'gpt-api', 'token-automation'))
+try:
+    from token_automation import TokenAutomation
+    token_auto = TokenAutomation(os.path.join(REPO_PATH, 'gpt-api', 'token-automation', 'token_config.json'))
+except Exception as e:
+    print(f"Warning: Could not load token automation: {e}")
+    token_auto = None
+
+@app.route('/tokens/auto-generate', methods=['POST'])
+def auto_generate_token():
+    """Generate a new token"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    data = request.json
+    token_type = data.get('type', 'api_key')
+    length = data.get('length', 32)
+    prefix = data.get('prefix', '')
+    include_special = data.get('include_special', True)
+    
+    try:
+        token = token_auto.generate_token(token_type, length, prefix, include_special)
+        return jsonify({
+            "success": True,
+            "token_type": token_type,
+            "token": token,
+            "length": len(token),
+            "created_at": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/rotate', methods=['POST'])
+def rotate_token_endpoint():
+    """Rotate a specific token"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    data = request.json
+    token_name = data.get('token_name')
+    new_token = data.get('new_token')  # Optional: provide specific token
+    
+    try:
+        result = token_auto.rotate_token(token_name, new_token)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/setup-rotation', methods=['POST'])
+def setup_rotation():
+    """Setup automatic rotation rule"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    data = request.json
+    token_name = data.get('token_name')
+    interval_hours = data.get('interval_hours', 24)
+    auto_rotate = data.get('auto_rotate', True)
+    notify = data.get('notify', True)
+    
+    try:
+        token_auto.setup_rotation_rule(token_name, interval_hours, auto_rotate, notify)
+        return jsonify({
+            "success": True,
+            "token_name": token_name,
+            "interval_hours": interval_hours,
+            "auto_rotate": auto_rotate
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/workflow/create', methods=['POST'])
+def create_workflow():
+    """Create token rotation workflow"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    data = request.json
+    workflow_name = data.get('workflow_name')
+    tokens = data.get('tokens', [])
+    schedule_cron = data.get('schedule', '0 0 * * *')  # Daily at midnight
+    
+    try:
+        token_auto.create_rotation_workflow(workflow_name, tokens, schedule_cron)
+        return jsonify({
+            "success": True,
+            "workflow_name": workflow_name,
+            "tokens": tokens
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/workflow/run', methods=['POST'])
+def run_workflow_endpoint():
+    """Run a specific workflow"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    data = request.json
+    workflow_name = data.get('workflow_name')
+    
+    try:
+        result = token_auto.run_workflow(workflow_name)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/health', methods=['GET'])
+def token_health():
+    """Get token health analysis"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    try:
+        health = token_auto.analyze_token_health()
+        return jsonify(health)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/suggest', methods=['GET'])
+def suggest_rotations():
+    """Get rotation suggestions"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    try:
+        suggestions = token_auto.suggest_rotations()
+        return jsonify({"suggestions": suggestions})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/status', methods=['GET'])
+def token_status():
+    """Get complete token automation status"""
+    if not token_auto:
+        return jsonify({"error": "Token automation not available"}), 500
+    
+    try:
+        status = token_auto.get_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
+# TOKEN AUTOMATION ENDPOINTS
+# ============================================
+
+# Initialize token automation
+token_automation = TokenAutomation(REPO_PATH)
+token_scheduler = TokenScheduler(token_automation)
+
+@app.route('/tokens/generate', methods=['POST'])
+def generate_token():
+    """Generate new token"""
+    data = request.json
+    service = data.get('service')
+    token_type = data.get('type', 'api_key')
+    
+    try:
+        if token_type == 'api_key':
+            result = token_automation.generate_api_key(
+                service,
+                prefix=data.get('prefix', ''),
+                length=data.get('length', 64),
+                charset=data.get('charset', 'alphanumeric')
+            )
+        elif token_type == 'github':
+            result = token_automation.generate_github_token_format(service)
+        elif token_type == 'oauth':
+            result = token_automation.generate_oauth_token(service, data.get('scopes'))
+        elif token_type == 'jwt':
+            result = token_automation.generate_jwt_secret(service, data.get('length', 64))
+        else:
+            return jsonify({"error": "Invalid token type"}), 400
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/rotate', methods=['POST'])
+def rotate_token_endpoint():
+    """Rotate token"""
+    data = request.json
+    service = data.get('service')
+    
+    try:
+        result = token_automation.rotate_token(
+            service,
+            new_token=data.get('new_token'),
+            auto_generate=data.get('auto_generate', True)
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/bulk-rotate', methods=['POST'])
+def bulk_rotate_tokens():
+    """Rotate multiple tokens"""
+    data = request.json
+    services = data.get('services')
+    
+    try:
+        result = token_automation.bulk_rotate_tokens(services)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/list-all', methods=['GET'])
+def list_all_tokens():
+    """List all tokens with metadata"""
+    try:
+        tokens = token_automation.list_all_tokens()
+        return jsonify({"tokens": tokens})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/automation/rules', methods=['GET', 'POST', 'DELETE'])
+def automation_rules():
+    """Manage automation rules"""
+    try:
+        if request.method == 'GET':
+            rules = token_automation.list_automation_rules()
+            return jsonify({"rules": rules})
+        
+        elif request.method == 'POST':
+            data = request.json
+            rule_name = data.get('rule_name')
+            rule_config = data.get('config')
+            
+            result = token_automation.create_automation_rule(rule_name, rule_config)
+            return jsonify(result)
+        
+        elif request.method == 'DELETE':
+            rule_name = request.args.get('rule_name')
+            result = token_automation.delete_automation_rule(rule_name)
+            return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/automation/execute', methods=['POST'])
+def execute_automation_rule():
+    """Execute specific automation rule"""
+    data = request.json
+    rule_name = data.get('rule_name')
+    
+    try:
+        result = token_automation.execute_automation_rule(rule_name)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/automation/check', methods=['POST'])
+def check_automation_rules():
+    """Check and execute due automation rules"""
+    try:
+        executed = token_automation.check_automation_rules()
+        return jsonify({
+            "executed_count": len(executed),
+            "executed": executed
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/automation/scheduler/start', methods=['POST'])
+def start_token_scheduler():
+    """Start background token scheduler"""
+    data = request.json
+    interval = data.get('interval_minutes', 60)
+    
+    try:
+        result = token_scheduler.start(interval)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/automation/scheduler/stop', methods=['POST'])
+def stop_token_scheduler():
+    """Stop background token scheduler"""
+    try:
+        result = token_scheduler.stop()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tokens/backup', methods=['POST'])
+def backup_all_tokens():
+    """Create backup of all tokens"""
+    try:
+        result = token_automation.backup_all_tokens()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============================================
 # STARTUP
 # ============================================
 
@@ -528,10 +828,19 @@ if __name__ == '__main__':
     print("   - File operations (read, write, delete, search)")
     print("   - Secrets management (list, get, set, delete)")
     print("   - Token management (GitHub, Google, etc)")
+    print("   - 🔥 TOKEN AUTOMATION (generate, rotate, schedule)")
     print("   - GitHub Actions (trigger, list, status, logs)")
     print("   - Environment variables")
     print("   - System commands")
     print("   - Ops automation")
+    print("")
+    print("🤖 Token Automation Features:")
+    print("   - Auto-generate secure tokens (API keys, OAuth, JWT)")
+    print("   - Rotate tokens on schedule")
+    print("   - Bulk operations")
+    print("   - Automation rules engine")
+    print("   - Background scheduler")
+    print("   - Backup & restore")
     print("")
     print("🔒 WARNING: This API has FULL SYSTEM ACCESS!")
     print("   Keep it local and secure.")
