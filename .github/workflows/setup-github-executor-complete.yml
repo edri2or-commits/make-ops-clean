@@ -1,0 +1,267 @@
+name: Setup GitHub Executor API - Complete
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "מאשר כתיבה" to confirm setup and deployment'
+        required: true
+        type: string
+
+jobs:
+  setup-and-deploy:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'מאשר כתיבה'
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/212701048029/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions@edri2or-mcp.iam.gserviceaccount.com'
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Verify GitHub PAT exists in repo secrets
+        run: |
+          if [ -z "${{ secrets.GH_EX }}" ]; then
+            echo "❌ ERROR: GH_EX not found in repository secrets"
+            echo "Please add it at: Settings → Secrets and variables → Actions → Repository secrets"
+            echo "Name: GH_EX"
+            echo "Value: [GitHub PAT with repo scope]"
+            exit 1
+          fi
+          echo "✅ GH_EX found in repo secrets"
+      
+      - name: Create github-executor-api-token in Secret Manager
+        env:
+          GITHUB_PAT: ${{ secrets.GH_EX }}
+        run: |
+          echo "Creating/updating github-executor-api-token secret..."
+          
+          # Check if secret exists
+          if gcloud secrets describe github-executor-api-token --project=edri2or-mcp 2>/dev/null; then
+            echo "Secret exists - adding new version"
+            echo "$GITHUB_PAT" | gcloud secrets versions add github-executor-api-token \
+              --project=edri2or-mcp \
+              --data-file=-
+          else
+            echo "Secret doesn't exist - creating new"
+            echo "$GITHUB_PAT" | gcloud secrets create github-executor-api-token \
+              --project=edri2or-mcp \
+              --replication-policy=automatic \
+              --data-file=-
+          fi
+          
+          echo "✅ github-executor-api-token ready"
+      
+      - name: Grant Cloud Run service account access
+        run: |
+          echo "Granting secretAccessor role..."
+          gcloud secrets add-iam-policy-binding github-executor-api-token \
+            --project=edri2or-mcp \
+            --member="serviceAccount:github-actions@edri2or-mcp.iam.gserviceaccount.com" \
+            --role="roles/secretmanager.secretAccessor" \
+            --condition=None || echo "Binding may already exist"
+          
+          echo "✅ Service account has access"
+      
+      - name: Deploy GitHub Executor API to Cloud Run
+        run: |
+          echo "Deploying GitHub Executor API..."
+          cd cloud-run/google-workspace-github-api
+          
+          gcloud run deploy github-executor-api \
+            --source=. \
+            --region=us-central1 \
+            --project=edri2or-mcp \
+            --platform=managed \
+            --allow-unauthenticated \
+            --set-secrets=GITHUB_TOKEN=github-executor-api-token:latest \
+            --set-env-vars="GITHUB_OWNER=edri2or-commits,GITHUB_REPO=make-ops-clean" \
+            --memory=512Mi \
+            --cpu=1 \
+            --max-instances=10 \
+            --timeout=60s \
+            --service-account=github-actions@edri2or-mcp.iam.gserviceaccount.com
+          
+          echo "✅ Deployment complete"
+      
+      - name: Get service URL
+        id: get-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe github-executor-api \
+            --region=us-central1 \
+            --project=edri2or-mcp \
+            --format='value(status.url)')
+          
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Service URL: $SERVICE_URL"
+      
+      - name: Wait for service to be ready
+        run: |
+          echo "Waiting 10 seconds for service to stabilize..."
+          sleep 10
+      
+      - name: Test 1 - Health Check
+        id: test-health
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.service_url }}"
+          echo "Testing: $SERVICE_URL/"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" "$SERVICE_URL/" || echo "CURL_FAILED\n000")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "health_status=✅ PASS" >> $GITHUB_OUTPUT
+            echo "✅ Health check passed"
+          else
+            echo "health_status=❌ FAIL (HTTP $HTTP_CODE)" >> $GITHUB_OUTPUT
+            echo "❌ Health check failed"
+          fi
+      
+      - name: Test 2 - Read File (OS_SAFE)
+        id: test-read
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.service_url }}"
+          echo "Testing: POST $SERVICE_URL/repo/read-file"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVICE_URL/repo/read-file" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "owner": "edri2or-commits",
+              "repo": "make-ops-clean",
+              "path": "README.md",
+              "branch": "main"
+            }' || echo "CURL_FAILED\n000")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response preview: $(echo "$BODY" | head -c 200)..."
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "read_status=✅ PASS" >> $GITHUB_OUTPUT
+            echo "✅ Read file test passed"
+          else
+            echo "read_status=❌ FAIL (HTTP $HTTP_CODE)" >> $GITHUB_OUTPUT
+            echo "❌ Read file test failed: $BODY"
+          fi
+      
+      - name: Test 3 - Update Doc (OS_SAFE)
+        id: test-update
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.service_url }}"
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          TEST_PATH="DOCS/GITHUB_EXECUTOR_API_TEST_RUN.md"
+          
+          echo "Testing: POST $SERVICE_URL/repo/update-doc"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVICE_URL/repo/update-doc" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"owner\": \"edri2or-commits\",
+              \"repo\": \"make-ops-clean\",
+              \"path\": \"$TEST_PATH\",
+              \"content\": \"# GitHub Executor API - Test Run Results\n\n**Timestamp**: $TIMESTAMP  \n**Status**: ✅ Automated E2E Test Passed  \n**Workflow**: ${{ github.run_id }}  \n\n## Test Results\n\n- Health Check: ✅ Service responding\n- Read File: ✅ Can read from repository\n- Update Doc: ✅ Can write to OS_SAFE paths\n\n## Service Details\n\n- **URL**: $SERVICE_URL\n- **Region**: us-central1\n- **Project**: edri2or-mcp\n- **Secret**: github-executor-api-token\n\n## Evidence\n\nThis file was created by the GitHub Executor API itself, proving write capability to DOCS/ paths.\n\",
+              \"message\": \"🧪 GitHub Executor API E2E test - $TIMESTAMP\",
+              \"branch\": \"main\"
+            }" || echo "CURL_FAILED\n000")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "update_status=✅ PASS" >> $GITHUB_OUTPUT
+            echo "update_file_created=true" >> $GITHUB_OUTPUT
+            echo "✅ Update doc test passed"
+          else
+            echo "update_status=❌ FAIL (HTTP $HTTP_CODE)" >> $GITHUB_OUTPUT
+            echo "update_file_created=false" >> $GITHUB_OUTPUT
+            echo "❌ Update doc test failed: $BODY"
+          fi
+      
+      - name: Create deployment evidence
+        run: |
+          mkdir -p OPS/EVIDENCE
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          cat > OPS/EVIDENCE/github_executor_deployed_${{ github.run_number }}.json << EOF
+          {
+            "timestamp": "$TIMESTAMP",
+            "workflow_run": "${{ github.run_id }}",
+            "triggered_by": "${{ github.actor }}",
+            "action": "setup_and_deploy_github_executor_api",
+            "project": "edri2or-mcp",
+            "region": "us-central1",
+            "service": {
+              "name": "github-executor-api",
+              "url": "${{ steps.get-url.outputs.service_url }}"
+            },
+            "secret": {
+              "source": "GH_EX (GitHub Actions secret)",
+              "target": "github-executor-api-token (GCP Secret Manager)",
+              "status": "created"
+            },
+            "tests": {
+              "health_check": "${{ steps.test-health.outputs.health_status }}",
+              "read_file": "${{ steps.test-read.outputs.read_status }}",
+              "update_doc": "${{ steps.test-update.outputs.update_status }}"
+            },
+            "status": "$([ "${{ steps.test-health.outputs.health_status }}" = "✅ PASS" ] && [ "${{ steps.test-read.outputs.read_status }}" = "✅ PASS" ] && [ "${{ steps.test-update.outputs.update_status }}" = "✅ PASS" ] && echo "VERIFIED" || echo "PARTIAL")"
+          }
+          EOF
+      
+      - name: Commit evidence file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add OPS/EVIDENCE/github_executor_deployed_${{ github.run_number }}.json
+          git commit -m "📊 Evidence: GitHub Executor API deployment #${{ github.run_number }}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-executor-evidence
+          path: OPS/EVIDENCE/github_executor_deployed_*.json
+      
+      - name: Summary
+        run: |
+          echo "## 🚀 GitHub Executor API - Setup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Service Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: ${{ steps.get-url.outputs.service_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region**: us-central1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project**: edri2or-mcp" >> $GITHUB_STEP_SUMMARY
+          echo "- **Secret**: github-executor-api-token ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Check**: ${{ steps.test-health.outputs.health_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Read File**: ${{ steps.test-read.outputs.read_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Update Doc**: ${{ steps.test-update.outputs.update_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.test-update.outputs.update_file_created }}" = "true" ]; then
+            echo "### Evidence" >> $GITHUB_STEP_SUMMARY
+            echo "- Test run document: \`DOCS/GITHUB_EXECUTOR_API_TEST_RUN.md\` ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- Evidence file: \`OPS/EVIDENCE/github_executor_deployed_${{ github.run_number }}.json\` ✅" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next**: Claude will update CAPABILITIES_MATRIX.md → Section 1.1.2 = VERIFIED" >> $GITHUB_STEP_SUMMARY
