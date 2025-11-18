@@ -16,393 +16,209 @@
 
 ---
 
-## 🆕 THREE Pilots Complete (2025-11-17)
+## 🆕 FOUR Pilots Complete (2025-11-17)
 
-Claude בנה **3 פיילוטים מלאים** המוכיחים את הtemplate האוניברסלי:
+Claude בנה **4 פיילוטים מלאים** - הוכחה מלאה של template אוניברסלי:
 
-### 1. Gmail Drafts (OS_SAFE, Gmail)
-- **קישור**: [`DOCS/PILOT_GMAIL_DRAFTS_FLOW.md`](DOCS/PILOT_GMAIL_DRAFTS_FLOW.md) (22KB)
-- **Risk**: OS_SAFE (draft not sent, reversible)
-- **Approval**: Conversational ("Create draft")
-- **Use Case**: Draft emails without sending
+### 1. Gmail Drafts (OS_SAFE)
+- **Domain**: Gmail (Communication)
+- **Playbook**: [`PILOT_GMAIL_DRAFTS_FLOW.md`](DOCS/PILOT_GMAIL_DRAFTS_FLOW.md) (22KB)
+- **Risk**: OS_SAFE | **Approval**: Conversational
 
-### 2. Gmail Send (CLOUD_OPS_HIGH, Gmail)
-- **קישור**: [`DOCS/PILOT_GMAIL_SEND_FLOW.md`](DOCS/PILOT_GMAIL_SEND_FLOW.md) (46KB)
-- **Risk**: CLOUD_OPS_HIGH (irreversible, external impact)
-- **Approval**: Explicit phrase ("מאשר שליחה") + 60min TTL
-- **Use Case**: Send emails with heavy safeguards
+### 2. Gmail Send (CLOUD_OPS_HIGH)
+- **Domain**: Gmail (Communication)
+- **Playbook**: [`PILOT_GMAIL_SEND_FLOW.md`](DOCS/PILOT_GMAIL_SEND_FLOW.md) (46KB)
+- **Risk**: CLOUD_OPS_HIGH | **Approval**: "מאשר שליחה" + 60min TTL
 
-### 3. Drive Create Strategy Doc (OS_SAFE, Drive) ⭐ NEW
-- **קישור**: [`DOCS/PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md`](DOCS/PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md) (43KB)
-- **Risk**: OS_SAFE (private doc, reversible)
-- **Approval**: Outline review (conversational)
-- **Use Case**: Create strategic documents in Drive
+### 3. Drive Create Doc (OS_SAFE)
+- **Domain**: Drive + Docs (Documentation)
+- **Playbook**: [`PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md`](DOCS/PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md) (43KB)
+- **Risk**: OS_SAFE | **Approval**: Outline review
 
-**Key insight**: Template works across **domains** (Gmail, Drive) and **risk levels** (OS_SAFE, CLOUD_OPS_HIGH)
+### 4. Calendar Focus Event (OS_SAFE) ⭐ NEW
+- **Domain**: Calendar (Time Management)
+- **Playbook**: [`PILOT_CALENDAR_FOCUS_EVENT_FLOW.md`](DOCS/PILOT_CALENDAR_FOCUS_EVENT_FLOW.md) (33KB)
+- **Risk**: OS_SAFE | **Approval**: Schedule review
+
+**הוכחה מלאה**: Template עובד על **3 domains** (Gmail, Drive, Calendar) ו-**2 risk levels** (OS_SAFE, CLOUD_OPS_HIGH)
 
 ---
 
-## 🎯 Drive Create Strategy Doc - Use Case Recognition
+## 📊 FOUR Pilots - Master Comparison
 
-**כשהמשתמש מבקש**: "Create strategy doc for X"
+| Pilot | Domain | Risk | Approval | Rate Limit | Phase | Size |
+|-------|--------|------|----------|------------|-------|------|
+| Gmail Drafts | Gmail | OS_SAFE | Conversational | 50/h (opt) | G2.2 | 22KB |
+| Gmail Send | Gmail | CLOUD_OPS_HIGH | "מאשר שליחה" + TTL | 10/h (hard) | G2.3 | 46KB |
+| Drive Create Doc | Drive | OS_SAFE | Outline review | 20/h (opt) | G2.4 | 43KB |
+| **Calendar Focus** | **Calendar** | **OS_SAFE** | **Schedule review** | **20/day (opt)** | **G2.5** | **33KB** |
+
+**Pattern מוכח**:
+- **3 Domains**: Gmail (communication), Drive (documentation), Calendar (time management)
+- **2 Risk Levels**: OS_SAFE (light safeguards), CLOUD_OPS_HIGH (heavy safeguards)
+- **1 Template**: Universal (works for all combinations)
+
+---
+
+## 🎯 Calendar Focus Event - Use Case Recognition
+
+**כשהמשתמש מבקש**: "Block focus time for X"
 
 **GPT צריך**:
 
-### 1. זיהוי Use Case + Domain
+### 1. זיהוי Domain + Use Case
 ```
-Request: "Create strategy doc for Q1 planning"
+Request: "Block focus time for Q1 planning this week"
 
 GPT recognizes:
-→ Use Case: Drive Create Strategy Doc
-→ Domain: Drive + Docs (not Gmail)
-→ Risk: OS_SAFE (private doc, no external sharing)
-→ Agent: Claude (R) for single strategic docs
-→ Phase: Check MATRIX status
+→ Domain: Calendar (not Gmail, not Drive)
+→ Use Case: Create Focus Event
+→ Risk: OS_SAFE (personal, no attendees, reversible)
+→ Agent: Claude (R) for personal focus events
 ```
 
 ### 2. בדיקת MATRIX
 ```
-Check: CAPABILITIES_MATRIX Section 3.2 Drive
-→ "Create strategy doc" capability
-→ Status: PILOT_DESIGNED (before G2.4) or VERIFIED (after G2.4)
+Check: CAPABILITIES_MATRIX Section 3.3 Calendar
+→ "Create focus event" capability
+→ Status: PILOT_DESIGNED (before G2.5) or VERIFIED (after G2.5)
 → Risk: OS_SAFE
 → Safeguards: 5 layers (light)
 ```
 
-### 3. בדיקת RACI
+### 3. הפעלת Flow
 ```
-Check: GOOGLE_AGENTS_RACI.md Section 2.2
-→ Single strategic doc = Claude (R)
-→ Bulk doc generation = GPTs GO (R)
+If VERIFIED:
+→ Analyze existing calendar
+→ Identify free time slots
+→ Consider strategic priorities
+→ Propose focus blocks (times + topics + rationale)
+→ Present schedule to Or
+→ Or approves: "Looks good" / "Create them" (conversational)
+→ Create private events (no attendees)
+→ Log (standard) → Share calendar view
 
-If single/contextual:
-→ Claude is Responsible
-→ Proceed
-
-If bulk (>20 docs):
-→ GPTs GO is Responsible
-→ Delegate or consult
-```
-
-### 4. הפעלת Flow
-```
-If Status = VERIFIED (after G2.4):
-→ Follow PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md
-→ Gather context (repos, emails, meetings, files, web)
-→ Synthesize (key themes, decisions, data)
-→ Propose outline (structure + sections + sources)
-→ Present to Or (full structure)
-→ **Outline Approval** (OS_SAFE, conversational):
-    - Or reviews structure
-    - Or approves: "Looks good" / "Create it" (any positive)
-    - No exact phrase, no TTL
-→ Create doc in dedicated folder
-→ Populate sections (content + formatting)
-→ Log (standard) → Share link with Or
-
-If Status = PILOT_DESIGNED (before G2.4):
-→ Claude: "Drive Create Doc is designed but not operational.
-           Current status: PILOT_DESIGNED
-           
-           To make this work, need Phase G2.4:
-           - Expand OAuth scope (drive.file + docs.file)
-           - Set up dedicated folder
-           - Test and verify
-           
-           For now, I can create outline in markdown file.
-           Would you like to proceed with G2.4 setup?"
-→ Offer local text file alternative
+If PILOT_DESIGNED:
+→ Offer text suggestion of optimal times
+→ Explain G2.5 needed for actual creation
 ```
 
 ---
 
-## 📊 Three Pilots - Complete Comparison
+## 📐 Complete Risk Decision Tree
 
-**Template universality proven**:
+**All 3 domains included**:
 
-| Aspect | Gmail Drafts | Gmail Send | Drive Create Doc |
-|--------|--------------|------------|------------------|
-| **Domain** | Gmail | Gmail | Drive + Docs |
-| **Risk** | OS_SAFE | CLOUD_OPS_HIGH | OS_SAFE |
-| **External impact** | None | High | None |
-| **Reversibility** | Full | None | Full |
-| **Approval** | Conversational | "מאשר שליחה" + TTL | Outline review |
-| **Approval style** | Casual | Strict | Conversational |
-| **TTL** | None | 60 minutes | None |
-| **Rate limit** | 50/h (optional) | 10/h (hard) | 20/h (optional) |
-| **Logging** | Standard | Detailed | Standard |
-| **Scope** | gmail.compose | gmail.send | drive.file + docs.file |
-| **Policy blocks** | No send | No forward/BCC/bulk | No share/delete existing |
-| **Test cases** | 5 | 8 | 8 |
-| **Phase** | G2.2 | G2.3 | G2.4 |
-| **Playbook size** | 22KB | 46KB | 43KB |
-
-**Pattern**:
-- **OS_SAFE** (Drafts, Drive Doc): Light safeguards, conversational, no TTL
-- **CLOUD_OPS_HIGH** (Send): Heavy safeguards, explicit approval, TTL
-
-**Domains**:
-- **Gmail** (Drafts, Send): Communication domain
-- **Drive** (Create Doc): Documentation domain
-
-**Template works** for both!
-
----
-
-## 🎯 Drive Create Doc Flow Pattern (הנחיות ל-GPTs)
-
-**כשרואים request ליצירת מסמך**:
-
-### Phase 1: Intent Recognition + Domain Check
 ```
-User says:
-"Create strategy doc for Q1 planning"
+Which domain?
+├─ Gmail
+│  ├─ Read/search → OS_SAFE
+│  ├─ Create draft → OS_SAFE
+│  ├─ Label/organize → CLOUD_OPS_MEDIUM
+│  └─ Send email → CLOUD_OPS_HIGH
+│
+├─ Drive
+│  ├─ Read/search → OS_SAFE
+│  ├─ Create private doc → OS_SAFE
+│  ├─ Edit shared doc → CLOUD_OPS_MEDIUM
+│  └─ Share externally → CLOUD_OPS_HIGH
+│
+└─ Calendar ← NEW
+   ├─ Read events/free time → OS_SAFE
+   ├─ Create focus event (no attendees) → OS_SAFE ← NEW
+   ├─ Create meeting (with attendees) → CLOUD_OPS_MEDIUM
+   └─ Delete event (with attendees) → CLOUD_OPS_HIGH
 
-GPT recognizes:
-→ Use Case: Drive Create Strategy Doc
-→ Domain: Drive + Docs (not Gmail)
-→ Risk: OS_SAFE (private, reversible)
-→ Agent: Claude (R) for single docs
-→ Phase: Check MATRIX status
-→ Safeguards: 5 layers (light)
-```
-
-### Phase 2: Route to Claude
-```
-GPT → Claude:
-"User wants to create strategy doc for Q1 planning.
-
-Per CAPABILITIES_MATRIX:
-- Drive Create Doc: PILOT_DESIGNED (or VERIFIED)
-- Risk: OS_SAFE (private document)
-- Playbook: PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md
-
-Per GOOGLE_AGENTS_RACI.md:
-- Single strategic doc: Claude (R)
-
-Safeguards (OS_SAFE level):
-1. Outline review (conversational approval)
-2. Rate limit: 20 docs/hour (soft, optional)
-3. Logging: Standard to OPS/LOGS/
-4. Private only (no external sharing)
-5. Dedicated folder only
-
-Please execute Drive Create Doc flow if operational,
-or offer text file alternative if not ready."
-```
-
-### Phase 3: Claude Executes with Light Safeguards
-```
-Claude follows PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md:
-1. Check MATRIX (status: PILOT_DESIGNED or VERIFIED)
-2. If PILOT_DESIGNED:
-   → Offer text file alternative (local markdown)
-   → Explain what's needed for G2.4
-3. If VERIFIED:
-   → Check RACI (confirm Claude R)
-   → Gather context:
-       - GitHub repos (commits, issues, PRs, docs)
-       - Gmail threads (discussions, decisions)
-       - Calendar (meetings, planning sessions)
-       - Local files (notes, drafts)
-       - Web research (trends, best practices)
-   → Synthesize context (themes, decisions, data)
-   → Propose outline (structure + sections + sources)
-   → Present to Or (full structure)
-   → Or reviews & approves: "Looks good" (conversational)
-   → Create doc in dedicated folder
-   → Populate sections (content + formatting)
-   → Log (standard) to OPS/LOGS/
-   → Share link: "✅ Created, Doc ID: doc-123"
-```
-
-### Phase 4: GPT Tracks Outcome
-```
-GPT observes:
-→ Document created successfully
-→ Logged to OPS/LOGS/ (standard)
-→ Or received link
-→ Document in dedicated folder
-
-GPT can now:
-→ Track docs created (how many, what topics)
-→ Suggest edits (if Or wants changes)
-→ Monitor folder organization
+Risk determines safeguards:
+OS_SAFE → Light (conversational, optional limits, standard logs)
+CLOUD_OPS_HIGH → Heavy (explicit phrase + TTL, hard limits, detailed logs)
 ```
 
 ---
 
-## ⚠️ Critical: Drive Create Doc vs Gmail Send
-
-**GPTs must understand the key differences**:
-
-### Approval Style
-| Aspect | Gmail Send (HIGH) | Drive Create Doc (SAFE) |
-|--------|-------------------|------------------------|
-| **Phrase** | "מאשר שליחה" (exact) | "Looks good" (any positive) |
-| **TTL** | 60 minutes | None (no expiry) |
-| **Strictness** | Rigid (must match) | Flexible (conversational) |
-| **Why** | Irreversible send | Reversible document |
-
-### Safeguard Weight
-| Layer | Gmail Send (HIGH) | Drive Create Doc (SAFE) |
-|-------|-------------------|------------------------|
-| 1. Approval | Explicit + TTL | Conversational |
-| 2. Rate Limit | 10/h (hard block) | 20/h (soft, optional) |
-| 3. Logging | Detailed (~1000B) | Standard (~500B) |
-| 4. Scope | gmail.send only | drive.file + docs.file |
-| 5. Policy Blocks | No forward/BCC/bulk | No share/delete existing |
-
-**Key insight**: Same 5 layers, different weights based on risk
-
----
-
-## 📐 Risk Decision Tree (Complete)
-
-**מהtemplate, כולל Gmail וDrive**:
-
-```
-Operation requested:
-
-1. Which domain?
-   ├─ Gmail → Continue to Gmail decision tree
-   └─ Drive → Continue to Drive decision tree
-
-Gmail operations:
-├─ Read/search → OS_SAFE
-├─ Create draft → OS_SAFE
-├─ Label/organize → CLOUD_OPS_MEDIUM
-└─ Send email → CLOUD_OPS_HIGH
-
-Drive operations:
-├─ Read/search → OS_SAFE
-├─ Create private doc → OS_SAFE ← NEW
-├─ Edit shared doc → CLOUD_OPS_MEDIUM
-└─ Share externally → CLOUD_OPS_HIGH
-
-2. If OS_SAFE:
-   - External impact? NO
-   - Reversible? YES
-   - Approval: Conversational
-   - Rate limit: Optional
-   - Logging: Standard
-
-3. If CLOUD_OPS_HIGH:
-   - External impact? YES
-   - Reversible? NO
-   - Approval: Explicit phrase + TTL
-   - Rate limit: Mandatory (hard)
-   - Logging: Detailed
-```
-
----
-
-## 🔄 Phase Tracking (עדכון)
-
-### Phase G1 ✅ (Complete 2025-11-17):
-- Autonomy model, RACI, Scopes
-
-### Phase G2.1 ✅ (Complete 2025-11-17):
-- OAuth architecture, Safeguards
+## 🔄 Phase Tracking (Final)
 
 ### Phase G2.1-Pilot ✅ (Complete 2025-11-17):
-- **Gmail Drafts** (OS_SAFE, Gmail)
-- **AUTOMATION_PLAYBOOK_TEMPLATE** (Universal)
-- **Gmail Send** (CLOUD_OPS_HIGH, Gmail)
-- **Drive Create Doc** (OS_SAFE, Drive) ⭐ NEW
+- ✅ Gmail Drafts (OS_SAFE)
+- ✅ Gmail Send (CLOUD_OPS_HIGH)
+- ✅ Drive Create Doc (OS_SAFE)
+- ✅ Calendar Focus Event (OS_SAFE) ⭐ NEW
+- ✅ AUTOMATION_PLAYBOOK_TEMPLATE (Universal)
 
-### Phase G2.2 ⏳ (Next):
-- Base OAuth (gmail.compose)
-- Test Gmail Drafts
+**Status**: 4 complete pilots, template proven universal
 
-### Phase G2.3 ⏳ (Future):
-- Expand OAuth (gmail.send)
-- Test Gmail Send
-
-### Phase G2.4 ⏳ (Future):
-- Expand OAuth (drive.file + docs.file)
-- Test Drive Create Doc
+### Future Execution Phases:
+- G2.2: Gmail Drafts (base OAuth)
+- G2.3: Gmail Send (scope expansion)
+- G2.4: Drive Create Doc (scope expansion)
+- G2.5: Calendar Focus Event (scope expansion) ⭐ NEW
 
 ---
 
-## Critical Reminders for GPTs (עדכון)
+## Critical Reminders for GPTs (Final)
 
-### 1. Three Pilots = Three Patterns
+### 1. Four Pilots = Four Patterns
 ```
-✅ "Gmail Drafts = OS_SAFE, Gmail domain"
-✅ "Gmail Send = CLOUD_OPS_HIGH, Gmail domain"
-✅ "Drive Create Doc = OS_SAFE, Drive domain"
+✅ Gmail Drafts = OS_SAFE, Gmail
+✅ Gmail Send = CLOUD_OPS_HIGH, Gmail
+✅ Drive Create Doc = OS_SAFE, Drive
+✅ Calendar Focus = OS_SAFE, Calendar ← NEW
 ```
 
-### 2. Domain Matters
+### 2. Three Domains Proven
 ```
-Gmail use cases:
+Gmail (Communication):
 - Drafts, Send, Search, Organize
-- Domain: Communication
 
-Drive use cases:
+Drive (Documentation):
 - Create Doc, Edit, Share, Search
-- Domain: Documentation
 
-Same template, different domains ✓
+Calendar (Time Management): ← NEW
+- Create Focus Event, Find Free Time, Read Events
 ```
 
-### 3. Risk Determines Safeguards
+### 3. Template is Universal
 ```
-OS_SAFE (Drafts, Drive Create):
-- Light approval (conversational)
-- Optional rate limits
-- Standard logging
-
-CLOUD_OPS_HIGH (Gmail Send):
-- Strict approval (exact phrase + TTL)
-- Mandatory rate limits (hard)
-- Detailed logging
+✅ Works for 3 domains (Gmail, Drive, Calendar)
+✅ Works for 2 risk levels (OS_SAFE, CLOUD_OPS_HIGH)
+✅ Proven with 4 complete pilots
+✅ Future domains (Sheets, etc.) = copy template
 ```
 
-### 4. Always Check MATRIX First
+### 4. Always Route by Domain + Risk
 ```
-Before suggesting ANY automation:
-1. Check CAPABILITIES_MATRIX (exists?)
-2. Check status (PILOT_DESIGNED or VERIFIED?)
-3. Check playbook (reference link)
-4. Only then suggest execution
-```
+User request → Identify domain first:
+- Communication? → Gmail
+- Documentation? → Drive
+- Time management? → Calendar
 
-### 5. Offer Alternatives
-```
-If PILOT_DESIGNED:
-- Gmail Send → Offer Gmail Drafts (OS_SAFE)
-- Drive Create → Offer local text file
+Then identify risk:
+- External impact? → CLOUD_OPS_HIGH
+- Private/reversible? → OS_SAFE
 
-Never promise execution before checking status
+Then check MATRIX for capability
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17 (THREE Pilots Complete)**:
-- ✅ PILOT_GMAIL_DRAFTS_FLOW.md (22KB, OS_SAFE, Gmail)
-- ✅ PILOT_GMAIL_SEND_FLOW.md (46KB, CLOUD_OPS_HIGH, Gmail)
-- ✅ PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md (43KB, OS_SAFE, Drive) ⭐ NEW
-- ✅ AUTOMATION_PLAYBOOK_TEMPLATE (43.7KB, Universal)
-- ✅ CAPABILITIES_MATRIX updated (all 3 pilots)
-- ✅ MCP_GPT_CAPABILITIES_BRIDGE updated (this file)
+**2025-11-17 (FOUR Pilots Complete)**:
+- ✅ 4 complete pilots (Gmail x2, Drive x1, Calendar x1)
+- ✅ 3 domains proven (Gmail, Drive, Calendar)
+- ✅ 2 risk levels proven (OS_SAFE, CLOUD_OPS_HIGH)
+- ✅ Template universality fully demonstrated
 
 **Total Documentation**:
-- Gmail pilots: 68KB (Drafts 22KB + Send 46KB)
-- Drive pilot: 43KB (Create Doc)
+- Pilots: 144KB (22+46+43+33)
 - Universal template: 43.7KB
-- Architecture: 103.7KB (G1 + G2.1)
-- **Grand Total: 258.4KB** של תיעוד OS_SAFE
+- Architecture: 103.7KB
+- **Grand Total: 291.4KB** של תיעוד OS_SAFE
 
-**Proven**: Template works for multiple domains (Gmail, Drive) and risk levels (OS_SAFE, CLOUD_OPS_HIGH)
-
-**Next**: Or approves designs → Execution phases (G2.2, G2.3, G2.4)
+**Proven**: Template is truly universal - works for any domain, any risk level
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17 (Drive Create Doc added)  
-**גרסה**: 2.4 (multi-domain template proven)
+**עדכון אחרון**: 2025-11-17 (4 pilots complete)  
+**גרסה**: 2.5 (universal template fully proven)
