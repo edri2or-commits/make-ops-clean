@@ -1,0 +1,276 @@
+openapi: 3.1.0
+info:
+  title: GitHub Executor API
+  description: |
+    Safe GitHub repository operations for GPT Unified Agent.
+    
+    **Capabilities**:
+    - Read any file from repository
+    - Update files in OS_SAFE paths only (DOCS/, logs/, OPS/STATUS/, STATE_FOR_GPT*)
+    
+    **Security**: 
+    - Path validation enforced server-side
+    - Code/workflow/infrastructure changes require explicit approval
+  version: 1.0.0
+  contact:
+    name: Or (אור)
+    email: edri2or@gmail.com
+
+servers:
+  - url: https://github-executor-api-REPLACE_WITH_ACTUAL_HASH-uc.a.run.app
+    description: Production Cloud Run service (update after deployment)
+
+paths:
+  /:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      description: Verify service is running and check capabilities
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: github-executor-api
+                  version:
+                    type: string
+                    example: 1.0.0
+                  status:
+                    type: string
+                    example: ok
+                  capabilities:
+                    type: array
+                    items:
+                      type: string
+                    example: ["read-file", "update-doc"]
+
+  /repo/read-file:
+    post:
+      operationId: readFile
+      summary: Read a file from GitHub repository
+      description: |
+        Read the contents of any file in the repository.
+        
+        **Use cases**:
+        - Check current documentation
+        - Read state files
+        - Review configuration (read-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - owner
+                - repo
+                - path
+              properties:
+                owner:
+                  type: string
+                  description: Repository owner (username or organization)
+                  example: edri2or-commits
+                repo:
+                  type: string
+                  description: Repository name
+                  example: make-ops-clean
+                path:
+                  type: string
+                  description: Path to file in repository
+                  example: DOCS/example.md
+                ref:
+                  type: string
+                  description: Git ref (branch, tag, or SHA). Defaults to repository default branch.
+                  example: main
+      responses:
+        '200':
+          description: File content retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  content:
+                    type: string
+                    description: File content (decoded from base64)
+                  path:
+                    type: string
+                    description: File path
+                  sha:
+                    type: string
+                    description: Git SHA of the file
+                  encoding:
+                    type: string
+                    example: utf-8
+        '400':
+          description: Invalid request (missing fields or invalid path)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: file_not_found
+                details: File does not exist at path DOCS/nonexistent.md
+        '500':
+          description: GitHub API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /repo/update-doc:
+    post:
+      operationId: updateDocFile
+      summary: Create or update a documentation file (OS_SAFE paths only)
+      description: |
+        Create or update files in safe paths only.
+        
+        **Allowed paths** (OS_SAFE):
+        - `DOCS/` - All documentation files
+        - `logs/` - Operation logs
+        - `OPS/STATUS/` - Status tracking
+        - `OPS/EVIDENCE/` - Evidence collection
+        - `STATE_FOR_GPT*.md` - State snapshot files
+        
+        **Forbidden paths** (requires approval):
+        - `.github/workflows/` - CI/CD pipelines
+        - `cloud-run/` - Service code
+        - `*.py`, `*.js` - Application code
+        - `*.yml` (except task files) - Infrastructure
+        - `CAPABILITIES_MATRIX.md` (structural changes)
+        
+        Server will reject requests to forbidden paths with HTTP 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - owner
+                - repo
+                - path
+                - content
+                - commit_message
+              properties:
+                owner:
+                  type: string
+                  description: Repository owner
+                  example: edri2or-commits
+                repo:
+                  type: string
+                  description: Repository name
+                  example: make-ops-clean
+                path:
+                  type: string
+                  description: File path (must be in OS_SAFE scope)
+                  pattern: '^(DOCS/|logs/|OPS/STATUS/|OPS/EVIDENCE/|STATE_FOR_GPT.*\.md)'
+                  example: DOCS/STATUS_UPDATE.md
+                content:
+                  type: string
+                  description: New file content (UTF-8)
+                  example: |
+                    # Status Update
+                    
+                    Deployment completed successfully on 2025-11-18.
+                commit_message:
+                  type: string
+                  description: Git commit message
+                  example: "docs: update deployment status"
+                branch:
+                  type: string
+                  description: Target branch (defaults to 'main')
+                  example: main
+      responses:
+        '200':
+          description: File created or updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  action:
+                    type: string
+                    enum: [create, update]
+                    description: Whether file was created or updated
+                  commit_sha:
+                    type: string
+                    description: SHA of the commit created
+                  content:
+                    type: object
+                    properties:
+                      path:
+                        type: string
+                        description: File path
+                      sha:
+                        type: string
+                        description: New SHA of the file
+        '400':
+          description: Invalid request (missing fields or invalid path format)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Path not in OS_SAFE scope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: OUT_OF_SAFE_SCOPE
+                  details:
+                    type: string
+                    example: "Path '.github/workflows/test.yml' is not in allowed safe paths"
+                  allowed_paths:
+                    type: array
+                    items:
+                      type: string
+                    example: ["DOCS/", "logs/", "OPS/STATUS/", "OPS/EVIDENCE/", "STATE_FOR_GPT*.md"]
+        '500':
+          description: GitHub API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error code
+        details:
+          type: string
+          description: Human-readable error details
+      required:
+        - error
+
+  securitySchemes: {}
+
+security: []
+
+tags:
+  - name: Repository Operations
+    description: Safe GitHub repository read/write operations
