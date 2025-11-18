@@ -18,87 +18,130 @@
 
 ## 🆕 Phase G2.1-Pilot Complete (2025-11-17)
 
-### Complete Framework: Pilots + Evals + Execution Plan
+### Complete Framework: 4 Documents
 
-**Built**:
+**Built** (383.5KB total):
 1. **4 Pilots** (144KB)
    - Gmail Drafts, Gmail Send, Drive Create Doc, Calendar Focus
 2. **Eval Framework** (31.5KB)
    - 87 scenarios, 100% pass required
-3. **Execution Plan** (26.5KB) ⭐ NEW
+3. **Execution Plan** (26.5KB)
    - G2.2-G2.5 roadmap, Executor RACI, Evidence formats
+4. **Executor Onboarding Kit** (34KB) ⭐ NEW
+   - Practical guide for Executor
+   - Quickstart, Checklists, Templates, Guardrails
 
-**Total Documentation**: 349.5KB (complete OS_SAFE framework)
+**Status**: Complete OS_SAFE framework, ready for Executor + Runtime
 
 ---
 
-## 🚨 THREE-GATE MODEL (Complete)
+## 📚 Four-Document Model (MANDATORY)
 
-### Mandatory Gates Before Runtime
-
-**Every capability must pass ALL three gates**:
+### Complete Documentation Before Runtime
 
 ```
-Gate 1: PLAYBOOK EXISTS
-→ Requirement: Complete playbook (Intent, RACI, Plan, Safeguards, etc.)
-→ Reference: AUTOMATION_PLAYBOOK_TEMPLATE.md
-→ Status: PILOT_DESIGNED
+Document 1: PLAYBOOK
+→ What to do, how to do it, safeguards
+→ Gate 1: Playbook exists
 
-Gate 2: EVALS DEFINED
-→ Requirement: Complete eval scenarios (87 total)
-→ Reference: AUTOMATION_EVALS_PLAN.md
-→ Requirement: 100% pass for upgrade
+Document 2: EVALS
+→ How to test, PASS/FAIL criteria, evidence
+→ Gate 2: Evals defined (100% pass required)
 
-Gate 3: EXECUTION PLAN EXISTS ⭐ NEW
-→ Requirement: Complete execution roadmap
-→ Reference: PHASE_G2_RUNTIME_EXECUTION_PLAN.md
-→ Includes: Executor RACI, OAuth steps, Evidence formats
-→ Requirement: Or approves before execution begins
+Document 3: EXECUTION PLAN
+→ Who executes, step-by-step, reporting
+→ Gate 3: Execution Plan approved by Or
 
-Only after ALL three gates:
-→ Executor can begin Runtime execution
-→ Status can upgrade to VERIFIED (if evals pass 100%)
+Document 4: EXECUTOR ONBOARDING KIT ⭐ NEW
+→ Practical onboarding for Executor
+→ Prerequisite: Executor reads before starting
+→ Reference: G2_EXECUTOR_ONBOARDING_KIT.md
+
+All four documents = Complete Runtime readiness
 ```
 
 ---
 
-## 📋 Execution Plan Summary
+## 🎓 Executor Onboarding Kit (NEW)
 
-### What's New (Gate 3)
+### What It Provides (34KB)
 
-**Complete operational roadmap**:
-- Master flow (9 steps: OAuth → Evals → Evidence → MATRIX → PR)
-- **Executor RACI** (who does what, allowed/forbidden operations)
-- G2.2 detailed plan (Gmail Drafts as first pilot example)
-- Evidence formats (results.json structure)
-- Failure handling (what if evals fail)
-- Reporting template (EXECUTOR→OR_REPORT)
+**Complete practical guide**:
 
-**Key insight**: No ad-hoc execution - everything documented before Runtime
+```
+Section 1: Context & Overview
+- What's already done (383.5KB framework)
+- What G2.2-G2.5 means (Executor language)
+- Three-gate model explained
+
+Section 2: Quickstart G2.2 (Gmail Drafts)
+- BEFORE/DURING/AFTER checklists
+- 9 steps detailed (OAuth → Report)
+- Direct links to all docs
+
+Section 3: Patterns for G2.3-G2.5
+- Universal 9-step model
+- Phase-specific differences
+
+Section 4: Communication & Reporting
+- EXECUTOR→OR_REPORT template (complete)
+- Report checklist (must-have items)
+- OPS/EVALS and OPS/LOGS usage
+
+Section 5: Guardrails & Boundaries
+- ALLOWED: OAuth, evals, commits, PRs
+- FORBIDDEN: Skip evals, bypass gates
+- Escalation paths (when to contact Or)
+```
+
+**Reference**: [`G2_EXECUTOR_ONBOARDING_KIT.md`](DOCS/G2_EXECUTOR_ONBOARDING_KIT.md)
 
 ---
 
-## 👤 Executor Role (NEW)
+## 🚨 Three-Gate Model + Executor Prerequisite
 
-### Who Executes Runtime Phases
+### Before Runtime Execution
+
+**Three gates** (must pass):
+```
+Gate 1: PLAYBOOK EXISTS ✅
+Gate 2: EVALS DEFINED ✅
+Gate 3: EXECUTION PLAN APPROVED ✅
+```
+
+**Executor prerequisite** (before execution):
+```
+Prerequisite: EXECUTOR ONBOARDED ⭐
+→ Executor reads G2_EXECUTOR_ONBOARDING_KIT.md
+→ Executor verifies checklist (all items)
+→ Executor confirms understanding
+→ Or verifies Executor ready
+→ Or signals GO
+
+Only then: Executor begins Runtime execution
+```
+
+---
+
+## 👤 Executor Role Summary
 
 **Executor = Technical operator** (NOT Or, NOT Claude, NOT GPTs)
 
 **ALLOWED**:
-- ✅ Update MCP configs (OAuth scopes)
-- ✅ Run eval scenarios
-- ✅ Collect evidence
-- ✅ Update CAPABILITIES_MATRIX (after evals)
-- ✅ Create PRs for Or review
-- ✅ Report results to Or
+- ✅ OAuth management (configs, consent, tokens)
+- ✅ Test execution (all evals, evidence, results)
+- ✅ Repository operations (branches, MATRIX, commits, PRs)
+- ✅ Reporting (EXECUTOR→OR_REPORT format)
+- ✅ Environment management (verify health, directories)
 
 **FORBIDDEN**:
-- ❌ Skip evals
-- ❌ Bypass gates
-- ❌ Override 100% pass requirement
-- ❌ Commit without Or review
+- ❌ Skip evals/safeguards/gates
+- ❌ Modify docs without approval
+- ❌ Bypass 100% pass requirement
+- ❌ Execute without Or GO
+- ❌ Make strategic decisions
 
-**Or = Accountable**:
+**Or = Accountable** (strategic approver):
 - Reviews evidence
 - Approves PRs
 - Signs off on VERIFIED
@@ -107,107 +150,73 @@ Only after ALL three gates:
 
 ## 🎯 Current Status (All 4 Pilots)
 
-| Phase | Pilot | Playbook | Evals | Exec Plan | Status | Ready? |
-|-------|-------|----------|-------|-----------|--------|--------|
-| **G2.2** | **Gmail Drafts** | ✅ | ✅ | ✅ | PILOT_DESIGNED | ⏳ Awaiting Or GO |
-| **G2.3** | **Gmail Send** | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
-| **G2.4** | **Drive Doc** | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
-| **G2.5** | **Calendar** | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
+| Phase | Playbook | Evals | Exec Plan | Onboarding | Status | Executor Ready? |
+|-------|----------|-------|-----------|------------|--------|-----------------|
+| **G2.2** | ✅ | ✅ | ✅ | ✅ | PILOT_DESIGNED | ⏳ Awaiting Executor + Or GO |
+| **G2.3** | ✅ | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
+| **G2.4** | ✅ | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
+| **G2.5** | ✅ | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
 
-**All three gates passed** - ready for Executor + Or GO signal
+**All prerequisites met** - ready for Executor onboarding + execution
 
 ---
 
 ## 📊 Before Using ANY Capability
 
-**GPTs MUST check ALL three gates**:
+**GPTs MUST check**:
 
 ```
-1. Check MATRIX:
-   - Playbook exists? (Gate 1)
-   - Evals defined? (Gate 2)
-   - Execution Plan exists? (Gate 3)
-   - Status: PILOT_DESIGNED or VERIFIED?
+1. Three gates passed?
+   - Playbook ✅
+   - Evals ✅
+   - Execution Plan ✅
 
-2. If PILOT_DESIGNED:
-   - NOT operational yet
-   - Evals not run OR not passed
-   - Offer alternative (text, local file, draft)
+2. Executor onboarded?
+   - Read Onboarding Kit ✅
+   - Verified checklist ✅
+   - Or confirmed ready ✅
 
-3. If VERIFIED:
-   - All gates passed ✓
-   - Evals passed 100% ✓
-   - Capability operational ✓
-   - Check freshness (< 90 days)
-   - Proceed with flow
+3. Status check:
+   - PILOT_DESIGNED → NOT operational
+   - VERIFIED → Operational (evals passed 100%)
+   - BLOCKED → NOT safe to use
 
-4. If BLOCKED:
-   - Evals failed
-   - NOT safe to use
-   - DO NOT proceed
+If NOT VERIFIED: Offer alternative (text, local, draft)
 ```
 
 ---
 
-## 🔧 G2.2-G2.5 Execution Phases
+## 🔧 G2.2-G2.5: Universal Execution Flow
 
-### All follow same master flow:
+**All phases follow same 9 steps**:
 
 ```
 1. OAuth: Executor expands scopes
 2. Setup: Verify environment
-3. Evals: Run all scenarios (manual or automated)
+3. Evals: Run all scenarios (19-26)
 4. Evidence: Collect results.json + logs
 5. Pass Rate: Calculate (must be 100%)
-6. MATRIX: Update status (VERIFIED or BLOCKED)
+6. MATRIX: Update status
 7. PR: Create for Or review
 8. Sign-off: Or approves
 9. Report: EXECUTOR→OR_REPORT
+
+First pilot (G2.2) proves model.
+Subsequent pilots (G2.3-G2.5) follow same pattern.
 ```
-
-**First pilot**: G2.2 (Gmail Drafts) - proves execution model
-
----
-
-## 📝 Example: G2.2 Gmail Drafts (Complete)
-
-### All Three Gates ✅
-
-**Gate 1 - Playbook**:
-- File: PILOT_GMAIL_DRAFTS_FLOW.md (22KB)
-- Complete: Intent, RACI, 14 steps, 5 safeguards
-
-**Gate 2 - Evals**:
-- File: AUTOMATION_EVALS_PLAN.md Section 1
-- Scenarios: 19 (5+3+4+4+3)
-- PASS/FAIL criteria: Clear
-
-**Gate 3 - Execution Plan**:
-- File: PHASE_G2_RUNTIME_EXECUTION_PLAN.md Section "G2.2"
-- OAuth: gmail.readonly + gmail.compose
-- Steps: 9 (detailed)
-- Evidence: results.json format specified
-
-### Next: Runtime Execution
-
-- Awaiting: Or approves Execution Plan
-- Awaiting: Executor identified
-- Awaiting: Or signals GO
-- Then: Executor executes (per plan)
-- Then: If 100% → VERIFIED
 
 ---
 
 ## 🔄 Phase Tracking (Final)
 
 ### Phase G2.1-Pilot ✅ (2025-11-17):
-- ✅ 4 pilots (Gmail x2, Drive x1, Calendar x1)
-- ✅ Universal template (proven across 3 domains, 2 risk levels)
+- ✅ 4 pilots (Gmail x2, Drive, Calendar)
+- ✅ Universal template (3 domains, 2 risk levels)
 - ✅ Eval framework (87 scenarios)
-- ✅ **Execution Plan** (G2.2-G2.5 roadmap) ⭐ NEW
-- ✅ **Executor RACI** (clear boundaries) ⭐ NEW
+- ✅ Execution Plan (G2.2-G2.5 roadmap)
+- ✅ **Executor Onboarding Kit** (practical guide) ⭐ NEW
 
-**Status**: Complete OS_SAFE framework, ready for Runtime
+**Total**: 383.5KB של framework מלא
 
 ### Future Phases (with Executor):
 - G2.2: Gmail Drafts (19 evals, first pilot)
@@ -217,64 +226,66 @@ Only after ALL three gates:
 
 ---
 
-## Critical Reminders for GPTs (Complete)
+## Critical Reminders for GPTs (Final)
 
-### 1. Three Gates = Three Checks
+### 1. Four Documents Required
 ```
-Before suggesting ANY automation:
-1. ✅ Playbook exists?
-2. ✅ Evals defined?
-3. ✅ Execution Plan exists?
-4. ✅ Status = VERIFIED?
+Before Runtime:
+1. ✅ Playbook exists
+2. ✅ Evals defined
+3. ✅ Execution Plan approved
+4. ✅ Executor onboarded ⭐ NEW
 
-If any NO → Capability NOT operational
-```
-
-### 2. Executor ≠ Or
-```
-Executor: Executes (runs evals, collects evidence)
-Or: Approves (reviews evidence, signs off)
-
-Clear separation of responsibilities.
+All four = Ready for execution
 ```
 
-### 3. 100% Pass Still Required
+### 2. Executor Must Read Onboarding Kit
 ```
-Execution Plan does NOT change:
-- 100% pass rate required
-- Safeguards MUST pass
-- Evidence MUST be collected
-- Or sign-off required
-
-Execution Plan just adds HOW (not WHAT).
+No execution without:
+- Executor reads G2_EXECUTOR_ONBOARDING_KIT.md (34KB)
+- Executor verifies checklist
+- Or confirms Executor ready
+- Or signals GO
 ```
 
-### 4. No Ad-Hoc Execution
+### 3. Status Determines Capability
 ```
-Everything documented before Runtime:
-- Playbook (what)
-- Evals (how to test)
-- Execution Plan (who executes, step-by-step)
+PILOT_DESIGNED: NOT operational (evals not run)
+VERIFIED: Operational (evals passed 100%)
+BLOCKED: NOT safe (evals failed)
 
-No improvisation during execution.
+Always check MATRIX status before use.
+```
+
+### 4. Executor ≠ Or
+```
+Executor: Technical operator (executes)
+Or: Strategic approver (reviews, approves)
+
+Executor cannot:
+- Skip evals
+- Bypass gates
+- Make strategic decisions
+- Execute without Or GO
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17 (Execution Plan Complete)**:
+**2025-11-17 (Executor Onboarding Kit Complete)**:
 - ✅ 4 pilots (144KB)
 - ✅ Universal template (43.7KB)
 - ✅ Eval framework (31.5KB)
-- ✅ **Execution Plan (26.5KB)** ⭐ NEW
+- ✅ Execution Plan (26.5KB)
+- ✅ **Executor Onboarding Kit (34KB)** ⭐ NEW
 
-**Total Documentation**: 349.5KB של framework מלא
+**Total Documentation**: 383.5KB של framework מלא
 
-**Next**: G2.2 execution (Gmail Drafts, first pilot) - awaiting Or GO
+**Next**: Executor onboarding → G2.2 execution (Gmail Drafts, first pilot)
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17 (Execution Plan added)  
-**גרסה**: 2.7 (three-gate model complete)
+**עדכון אחרון**: 2025-11-17 (Executor Onboarding Kit added)  
+**גרסה**: 2.8 (four-document model complete)
