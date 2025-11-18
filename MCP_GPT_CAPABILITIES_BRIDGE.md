@@ -18,287 +18,263 @@
 
 ## 🆕 Phase G2.1-Pilot Complete (2025-11-17)
 
-### 4 Pilots + Eval Framework
+### Complete Framework: Pilots + Evals + Execution Plan
 
-**Pilots בנוי**:
-1. Gmail Drafts (OS_SAFE, 22KB)
-2. Gmail Send (CLOUD_OPS_HIGH, 46KB)
-3. Drive Create Doc (OS_SAFE, 43KB)
-4. Calendar Focus (OS_SAFE, 33KB)
+**Built**:
+1. **4 Pilots** (144KB)
+   - Gmail Drafts, Gmail Send, Drive Create Doc, Calendar Focus
+2. **Eval Framework** (31.5KB)
+   - 87 scenarios, 100% pass required
+3. **Execution Plan** (26.5KB) ⭐ NEW
+   - G2.2-G2.5 roadmap, Executor RACI, Evidence formats
 
-**Eval Framework** ⭐ NEW:
-- [`AUTOMATION_EVALS_PLAN.md`](DOCS/AUTOMATION_EVALS_PLAN.md) (31.5KB)
-- **87 total evals** across 4 pilots
-- **100% pass required** for capability upgrade
-- **No Evals = No Autonomy Upgrade**
-
-**Total Documentation**: 323KB (pilots 144KB + template 43.7KB + evals 31.5KB + arch 103.7KB)
+**Total Documentation**: 349.5KB (complete OS_SAFE framework)
 
 ---
 
-## 🚨 CRITICAL: No Evals = No Autonomy Upgrade
+## 🚨 THREE-GATE MODEL (Complete)
 
-### Eval Gate (MANDATORY)
+### Mandatory Gates Before Runtime
 
-**Every capability MUST**:
+**Every capability must pass ALL three gates**:
+
 ```
-1. ✅ Have evals defined (AUTOMATION_EVALS_PLAN.md)
-2. ✅ Run evals (execution phase)
-3. ✅ Pass 100% of evals (strict)
-4. ✅ Document evidence (OPS/EVALS/)
-5. ✅ Get Or's sign-off
+Gate 1: PLAYBOOK EXISTS
+→ Requirement: Complete playbook (Intent, RACI, Plan, Safeguards, etc.)
+→ Reference: AUTOMATION_PLAYBOOK_TEMPLATE.md
+→ Status: PILOT_DESIGNED
 
-No shortcuts. No exceptions.
-```
+Gate 2: EVALS DEFINED
+→ Requirement: Complete eval scenarios (87 total)
+→ Reference: AUTOMATION_EVALS_PLAN.md
+→ Requirement: 100% pass for upgrade
 
-**Status transitions**:
-```
-PILOT_DESIGNED → (No evals) → PILOT_DESIGNED (blocked)
-PILOT_DESIGNED → (Evals PASS 100%) → VERIFIED
-PILOT_DESIGNED → (Evals FAIL) → BLOCKED
+Gate 3: EXECUTION PLAN EXISTS ⭐ NEW
+→ Requirement: Complete execution roadmap
+→ Reference: PHASE_G2_RUNTIME_EXECUTION_PLAN.md
+→ Includes: Executor RACI, OAuth steps, Evidence formats
+→ Requirement: Or approves before execution begins
+
+Only after ALL three gates:
+→ Executor can begin Runtime execution
+→ Status can upgrade to VERIFIED (if evals pass 100%)
 ```
 
 ---
 
-## 📊 Eval Coverage (Current Status)
+## 📋 Execution Plan Summary
 
-| Pilot | Evals Designed | Evals Run | Pass Rate | Status |
-|-------|----------------|-----------|-----------|--------|
-| Gmail Drafts | 19 ✅ | 0 | 0% | PILOT_DESIGNED |
-| Gmail Send | 26 ✅ | 0 | 0% | PILOT_DESIGNED |
-| Drive Create Doc | 21 ✅ | 0 | 0% | PILOT_DESIGNED |
-| Calendar Focus | 21 ✅ | 0 | 0% | PILOT_DESIGNED |
-| **TOTAL** | **87 ✅** | **0** | **0%** | **Pending G2.2-G2.5** |
+### What's New (Gate 3)
 
-**All evals designed, none executed** (awaiting Executor + Or approval)
+**Complete operational roadmap**:
+- Master flow (9 steps: OAuth → Evals → Evidence → MATRIX → PR)
+- **Executor RACI** (who does what, allowed/forbidden operations)
+- G2.2 detailed plan (Gmail Drafts as first pilot example)
+- Evidence formats (results.json structure)
+- Failure handling (what if evals fail)
+- Reporting template (EXECUTOR→OR_REPORT)
 
----
-
-## 🔍 Eval Categories (Universal)
-
-**Every pilot has 5 categories**:
-
-1. **Happy Path** (core functionality works)
-2. **Safeguards** (all 5 layers enforced) ⭐ CRITICAL
-3. **Edge Cases** (boundaries, special inputs)
-4. **Failure Modes** (errors handled gracefully)
-5. **Observability** (logs, state, MATRIX)
-
-**Example breakdown**:
-- Gmail Drafts: 5+3+4+4+3 = 19 scenarios
-- Gmail Send: 4+**8**+5+5+4 = 26 scenarios (more safeguards for CLOUD_OPS_HIGH)
-- Drive Create Doc: 5+5+4+4+3 = 21 scenarios
-- Calendar Focus: 5+5+4+4+3 = 21 scenarios
+**Key insight**: No ad-hoc execution - everything documented before Runtime
 
 ---
 
-## 🛡️ Safeguard Evals (NON-NEGOTIABLE)
+## 👤 Executor Role (NEW)
 
-**Total safeguard scenarios**: 21 across all pilots
+### Who Executes Runtime Phases
 
-**Mandatory checks** (every pilot):
-1. ✅ Approval gate enforced (can't bypass)
-2. ✅ Rate limiting works (if applicable)
-3. ✅ Logging captures all fields
-4. ✅ Scope limitations enforced
-5. ✅ Policy blocks prevent forbidden operations
+**Executor = Technical operator** (NOT Or, NOT Claude, NOT GPTs)
 
-**Safeguard failure = BLOCKED** (no exceptions)
+**ALLOWED**:
+- ✅ Update MCP configs (OAuth scopes)
+- ✅ Run eval scenarios
+- ✅ Collect evidence
+- ✅ Update CAPABILITIES_MATRIX (after evals)
+- ✅ Create PRs for Or review
+- ✅ Report results to Or
 
-**Example safeguard evals** (Gmail Send):
-- "מאשר שליחה" required (exact phrase)
-- Wrong phrase blocked
-- TTL (60 min) enforced
-- Rate limit blocks at 10/hour
-- No auto-forwarding rules
-- No BCC hijacking
-- Detailed logging (approval details)
-- Scope: gmail.send only
+**FORBIDDEN**:
+- ❌ Skip evals
+- ❌ Bypass gates
+- ❌ Override 100% pass requirement
+- ❌ Commit without Or review
+
+**Or = Accountable**:
+- Reviews evidence
+- Approves PRs
+- Signs off on VERIFIED
 
 ---
 
-## 📋 Before Using ANY Capability
+## 🎯 Current Status (All 4 Pilots)
 
-**GPTs MUST check**:
+| Phase | Pilot | Playbook | Evals | Exec Plan | Status | Ready? |
+|-------|-------|----------|-------|-----------|--------|--------|
+| **G2.2** | **Gmail Drafts** | ✅ | ✅ | ✅ | PILOT_DESIGNED | ⏳ Awaiting Or GO |
+| **G2.3** | **Gmail Send** | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
+| **G2.4** | **Drive Doc** | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
+| **G2.5** | **Calendar** | ✅ | ✅ | ✅ | PILOT_DESIGNED | After G2.2 |
+
+**All three gates passed** - ready for Executor + Or GO signal
+
+---
+
+## 📊 Before Using ANY Capability
+
+**GPTs MUST check ALL three gates**:
 
 ```
-1. Check CAPABILITIES_MATRIX:
-   - Capability exists?
+1. Check MATRIX:
+   - Playbook exists? (Gate 1)
+   - Evals defined? (Gate 2)
+   - Execution Plan exists? (Gate 3)
    - Status: PILOT_DESIGNED or VERIFIED?
-   - Eval coverage: X/Y (Z%)?
 
-2. If Status = PILOT_DESIGNED:
-   - Evals NOT run yet
-   - Capability NOT operational
-   - Offer alternative (text, local file, etc.)
+2. If PILOT_DESIGNED:
+   - NOT operational yet
+   - Evals not run OR not passed
+   - Offer alternative (text, local file, draft)
 
-3. If Status = VERIFIED:
-   - Evals passed (100%)
-   - Capability operational
-   - Check eval freshness (< 90 days)
+3. If VERIFIED:
+   - All gates passed ✓
+   - Evals passed 100% ✓
+   - Capability operational ✓
+   - Check freshness (< 90 days)
    - Proceed with flow
 
-4. If Status = BLOCKED:
+4. If BLOCKED:
    - Evals failed
-   - Capability NOT safe
-   - DO NOT use
-```
-
-**Never assume capability works** - always check MATRIX first!
-
----
-
-## 🎯 Execution Phases with Evals
-
-### Phase G2.2 (Gmail Drafts):
-```
-1. Executor expands OAuth → gmail.compose
-2. Run 19 evals → OPS/EVALS/gmail-drafts-results.json
-3. Check pass rate:
-   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED
-   - <100% → BLOCKED, fix, re-run
-4. Or sign-off
-```
-
-### Phase G2.3 (Gmail Send):
-```
-1. Executor expands OAuth → gmail.send
-2. Run 26 evals (CRITICAL - CLOUD_OPS_HIGH)
-3. Check pass rate:
-   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED (BLOCKED for prod)
-   - <100% → BLOCKED indefinitely
-4. Or sign-off
-```
-
-### Phase G2.4 (Drive Create Doc):
-```
-1. Executor expands OAuth → drive.file + docs.file
-2. Run 21 evals
-3. Check pass rate:
-   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED
-   - <100% → BLOCKED, fix, re-run
-4. Or sign-off
-```
-
-### Phase G2.5 (Calendar Focus):
-```
-1. Executor expands OAuth → calendar.events
-2. Run 21 evals
-3. Check pass rate:
-   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED
-   - <100% → BLOCKED, fix, re-run
-4. Or sign-off
+   - NOT safe to use
+   - DO NOT proceed
 ```
 
 ---
 
-## 📊 MATRIX Integration
+## 🔧 G2.2-G2.5 Execution Phases
 
-**New field**: Eval Coverage
+### All follow same master flow:
 
-**Example MATRIX entries**:
-
-**Before evals** (G2.2 not run):
 ```
-| Capability | Status | Eval Coverage | Last Eval | Results |
-|-----------|--------|---------------|-----------|---------|
-| Gmail Drafts | PILOT_DESIGNED | 0/19 (0%) | Not run | Pending |
-```
-
-**After evals pass**:
-```
-| Capability | Status | Eval Coverage | Last Eval | Results |
-|-----------|--------|---------------|-----------|---------|
-| Gmail Drafts | ✅ VERIFIED | 19/19 (100%) | 2025-11-18 | [json](../../OPS/EVALS/gmail-drafts-results.json) |
+1. OAuth: Executor expands scopes
+2. Setup: Verify environment
+3. Evals: Run all scenarios (manual or automated)
+4. Evidence: Collect results.json + logs
+5. Pass Rate: Calculate (must be 100%)
+6. MATRIX: Update status (VERIFIED or BLOCKED)
+7. PR: Create for Or review
+8. Sign-off: Or approves
+9. Report: EXECUTOR→OR_REPORT
 ```
 
-**After evals fail**:
-```
-| Capability | Status | Eval Coverage | Last Eval | Results |
-|-----------|--------|---------------|-----------|---------|
-| Gmail Drafts | ❌ BLOCKED | 15/19 (79%) | 2025-11-18 | [json](../../OPS/EVALS/gmail-drafts-results.json) |
-```
+**First pilot**: G2.2 (Gmail Drafts) - proves execution model
 
 ---
 
-## 🔄 Phase Tracking (Complete)
+## 📝 Example: G2.2 Gmail Drafts (Complete)
+
+### All Three Gates ✅
+
+**Gate 1 - Playbook**:
+- File: PILOT_GMAIL_DRAFTS_FLOW.md (22KB)
+- Complete: Intent, RACI, 14 steps, 5 safeguards
+
+**Gate 2 - Evals**:
+- File: AUTOMATION_EVALS_PLAN.md Section 1
+- Scenarios: 19 (5+3+4+4+3)
+- PASS/FAIL criteria: Clear
+
+**Gate 3 - Execution Plan**:
+- File: PHASE_G2_RUNTIME_EXECUTION_PLAN.md Section "G2.2"
+- OAuth: gmail.readonly + gmail.compose
+- Steps: 9 (detailed)
+- Evidence: results.json format specified
+
+### Next: Runtime Execution
+
+- Awaiting: Or approves Execution Plan
+- Awaiting: Executor identified
+- Awaiting: Or signals GO
+- Then: Executor executes (per plan)
+- Then: If 100% → VERIFIED
+
+---
+
+## 🔄 Phase Tracking (Final)
 
 ### Phase G2.1-Pilot ✅ (2025-11-17):
-- ✅ 4 pilots complete (Gmail x2, Drive x1, Calendar x1)
-- ✅ Universal template proven (3 domains, 2 risk levels)
-- ✅ **Eval framework complete** (87 evals designed) ⭐ NEW
-- ✅ **Eval integration** (MATRIX + BRIDGE updated)
+- ✅ 4 pilots (Gmail x2, Drive x1, Calendar x1)
+- ✅ Universal template (proven across 3 domains, 2 risk levels)
+- ✅ Eval framework (87 scenarios)
+- ✅ **Execution Plan** (G2.2-G2.5 roadmap) ⭐ NEW
+- ✅ **Executor RACI** (clear boundaries) ⭐ NEW
 
-**Status**: Ready for G2.2-G2.5 execution (with Executor)
+**Status**: Complete OS_SAFE framework, ready for Runtime
 
-### Future Phases:
-- G2.2: Gmail Drafts + 19 evals
-- G2.3: Gmail Send + 26 evals (CRITICAL)
-- G2.4: Drive Create Doc + 21 evals
-- G2.5: Calendar Focus + 21 evals
+### Future Phases (with Executor):
+- G2.2: Gmail Drafts (19 evals, first pilot)
+- G2.3: Gmail Send (26 evals, CRITICAL)
+- G2.4: Drive Create Doc (21 evals)
+- G2.5: Calendar Focus (21 evals)
 
 ---
 
-## Critical Reminders for GPTs (Final)
+## Critical Reminders for GPTs (Complete)
 
-### 1. Evals are Mandatory
-```
-🚨 NO EVALS = NO AUTONOMY UPGRADE 🚨
-
-Every capability needs:
-- Evals designed ✅ (done)
-- Evals executed ⏳ (pending)
-- 100% pass rate ⏳ (required)
-- Or sign-off ⏳ (required)
-```
-
-### 2. Check MATRIX Before Every Use
+### 1. Three Gates = Three Checks
 ```
 Before suggesting ANY automation:
-1. Check CAPABILITIES_MATRIX
-2. Check status (PILOT_DESIGNED vs VERIFIED)
-3. Check eval coverage (X/Y pass rate)
-4. Only proceed if VERIFIED with 100% pass
+1. ✅ Playbook exists?
+2. ✅ Evals defined?
+3. ✅ Execution Plan exists?
+4. ✅ Status = VERIFIED?
+
+If any NO → Capability NOT operational
 ```
 
-### 3. Safeguards are NON-NEGOTIABLE
+### 2. Executor ≠ Or
 ```
-Safeguard evals MUST pass 100%
-- Approval gates
-- Rate limits
-- Logging
-- Scope restrictions
-- Policy blocks
+Executor: Executes (runs evals, collects evidence)
+Or: Approves (reviews evidence, signs off)
 
-Any safeguard failure = BLOCKED indefinitely
+Clear separation of responsibilities.
 ```
 
-### 4. Evidence is Permanent
+### 3. 100% Pass Still Required
 ```
-All eval runs logged to OPS/EVALS/
-- JSON results files
-- Screenshots (if needed)
-- Test execution logs
-- Committed to repo (audit trail)
+Execution Plan does NOT change:
+- 100% pass rate required
+- Safeguards MUST pass
+- Evidence MUST be collected
+- Or sign-off required
+
+Execution Plan just adds HOW (not WHAT).
+```
+
+### 4. No Ad-Hoc Execution
+```
+Everything documented before Runtime:
+- Playbook (what)
+- Evals (how to test)
+- Execution Plan (who executes, step-by-step)
+
+No improvisation during execution.
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17 (Eval Framework Complete)**:
+**2025-11-17 (Execution Plan Complete)**:
 - ✅ 4 pilots (144KB)
 - ✅ Universal template (43.7KB)
-- ✅ **Eval framework (31.5KB)** ⭐ NEW
-- ✅ **87 evals designed**
-- ✅ **MATRIX + BRIDGE updated**
+- ✅ Eval framework (31.5KB)
+- ✅ **Execution Plan (26.5KB)** ⭐ NEW
 
-**Total Documentation**: 323KB של תיעוד מלא
+**Total Documentation**: 349.5KB של framework מלא
 
-**Next**: G2.2-G2.5 execution (Executor + Or approval required)
+**Next**: G2.2 execution (Gmail Drafts, first pilot) - awaiting Or GO
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17 (Eval framework added)  
-**גרסה**: 2.6 (evals mandatory for all upgrades)
+**עדכון אחרון**: 2025-11-17 (Execution Plan added)  
+**גרסה**: 2.7 (three-gate model complete)
