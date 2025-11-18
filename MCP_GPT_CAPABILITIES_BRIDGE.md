@@ -16,209 +16,289 @@
 
 ---
 
-## 🆕 FOUR Pilots Complete (2025-11-17)
+## 🆕 Phase G2.1-Pilot Complete (2025-11-17)
 
-Claude בנה **4 פיילוטים מלאים** - הוכחה מלאה של template אוניברסלי:
+### 4 Pilots + Eval Framework
 
-### 1. Gmail Drafts (OS_SAFE)
-- **Domain**: Gmail (Communication)
-- **Playbook**: [`PILOT_GMAIL_DRAFTS_FLOW.md`](DOCS/PILOT_GMAIL_DRAFTS_FLOW.md) (22KB)
-- **Risk**: OS_SAFE | **Approval**: Conversational
+**Pilots בנוי**:
+1. Gmail Drafts (OS_SAFE, 22KB)
+2. Gmail Send (CLOUD_OPS_HIGH, 46KB)
+3. Drive Create Doc (OS_SAFE, 43KB)
+4. Calendar Focus (OS_SAFE, 33KB)
 
-### 2. Gmail Send (CLOUD_OPS_HIGH)
-- **Domain**: Gmail (Communication)
-- **Playbook**: [`PILOT_GMAIL_SEND_FLOW.md`](DOCS/PILOT_GMAIL_SEND_FLOW.md) (46KB)
-- **Risk**: CLOUD_OPS_HIGH | **Approval**: "מאשר שליחה" + 60min TTL
+**Eval Framework** ⭐ NEW:
+- [`AUTOMATION_EVALS_PLAN.md`](DOCS/AUTOMATION_EVALS_PLAN.md) (31.5KB)
+- **87 total evals** across 4 pilots
+- **100% pass required** for capability upgrade
+- **No Evals = No Autonomy Upgrade**
 
-### 3. Drive Create Doc (OS_SAFE)
-- **Domain**: Drive + Docs (Documentation)
-- **Playbook**: [`PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md`](DOCS/PILOT_DRIVE_CREATE_STRATEGY_DOC_FLOW.md) (43KB)
-- **Risk**: OS_SAFE | **Approval**: Outline review
-
-### 4. Calendar Focus Event (OS_SAFE) ⭐ NEW
-- **Domain**: Calendar (Time Management)
-- **Playbook**: [`PILOT_CALENDAR_FOCUS_EVENT_FLOW.md`](DOCS/PILOT_CALENDAR_FOCUS_EVENT_FLOW.md) (33KB)
-- **Risk**: OS_SAFE | **Approval**: Schedule review
-
-**הוכחה מלאה**: Template עובד על **3 domains** (Gmail, Drive, Calendar) ו-**2 risk levels** (OS_SAFE, CLOUD_OPS_HIGH)
+**Total Documentation**: 323KB (pilots 144KB + template 43.7KB + evals 31.5KB + arch 103.7KB)
 
 ---
 
-## 📊 FOUR Pilots - Master Comparison
+## 🚨 CRITICAL: No Evals = No Autonomy Upgrade
 
-| Pilot | Domain | Risk | Approval | Rate Limit | Phase | Size |
-|-------|--------|------|----------|------------|-------|------|
-| Gmail Drafts | Gmail | OS_SAFE | Conversational | 50/h (opt) | G2.2 | 22KB |
-| Gmail Send | Gmail | CLOUD_OPS_HIGH | "מאשר שליחה" + TTL | 10/h (hard) | G2.3 | 46KB |
-| Drive Create Doc | Drive | OS_SAFE | Outline review | 20/h (opt) | G2.4 | 43KB |
-| **Calendar Focus** | **Calendar** | **OS_SAFE** | **Schedule review** | **20/day (opt)** | **G2.5** | **33KB** |
+### Eval Gate (MANDATORY)
 
-**Pattern מוכח**:
-- **3 Domains**: Gmail (communication), Drive (documentation), Calendar (time management)
-- **2 Risk Levels**: OS_SAFE (light safeguards), CLOUD_OPS_HIGH (heavy safeguards)
-- **1 Template**: Universal (works for all combinations)
-
----
-
-## 🎯 Calendar Focus Event - Use Case Recognition
-
-**כשהמשתמש מבקש**: "Block focus time for X"
-
-**GPT צריך**:
-
-### 1. זיהוי Domain + Use Case
+**Every capability MUST**:
 ```
-Request: "Block focus time for Q1 planning this week"
+1. ✅ Have evals defined (AUTOMATION_EVALS_PLAN.md)
+2. ✅ Run evals (execution phase)
+3. ✅ Pass 100% of evals (strict)
+4. ✅ Document evidence (OPS/EVALS/)
+5. ✅ Get Or's sign-off
 
-GPT recognizes:
-→ Domain: Calendar (not Gmail, not Drive)
-→ Use Case: Create Focus Event
-→ Risk: OS_SAFE (personal, no attendees, reversible)
-→ Agent: Claude (R) for personal focus events
+No shortcuts. No exceptions.
 ```
 
-### 2. בדיקת MATRIX
+**Status transitions**:
 ```
-Check: CAPABILITIES_MATRIX Section 3.3 Calendar
-→ "Create focus event" capability
-→ Status: PILOT_DESIGNED (before G2.5) or VERIFIED (after G2.5)
-→ Risk: OS_SAFE
-→ Safeguards: 5 layers (light)
-```
-
-### 3. הפעלת Flow
-```
-If VERIFIED:
-→ Analyze existing calendar
-→ Identify free time slots
-→ Consider strategic priorities
-→ Propose focus blocks (times + topics + rationale)
-→ Present schedule to Or
-→ Or approves: "Looks good" / "Create them" (conversational)
-→ Create private events (no attendees)
-→ Log (standard) → Share calendar view
-
-If PILOT_DESIGNED:
-→ Offer text suggestion of optimal times
-→ Explain G2.5 needed for actual creation
+PILOT_DESIGNED → (No evals) → PILOT_DESIGNED (blocked)
+PILOT_DESIGNED → (Evals PASS 100%) → VERIFIED
+PILOT_DESIGNED → (Evals FAIL) → BLOCKED
 ```
 
 ---
 
-## 📐 Complete Risk Decision Tree
+## 📊 Eval Coverage (Current Status)
 
-**All 3 domains included**:
+| Pilot | Evals Designed | Evals Run | Pass Rate | Status |
+|-------|----------------|-----------|-----------|--------|
+| Gmail Drafts | 19 ✅ | 0 | 0% | PILOT_DESIGNED |
+| Gmail Send | 26 ✅ | 0 | 0% | PILOT_DESIGNED |
+| Drive Create Doc | 21 ✅ | 0 | 0% | PILOT_DESIGNED |
+| Calendar Focus | 21 ✅ | 0 | 0% | PILOT_DESIGNED |
+| **TOTAL** | **87 ✅** | **0** | **0%** | **Pending G2.2-G2.5** |
+
+**All evals designed, none executed** (awaiting Executor + Or approval)
+
+---
+
+## 🔍 Eval Categories (Universal)
+
+**Every pilot has 5 categories**:
+
+1. **Happy Path** (core functionality works)
+2. **Safeguards** (all 5 layers enforced) ⭐ CRITICAL
+3. **Edge Cases** (boundaries, special inputs)
+4. **Failure Modes** (errors handled gracefully)
+5. **Observability** (logs, state, MATRIX)
+
+**Example breakdown**:
+- Gmail Drafts: 5+3+4+4+3 = 19 scenarios
+- Gmail Send: 4+**8**+5+5+4 = 26 scenarios (more safeguards for CLOUD_OPS_HIGH)
+- Drive Create Doc: 5+5+4+4+3 = 21 scenarios
+- Calendar Focus: 5+5+4+4+3 = 21 scenarios
+
+---
+
+## 🛡️ Safeguard Evals (NON-NEGOTIABLE)
+
+**Total safeguard scenarios**: 21 across all pilots
+
+**Mandatory checks** (every pilot):
+1. ✅ Approval gate enforced (can't bypass)
+2. ✅ Rate limiting works (if applicable)
+3. ✅ Logging captures all fields
+4. ✅ Scope limitations enforced
+5. ✅ Policy blocks prevent forbidden operations
+
+**Safeguard failure = BLOCKED** (no exceptions)
+
+**Example safeguard evals** (Gmail Send):
+- "מאשר שליחה" required (exact phrase)
+- Wrong phrase blocked
+- TTL (60 min) enforced
+- Rate limit blocks at 10/hour
+- No auto-forwarding rules
+- No BCC hijacking
+- Detailed logging (approval details)
+- Scope: gmail.send only
+
+---
+
+## 📋 Before Using ANY Capability
+
+**GPTs MUST check**:
 
 ```
-Which domain?
-├─ Gmail
-│  ├─ Read/search → OS_SAFE
-│  ├─ Create draft → OS_SAFE
-│  ├─ Label/organize → CLOUD_OPS_MEDIUM
-│  └─ Send email → CLOUD_OPS_HIGH
-│
-├─ Drive
-│  ├─ Read/search → OS_SAFE
-│  ├─ Create private doc → OS_SAFE
-│  ├─ Edit shared doc → CLOUD_OPS_MEDIUM
-│  └─ Share externally → CLOUD_OPS_HIGH
-│
-└─ Calendar ← NEW
-   ├─ Read events/free time → OS_SAFE
-   ├─ Create focus event (no attendees) → OS_SAFE ← NEW
-   ├─ Create meeting (with attendees) → CLOUD_OPS_MEDIUM
-   └─ Delete event (with attendees) → CLOUD_OPS_HIGH
+1. Check CAPABILITIES_MATRIX:
+   - Capability exists?
+   - Status: PILOT_DESIGNED or VERIFIED?
+   - Eval coverage: X/Y (Z%)?
 
-Risk determines safeguards:
-OS_SAFE → Light (conversational, optional limits, standard logs)
-CLOUD_OPS_HIGH → Heavy (explicit phrase + TTL, hard limits, detailed logs)
+2. If Status = PILOT_DESIGNED:
+   - Evals NOT run yet
+   - Capability NOT operational
+   - Offer alternative (text, local file, etc.)
+
+3. If Status = VERIFIED:
+   - Evals passed (100%)
+   - Capability operational
+   - Check eval freshness (< 90 days)
+   - Proceed with flow
+
+4. If Status = BLOCKED:
+   - Evals failed
+   - Capability NOT safe
+   - DO NOT use
+```
+
+**Never assume capability works** - always check MATRIX first!
+
+---
+
+## 🎯 Execution Phases with Evals
+
+### Phase G2.2 (Gmail Drafts):
+```
+1. Executor expands OAuth → gmail.compose
+2. Run 19 evals → OPS/EVALS/gmail-drafts-results.json
+3. Check pass rate:
+   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED
+   - <100% → BLOCKED, fix, re-run
+4. Or sign-off
+```
+
+### Phase G2.3 (Gmail Send):
+```
+1. Executor expands OAuth → gmail.send
+2. Run 26 evals (CRITICAL - CLOUD_OPS_HIGH)
+3. Check pass rate:
+   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED (BLOCKED for prod)
+   - <100% → BLOCKED indefinitely
+4. Or sign-off
+```
+
+### Phase G2.4 (Drive Create Doc):
+```
+1. Executor expands OAuth → drive.file + docs.file
+2. Run 21 evals
+3. Check pass rate:
+   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED
+   - <100% → BLOCKED, fix, re-run
+4. Or sign-off
+```
+
+### Phase G2.5 (Calendar Focus):
+```
+1. Executor expands OAuth → calendar.events
+2. Run 21 evals
+3. Check pass rate:
+   - 100% → MATRIX: PILOT_DESIGNED → VERIFIED
+   - <100% → BLOCKED, fix, re-run
+4. Or sign-off
 ```
 
 ---
 
-## 🔄 Phase Tracking (Final)
+## 📊 MATRIX Integration
 
-### Phase G2.1-Pilot ✅ (Complete 2025-11-17):
-- ✅ Gmail Drafts (OS_SAFE)
-- ✅ Gmail Send (CLOUD_OPS_HIGH)
-- ✅ Drive Create Doc (OS_SAFE)
-- ✅ Calendar Focus Event (OS_SAFE) ⭐ NEW
-- ✅ AUTOMATION_PLAYBOOK_TEMPLATE (Universal)
+**New field**: Eval Coverage
 
-**Status**: 4 complete pilots, template proven universal
+**Example MATRIX entries**:
 
-### Future Execution Phases:
-- G2.2: Gmail Drafts (base OAuth)
-- G2.3: Gmail Send (scope expansion)
-- G2.4: Drive Create Doc (scope expansion)
-- G2.5: Calendar Focus Event (scope expansion) ⭐ NEW
+**Before evals** (G2.2 not run):
+```
+| Capability | Status | Eval Coverage | Last Eval | Results |
+|-----------|--------|---------------|-----------|---------|
+| Gmail Drafts | PILOT_DESIGNED | 0/19 (0%) | Not run | Pending |
+```
+
+**After evals pass**:
+```
+| Capability | Status | Eval Coverage | Last Eval | Results |
+|-----------|--------|---------------|-----------|---------|
+| Gmail Drafts | ✅ VERIFIED | 19/19 (100%) | 2025-11-18 | [json](../../OPS/EVALS/gmail-drafts-results.json) |
+```
+
+**After evals fail**:
+```
+| Capability | Status | Eval Coverage | Last Eval | Results |
+|-----------|--------|---------------|-----------|---------|
+| Gmail Drafts | ❌ BLOCKED | 15/19 (79%) | 2025-11-18 | [json](../../OPS/EVALS/gmail-drafts-results.json) |
+```
+
+---
+
+## 🔄 Phase Tracking (Complete)
+
+### Phase G2.1-Pilot ✅ (2025-11-17):
+- ✅ 4 pilots complete (Gmail x2, Drive x1, Calendar x1)
+- ✅ Universal template proven (3 domains, 2 risk levels)
+- ✅ **Eval framework complete** (87 evals designed) ⭐ NEW
+- ✅ **Eval integration** (MATRIX + BRIDGE updated)
+
+**Status**: Ready for G2.2-G2.5 execution (with Executor)
+
+### Future Phases:
+- G2.2: Gmail Drafts + 19 evals
+- G2.3: Gmail Send + 26 evals (CRITICAL)
+- G2.4: Drive Create Doc + 21 evals
+- G2.5: Calendar Focus + 21 evals
 
 ---
 
 ## Critical Reminders for GPTs (Final)
 
-### 1. Four Pilots = Four Patterns
+### 1. Evals are Mandatory
 ```
-✅ Gmail Drafts = OS_SAFE, Gmail
-✅ Gmail Send = CLOUD_OPS_HIGH, Gmail
-✅ Drive Create Doc = OS_SAFE, Drive
-✅ Calendar Focus = OS_SAFE, Calendar ← NEW
-```
+🚨 NO EVALS = NO AUTONOMY UPGRADE 🚨
 
-### 2. Three Domains Proven
-```
-Gmail (Communication):
-- Drafts, Send, Search, Organize
-
-Drive (Documentation):
-- Create Doc, Edit, Share, Search
-
-Calendar (Time Management): ← NEW
-- Create Focus Event, Find Free Time, Read Events
+Every capability needs:
+- Evals designed ✅ (done)
+- Evals executed ⏳ (pending)
+- 100% pass rate ⏳ (required)
+- Or sign-off ⏳ (required)
 ```
 
-### 3. Template is Universal
+### 2. Check MATRIX Before Every Use
 ```
-✅ Works for 3 domains (Gmail, Drive, Calendar)
-✅ Works for 2 risk levels (OS_SAFE, CLOUD_OPS_HIGH)
-✅ Proven with 4 complete pilots
-✅ Future domains (Sheets, etc.) = copy template
+Before suggesting ANY automation:
+1. Check CAPABILITIES_MATRIX
+2. Check status (PILOT_DESIGNED vs VERIFIED)
+3. Check eval coverage (X/Y pass rate)
+4. Only proceed if VERIFIED with 100% pass
 ```
 
-### 4. Always Route by Domain + Risk
+### 3. Safeguards are NON-NEGOTIABLE
 ```
-User request → Identify domain first:
-- Communication? → Gmail
-- Documentation? → Drive
-- Time management? → Calendar
+Safeguard evals MUST pass 100%
+- Approval gates
+- Rate limits
+- Logging
+- Scope restrictions
+- Policy blocks
 
-Then identify risk:
-- External impact? → CLOUD_OPS_HIGH
-- Private/reversible? → OS_SAFE
+Any safeguard failure = BLOCKED indefinitely
+```
 
-Then check MATRIX for capability
+### 4. Evidence is Permanent
+```
+All eval runs logged to OPS/EVALS/
+- JSON results files
+- Screenshots (if needed)
+- Test execution logs
+- Committed to repo (audit trail)
 ```
 
 ---
 
 ## עדכון אחרון
 
-**2025-11-17 (FOUR Pilots Complete)**:
-- ✅ 4 complete pilots (Gmail x2, Drive x1, Calendar x1)
-- ✅ 3 domains proven (Gmail, Drive, Calendar)
-- ✅ 2 risk levels proven (OS_SAFE, CLOUD_OPS_HIGH)
-- ✅ Template universality fully demonstrated
+**2025-11-17 (Eval Framework Complete)**:
+- ✅ 4 pilots (144KB)
+- ✅ Universal template (43.7KB)
+- ✅ **Eval framework (31.5KB)** ⭐ NEW
+- ✅ **87 evals designed**
+- ✅ **MATRIX + BRIDGE updated**
 
-**Total Documentation**:
-- Pilots: 144KB (22+46+43+33)
-- Universal template: 43.7KB
-- Architecture: 103.7KB
-- **Grand Total: 291.4KB** של תיעוד OS_SAFE
+**Total Documentation**: 323KB של תיעוד מלא
 
-**Proven**: Template is truly universal - works for any domain, any risk level
+**Next**: G2.2-G2.5 execution (Executor + Or approval required)
 
 ---
 
 **תחזוקה**: Claude (עם אישור אור)  
-**עדכון אחרון**: 2025-11-17 (4 pilots complete)  
-**גרסה**: 2.5 (universal template fully proven)
+**עדכון אחרון**: 2025-11-17 (Eval framework added)  
+**גרסה**: 2.6 (evals mandatory for all upgrades)
