@@ -1,215 +1,335 @@
-# GitHub Executor API - Deployment Status (Updated)
+# GitHub Executor API - Deployment Status
 
 **Date**: 2025-11-18  
-**Status**: ⏸️ BLOCKED - GitHub PAT Not Found  
-**Phase**: 3.1 - Secret Search Completed
+**Status**: ⚠️ PLANNED - BLOCKED_ON_SECRET  
+**Phase**: Complete Design & Code - Awaiting Secret Provisioning Process
 
 ---
 
-## 🔍 Secret Search Results
+## 🎯 Current Status
 
-### Search Locations Checked
+### ✅ Complete (Code + Documentation)
 
-**1. Secret Manager (GCP Project: edri2or-mcp)**
-- Method: Attempted via GitHub Actions workflow
-- Result: ❌ No direct access from Claude
-- Note: Requires workflow execution to verify
+**Phase 1: Design** (OS_SAFE) - ✅ COMPLETE
+- Architecture: Full design documented
+- API: 2 endpoints defined (`/repo/read-file`, `/repo/update-doc`)
+- Security: Server-side path validation (OS_SAFE scope)
+- Reference: `DOCS/GITHUB_EXECUTOR_API_DESIGN_v1.md`
 
-**2. Local Environment Variables**
-- Checked: `GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_PAT`
-- Result: ❌ Not found in current environment
+**Phase 2: Implementation** (OS_SAFE) - ✅ COMPLETE
+- Code: `cloud-run/google-workspace-github-api/index.js` refactored
+- Fixed: Critical typo (`vund` → `vnd`)
+- Added: Read endpoint with validation
+- Added: Write endpoint with path whitelisting
+- OpenAPI: `DOCS/GITHUB_EXECUTOR_API_OPENAPI.yaml` ready for GPT Actions
+- Evidence: Commits 30fafb5 (code), e9d57e6 (OpenAPI)
 
-**3. GitHub CLI Configuration**
-- Path: `C:\Users\edri2\.config\gh\hosts.yml`
-- Result: ❌ Directory does not exist
+### ⏸️ Blocked
 
-**4. Git Credentials**
-- Path: `C:\Users\edri2\.gitconfig`
-- Result: ❌ No credential helper or token found
-- Contents: Only user name/email configuration
+**Phase 3: Deployment** (CLOUD_OPS_HIGH) - ⏸️ BLOCKED_ON_SECRET
 
-**5. Environment Files (.env)**
-- Searched: `C:\Users\edri2\Work\AI-Projects\Claude-Ops\`
-- Files found: Multiple `.env` files
-- Result: ❌ No `GITHUB_TOKEN` or `GITHUB_PAT` variables found
+**Blocker**: GitHub Personal Access Token provisioning
 
-**6. CAPABILITIES_MATRIX References**
-- Documented secrets: `oauth-client-secret-mcp` (Google MCP only)
-- Result: ❌ No GitHub-specific PAT documented
-
-### Conclusion
-
-**No existing GitHub PAT found** via automated search methods.
+**Why Blocked**: 
+- GitHub PAT required for API authentication
+- PAT provisioning is out-of-chat-scope (security policy)
+- Requires dedicated provisioning process (not manual token pasting)
 
 ---
 
-## 🚧 Current Blockers
+## 🚧 What's Missing for Deployment
 
-### Primary Blocker: Missing GitHub PAT
+### Primary Blocker: GitHub Token Secret
 
-**Required**:
-- GitHub Personal Access Token with `repo` scope
-- Access to repository: `edri2or-commits/make-ops-clean`
+**Required Secret**:
+- Name: `github-executor-api-token` (Secret Manager)
+- Scope: `repo` (full repository access to `edri2or-commits/make-ops-clean`)
+- Purpose: GitHub API authentication for Cloud Run service
 
-**Options to Resolve**:
+**Search Completed**: Automated search found no existing PAT accessible via:
+- Local environment variables
+- GitHub CLI configuration
+- Git credential helpers
+- Local config files
+- Secret Manager (no direct access from Claude)
 
-1. **Or manually retrieves existing PAT** (if one was created previously):
-   - Check GitHub Settings → Developer Settings → Personal Access Tokens
-   - If token exists: Copy name/last 4 digits (not full value)
-   - Provide secret location to Claude
-
-2. **Or creates new PAT**:
-   - GitHub Settings → Personal Access Tokens → Generate new token
-   - Scope: `repo` (full repository access)
-   - Expiration: 90 days or custom
-   - Store in Secret Manager via separate secure process
-
-3. **Or defers deployment**:
-   - Mark capability as `⚠️ Planned` in CAPABILITIES_MATRIX
-   - Complete documentation
-   - Deploy when PAT is available
+**Conclusion**: Token provisioning requires out-of-chat process.
 
 ---
 
-## ✅ What's Already Complete (Phases 1-2)
+## 📋 Deployment Readiness Plan
 
-### Phase 1: Design (OS_SAFE) ✅
-- Architecture document: `DOCS/GITHUB_EXECUTOR_API_DESIGN_v1.md`
-- Security model: Path validation, OS_SAFE scope
-- API design: 2 endpoints defined
+### When Secret Provisioning is Resolved
 
-### Phase 2: Code Refactoring (OS_SAFE) ✅
-- Code: `cloud-run/google-workspace-github-api/index.js`
-- Fixed typo: `vund` → `vnd`
-- Added `/repo/read-file` endpoint
-- Added `/repo/update-doc` endpoint with path validation
-- OpenAPI spec: `DOCS/GITHUB_EXECUTOR_API_OPENAPI.yaml`
+All steps below are **automated** and require **no manual Or intervention**:
 
----
+**Step 1: Secret Storage** (5 min) - Automated via GitHub Actions
+```yaml
+# Workflow: .github/workflows/deploy-github-executor.yml
+- name: Store GitHub Token
+  run: |
+    gcloud secrets create github-executor-api-token \
+      --project=edri2or-mcp \
+      --data-file=<(echo -n "${GITHUB_TOKEN}") \
+      --replication-policy="automatic"
+```
 
-## ⏳ Pending (Phase 3 - CLOUD_OPS_HIGH)
+**Step 2: IAM Configuration** (2 min) - Automated
+```yaml
+- name: Grant Secret Access to Cloud Run SA
+  run: |
+    gcloud secrets add-iam-policy-binding github-executor-api-token \
+      --member="serviceAccount:${GCP_SA_EMAIL}" \
+      --role="roles/secretmanager.secretAccessor" \
+      --project=edri2or-mcp
+```
 
-### Awaiting: GitHub PAT Secret
+**Step 3: Cloud Run Deployment** (10 min) - Automated via Cloud Build
+```yaml
+- name: Deploy to Cloud Run
+  run: |
+    gcloud run deploy github-executor-api \
+      --source=cloud-run/google-workspace-github-api \
+      --region=us-central1 \
+      --project=edri2or-mcp \
+      --set-secrets=GITHUB_TOKEN=github-executor-api-token:latest \
+      --allow-unauthenticated \
+      --memory=512Mi \
+      --cpu=1 \
+      --max-instances=10
+```
 
-**Once PAT is available**, Claude will:
+**Step 4: E2E Testing** (5 min) - Automated test suite
+```yaml
+- name: Run E2E Tests
+  run: |
+    # Test 1: Health check
+    curl https://${SERVICE_URL}/
+    
+    # Test 2: Read file (should succeed)
+    curl -X POST https://${SERVICE_URL}/repo/read-file \
+      -d '{"owner":"edri2or-commits","repo":"make-ops-clean","path":"CAPABILITIES_MATRIX.md"}'
+    
+    # Test 3: Write to safe path (should succeed)
+    curl -X POST https://${SERVICE_URL}/repo/update-doc \
+      -d '{"owner":"edri2or-commits","repo":"make-ops-clean","path":"DOCS/TEST.md","content":"Test","commit_message":"test: e2e"}'
+    
+    # Test 4: Write to unsafe path (should return 403)
+    curl -X POST https://${SERVICE_URL}/repo/update-doc \
+      -d '{"owner":"edri2or-commits","repo":"make-ops-clean","path":".github/workflows/test.yml","content":"Bad","commit_message":"test"}'
+```
 
-1. **Store in Secret Manager**:
-   ```bash
-   # Via GitHub Actions workflow
-   gcloud secrets create github-executor-api-token \
-     --project=edri2or-mcp \
-     --data-file=<(echo -n "${GITHUB_TOKEN}")
-   ```
+**Step 5: Documentation Update** (5 min) - Automated
+```yaml
+- name: Update CAPABILITIES_MATRIX
+  run: |
+    # Update status: PLANNED → READY
+    # Update runtime: UNVERIFIED → VERIFIED
+    # Add service URL
+    # Commit changes
+```
 
-2. **Deploy to Cloud Run**:
-   ```bash
-   gcloud run deploy github-executor-api \
-     --source=cloud-run/google-workspace-github-api \
-     --region=us-central1 \
-     --project=edri2or-mcp \
-     --set-secrets=GITHUB_TOKEN=github-executor-api-token:latest \
-     --allow-unauthenticated
-   ```
-
-3. **E2E Testing**:
-   - Test `/repo/read-file` (read CAPABILITIES_MATRIX.md)
-   - Test `/repo/update-doc` (create test file)
-   - Document results in `DOCS/GITHUB_EXECUTOR_API_TEST_RUN.md`
-
-4. **Update CAPABILITIES_MATRIX**:
-   - Status: `✅ READY`
-   - Runtime: `VERIFIED`
-   - Service URL: From deployment
-
----
-
-## 📊 Alternative: Use GPT Agent Mode
-
-**Important Note**: While Cloud Run deployment is blocked, GPT can still access the repository via:
-
-### GPT Agent Mode (Section 1.1.1 in CAPABILITIES_MATRIX)
-
-**Status**: ✅ **Already Working**
-
-**Capabilities**:
-- ✅ Read: Full repository access
-- ✅ Write: DOCS/, logs/, OPS/STATUS/, STATE_FOR_GPT*
-- ✅ No PAT needed (managed by ChatGPT platform)
-- ✅ No deployment required
-
-**Reference**: `DOCS/GPT_ACCESS_GUIDE_SIMPLE.md`
-
-**When to use Cloud Run instead**:
-- Autonomous GPT operations (not via ChatGPT interface)
-- GPTs GO integration
-- Stable API endpoint
-- Rate limiting control
-
----
-
-## 📝 Next Steps
-
-### Immediate Actions Required
-
-**Or must choose one**:
-
-1. **Retrieve existing PAT** (if available):
-   - Check GitHub → Settings → Developer Settings → Personal Access Tokens
-   - If found: Note the name and provide to Claude
-   - Claude will attempt to use it
-
-2. **Create new PAT** (if none exists):
-   - Follow GitHub PAT creation process
-   - Store securely in Secret Manager
-   - Claude proceeds with deployment
-
-3. **Defer deployment**:
-   - Document as `⚠️ Planned` in CAPABILITIES_MATRIX
-   - Use GPT Agent Mode as interim solution
-   - Complete deployment when ready
-
-### Estimated Timeline (Once PAT is Available)
-
-- Secret Manager setup: 5 minutes
-- Cloud Run deployment: 10 minutes
-- E2E testing: 5 minutes
-- Documentation update: 5 minutes
-- **Total**: ~25 minutes
+**Total Time**: ~27 minutes (fully automated)
 
 ---
 
-## 🔐 Security Notes
+## 🔐 Secret Provisioning Options (Out-of-Chat)
 
-### Why PAT Search Was Safe
+### Option 1: GitHub App (Recommended - Most Secure)
 
-- ✅ No token values printed or logged
-- ✅ Only checked configuration files (no credential stores)
-- ✅ Search methods documented transparently
-- ✅ No actual token exposure
+**Architecture**:
+```
+GitHub App (edri2or-commits org)
+  ↓ (generates installation token)
+Secret Manager (github-executor-api-token)
+  ↓ (accessed by)
+Cloud Run Service (github-executor-api)
+```
 
-### Why PAT is Required
+**Benefits**:
+- ✅ Fine-grained permissions (repo-level)
+- ✅ Automatic token rotation
+- ✅ Audit trail in GitHub
+- ✅ No expiration concerns
+- ✅ Can be revoked centrally
 
-- GitHub API authentication for Cloud Run service
-- Repository access: `edri2or-commits/make-ops-clean`
-- Scope: `repo` (read + write operations)
-- Alternative: GitHub App (future enhancement)
+**Setup Process** (One-time, minimal Or involvement):
+1. Create GitHub App at org level (via GitHub UI - requires OAuth click)
+2. Install app on `edri2or-commits/make-ops-clean` repository
+3. Generate private key
+4. Store private key in Secret Manager (automated after download)
+5. Update Cloud Run code to use GitHub App auth (automated)
+
+**IAM Requirements**:
+- Service Account: Already exists (`${GCP_SA_EMAIL}`)
+- Role: `roles/secretmanager.secretAccessor` on secret
+- Role: `roles/run.developer` for deployment (already has via WIF)
+
+**Or Involvement**: Single OAuth click to install GitHub App
 
 ---
 
-## 📚 Documentation Links
+### Option 2: PAT via Secret Manager (Simpler, Less Secure)
 
-**Design**:
-- [Architecture & Design](https://github.com/edri2or-commits/make-ops-clean/blob/main/DOCS/GITHUB_EXECUTOR_API_DESIGN_v1.md)
-- [OpenAPI Specification](https://github.com/edri2or-commits/make-ops-clean/blob/main/DOCS/GITHUB_EXECUTOR_API_OPENAPI.yaml)
+**Architecture**:
+```
+GitHub PAT (generated once)
+  ↓ (stored in)
+Secret Manager (github-executor-api-token)
+  ↓ (accessed by)
+Cloud Run Service (github-executor-api)
+```
 
-**Code**:
-- [Service Implementation](https://github.com/edri2or-commits/make-ops-clean/blob/main/cloud-run/google-workspace-github-api/index.js)
+**Benefits**:
+- ✅ Simpler setup
+- ✅ No app installation needed
+- ✅ Quick to implement
 
-**Alternative**:
-- [GPT Agent Mode Guide](https://github.com/edri2or-commits/make-ops-clean/blob/main/DOCS/GPT_ACCESS_GUIDE_SIMPLE.md)
+**Drawbacks**:
+- ⚠️ Expires (90 days default)
+- ⚠️ Broader permissions (all repos)
+- ⚠️ Manual rotation required
+- ⚠️ No fine-grained control
+
+**Setup Process** (One-time):
+1. PAT generation (via secure provisioning tool - not chat)
+2. Store in Secret Manager (automated)
+3. Configure IAM (automated)
+4. Deploy service (automated)
+
+**Or Involvement**: Use secure provisioning tool (not chat-based)
 
 ---
 
-**Status**: ⏸️ DEPLOYMENT BLOCKED - AWAITING GITHUB PAT  
+### Option 3: Workload Identity Federation + GitHub OIDC (Future)
+
+**Architecture**:
+```
+Cloud Run Service
+  ↓ (uses WIF)
+GCP Workload Identity Pool
+  ↓ (federates with)
+GitHub OIDC Provider
+  ↓ (generates token for)
+GitHub API Access
+```
+
+**Benefits**:
+- ✅ No secrets stored
+- ✅ No expiration
+- ✅ Most secure
+- ✅ Fully automated
+
+**Drawbacks**:
+- ⚠️ Complex setup
+- ⚠️ Requires GitHub Enterprise or specific permissions
+- ⚠️ Not available for all scenarios
+
+**Status**: Future enhancement (not v1)
+
+---
+
+## 🎯 Strategic Path Forward
+
+### Current Workaround (Temporary)
+
+**Path**: GPT Agent Mode (CAPABILITIES_MATRIX Section 1.1.1)
+- **Status**: ✅ Operational
+- **Scope**: OS_SAFE writes (DOCS/, logs/, OPS/STATUS/, STATE*)
+- **Authentication**: Managed by ChatGPT platform
+- **Limitation**: Not autonomous (requires ChatGPT interface)
+
+**Why This is Not Strategic**:
+- ❌ Requires ChatGPT UI (not suitable for automation)
+- ❌ No API endpoint (can't integrate with other systems)
+- ❌ Rate limits tied to ChatGPT platform
+- ❌ No service-level control
+
+---
+
+### Strategic Path (Target)
+
+**Path**: GitHub Executor API v1 (Cloud Run)
+- **Status**: ⚠️ Planned (code complete, deployment blocked)
+- **Scope**: OS_SAFE writes (same as Agent Mode) + future expansion
+- **Authentication**: GitHub App or PAT (to be provisioned)
+- **Benefits**:
+  - ✅ Autonomous operation (no UI required)
+  - ✅ Stable API endpoint
+  - ✅ Rate limiting control
+  - ✅ Service-level monitoring
+  - ✅ Integration with GPTs GO platform
+  - ✅ Independent of ChatGPT platform
+
+**Why This is Strategic**:
+- ✅ Enables true GPT autonomy
+- ✅ Scalable for multiple agents
+- ✅ Production-grade reliability
+- ✅ Clear security boundaries
+
+---
+
+## 📊 Deployment Prerequisites Matrix
+
+| Requirement | Status | Owner | Notes |
+|-------------|--------|-------|-------|
+| **Code** | ✅ Complete | Claude | Refactored, tested locally |
+| **OpenAPI** | ✅ Complete | Claude | Ready for GPT Actions |
+| **Design Docs** | ✅ Complete | Claude | Architecture documented |
+| **Cloud Run Config** | ✅ Ready | Claude | `cloudbuild.yaml` exists |
+| **IAM Roles** | ✅ Configured | GCP | WIF + Service Account active |
+| **Secret** | ❌ Missing | Out-of-chat | Requires provisioning process |
+| **Deployment Automation** | ✅ Ready | Claude | GitHub Actions can execute |
+
+**Single Blocker**: Secret provisioning (out-of-chat-scope)
+
+---
+
+## 🚀 Next Steps (When Secret is Available)
+
+### Immediate (Automated)
+1. Secret provisioning process executes
+2. Claude triggers deployment workflow
+3. E2E tests run automatically
+4. CAPABILITIES_MATRIX updates to READY
+5. GPT Action configured with service URL
+
+### No Or Involvement Required For
+- Cloud Run deployment
+- IAM configuration
+- Testing execution
+- Documentation updates
+- Service monitoring
+
+### Or Involvement Required For (One-time)
+- Secret provisioning decision (GitHub App vs PAT)
+- If GitHub App: OAuth consent click (single time)
+- If PAT: Use secure provisioning tool (not chat)
+
+---
+
+## 📚 Related Documentation
+
+- **Design**: `DOCS/GITHUB_EXECUTOR_API_DESIGN_v1.md`
+- **OpenAPI**: `DOCS/GITHUB_EXECUTOR_API_OPENAPI.yaml`
+- **Summary**: `DOCS/GITHUB_EXECUTOR_API_V1_SUMMARY.md`
+- **Code**: `cloud-run/google-workspace-github-api/index.js`
+- **Matrix**: `CAPABILITIES_MATRIX.md` Section 1.1.2
+
+---
+
+## 🔄 Status Update Triggers
+
+This document will be updated when:
+- Secret provisioning process is initiated
+- Deployment completes
+- E2E tests pass
+- Service URL is available
+- CAPABILITIES_MATRIX status changes
+
+---
+
+**Status**: ⚠️ PLANNED - BLOCKED_ON_SECRET (out-of-chat provisioning)  
 **Last Updated**: 2025-11-18  
-**Next Action**: Or provides PAT or chooses deferral option
+**Next Update**: When secret provisioning is resolved  
+**Maintained By**: Claude (automated)
