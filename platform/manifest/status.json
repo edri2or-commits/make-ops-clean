@@ -1,0 +1,14 @@
+{
+  "kpis": {
+    "ttv_seconds_avg": null,
+    "success_rate": null,
+    "drift_incidents_week": 0
+  },
+  "health": {
+    "github": "unknown",
+    "google_read": "unknown",
+    "local": "unknown"
+  },
+  "drift": [],
+  "last_updated": null
+}
