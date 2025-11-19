@@ -1,5 +1,9 @@
 # 🔥 Token Automation System - Complete Guide
 
+> **STATUS: EXPERIMENTAL / LAB ONLY** – not used in the current production control flow.  
+> For production GPT control, see `GPT_CONTROL_API_V1_DESIGN.md` and use `server_simple.py`.  
+> This guide documents advanced token automation features that are not part of GPT_CONTROL_API_V1.
+
 ## Overview
 
 GPT now has **COMPLETE AUTOMATED TOKEN MANAGEMENT** capabilities!

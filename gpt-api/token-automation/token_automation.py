@@ -1,3 +1,7 @@
+# NOTE: LAB / EXPERIMENTAL. Not part of GPT_CONTROL_API_V1. Do not use in production flows yet.
+# This module provides advanced token automation including rotation, scheduling, and bulk operations.
+# For basic token generation, use the /tokens/generate endpoint in GPT_CONTROL_API_V1.
+
 """
 Token Automation System
 Automatically generates, rotates, and manages tokens

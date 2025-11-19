@@ -1,0 +1,387 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GPT Control API V1",
+    "description": "Central control API for make-ops-clean automation system. Provides GitHub operations, file management, secrets handling, and token generation.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://gpt-control-api-v1-212701048029.us-central1.run.app"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_check",
+        "summary": "Health check endpoint",
+        "description": "Check if the API is running and properly configured",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string"},
+                    "version": {"type": "string"},
+                    "auth_enabled": {"type": "boolean"},
+                    "github_configured": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/git/status": {
+      "get": {
+        "operationId": "git_status",
+        "summary": "Get repository status",
+        "description": "Get current status of the GitHub repository including latest commit info",
+        "responses": {
+          "200": {
+            "description": "Repository status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "branch": {"type": "string"},
+                    "latest_commit": {
+                      "type": "object",
+                      "properties": {
+                        "sha": {"type": "string"},
+                        "message": {"type": "string"},
+                        "author": {"type": "string"},
+                        "date": {"type": "string"}
+                      }
+                    },
+                    "status": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid API key"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    },
+    "/git/commit": {
+      "post": {
+        "operationId": "git_commit",
+        "summary": "Commit and push changes",
+        "description": "Commit multiple file changes to GitHub and push to main branch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "description": "Commit message"
+                  },
+                  "files": {
+                    "type": "array",
+                    "description": "Array of files to commit",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "path": {"type": "string"},
+                        "content": {"type": "string"}
+                      },
+                      "required": ["path", "content"]
+                    }
+                  }
+                },
+                "required": ["message", "files"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Commit successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "commit": {
+                      "type": "object",
+                      "properties": {
+                        "sha": {"type": "string"},
+                        "message": {"type": "string"},
+                        "url": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    },
+    "/files/read": {
+      "get": {
+        "operationId": "read_file",
+        "summary": "Read file from repository",
+        "description": "Read the contents of a file from the GitHub repository",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "description": "Path to the file relative to repository root",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File contents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                    "sha": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    },
+    "/files/write": {
+      "post": {
+        "operationId": "write_file",
+        "summary": "Write file to repository",
+        "description": "Create or update a file in the GitHub repository and commit immediately",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Path to the file relative to repository root"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "File content"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Commit message (optional, defaults to 'Update {path}')"
+                  }
+                },
+                "required": ["path", "content"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File written successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "path": {"type": "string"},
+                    "commit": {
+                      "type": "object",
+                      "properties": {
+                        "sha": {"type": "string"},
+                        "url": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    },
+    "/secrets/list": {
+      "get": {
+        "operationId": "list_secrets",
+        "summary": "List secrets (masked)",
+        "description": "List all secrets from SECRETS/.env.local with values masked for security",
+        "responses": {
+          "200": {
+            "description": "List of secrets with masked values",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "secrets": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "Masked secret value (e.g., 'ghp_xxx***')"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    },
+    "/secrets/set": {
+      "post": {
+        "operationId": "set_secret",
+        "summary": "Set or update a secret",
+        "description": "Store a secret in SECRETS/.env.local file. NEVER display the secret value in responses.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "Secret name/key"
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Secret value (NEVER display this in responses)"
+                  }
+                },
+                "required": ["key", "value"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Secret stored successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "key": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    },
+    "/tokens/generate": {
+      "post": {
+        "operationId": "generate_token",
+        "summary": "Generate secure token",
+        "description": "Generate a cryptographically secure token and save to SECRETS/.env.local",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string",
+                    "description": "Service name (becomes the key in secrets file)"
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "description": "Token prefix (optional, e.g., 'api_')"
+                  },
+                  "length": {
+                    "type": "integer",
+                    "description": "Length of random portion (default: 64)",
+                    "default": 64
+                  }
+                },
+                "required": ["service"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token generated and saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "service": {"type": "string"},
+                    "token": {
+                      "type": "string",
+                      "description": "The generated token. Display only once to user if requested, then mask."
+                    },
+                    "length": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [{"ApiKeyAuth": []}]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  }
+}

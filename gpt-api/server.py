@@ -1,3 +1,7 @@
+# NOTE: LAB / EXPERIMENTAL. Not part of GPT_CONTROL_API_V1. Do not use in production flows yet.
+# This file contains experimental features including token automation, scheduling, and advanced operations.
+# For production GPT control, use server_simple.py (GPT_CONTROL_API_V1) on port 5001.
+
 from flask import Flask, request, jsonify
 import subprocess
 import os
