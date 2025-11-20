@@ -1,0 +1,131 @@
+name: app-auth-ready
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_app_auth:
+        description: 'Use GitHub App authentication'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+  push:
+    branches:
+      - 'auth/**'
+
+permissions:
+  contents: read
+
+jobs:
+  auth-readiness-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Check App Auth Configuration
+        id: check-app
+        env:
+          GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY_PEM }}
+          USE_APP_AUTH: ${{ github.event.inputs.use_app_auth || 'false' }}
+        run: |
+          echo "🔍 Checking GitHub App authentication readiness..."
+          
+          if [ "$USE_APP_AUTH" = "true" ]; then
+            if [ -z "$GH_APP_ID" ] || [ -z "$GH_APP_PRIVATE_KEY" ]; then
+              echo "❌ GitHub App credentials not configured"
+              echo "Required secrets: GH_APP_ID, GH_APP_PRIVATE_KEY_PEM"
+              echo "app_auth_ready=false" >> $GITHUB_OUTPUT
+              exit 0
+            else
+              echo "✅ GitHub App credentials found"
+              echo "app_auth_ready=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "ℹ️  App auth not requested (use_app_auth=false)"
+            echo "app_auth_ready=skipped" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate JWT (if App auth ready)
+        if: steps.check-app.outputs.app_auth_ready == 'true'
+        env:
+          GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY_PEM }}
+        run: |
+          echo "🔐 Generating JWT for GitHub App..."
+          
+          # Install PyJWT
+          pip install PyJWT[crypto] requests
+          
+          # Generate JWT using our wrapper
+          python3 -c "
+import jwt
+import time
+import os
+
+app_id = os.environ['GH_APP_ID']
+private_key = os.environ['GH_APP_PRIVATE_KEY']
+
+now = int(time.time())
+payload = {
+    'iat': now,
+    'exp': now + 600,
+    'iss': app_id
+}
+
+jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
+print(f'✅ JWT generated (length: {len(jwt_token)} chars)')
+print(f'::add-mask::{jwt_token}')
+print(f'JWT_TOKEN={jwt_token}')
+" | tee jwt_output.txt
+          
+          # Extract JWT token (masked in logs)
+          JWT_TOKEN=$(grep '^JWT_TOKEN=' jwt_output.txt | cut -d'=' -f2)
+          echo "JWT_TOKEN=$JWT_TOKEN" >> $GITHUB_ENV
+      
+      - name: Mint Installation Token (if App auth ready)
+        if: steps.check-app.outputs.app_auth_ready == 'true'
+        env:
+          JWT_TOKEN: ${{ env.JWT_TOKEN }}
+        run: |
+          echo "🎫 Minting Installation Access Token..."
+          
+          # Note: INSTALLATION_ID must be configured or discovered
+          # For now, this is a placeholder
+          echo "⚠️  INSTALLATION_ID not yet configured"
+          echo "Next step: Or must provide Installation ID or we discover it via API"
+          
+          # Example API call (when INSTALLATION_ID available):
+          # curl -X POST \
+          #   -H "Authorization: Bearer $JWT_TOKEN" \
+          #   -H "Accept: application/vnd.github+json" \
+          #   https://api.github.com/app/installations/{installation_id}/access_tokens
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 📊 App Auth Readiness Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check-app.outputs.app_auth_ready }}" = "true" ]; then
+            echo "✅ **Status**: GitHub App authentication ready" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Configure INSTALLATION_ID" >> $GITHUB_STEP_SUMMARY
+            echo "2. Test Installation Token minting" >> $GITHUB_STEP_SUMMARY
+            echo "3. Migrate MCP client to use App tokens" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.check-app.outputs.app_auth_ready }}" = "false" ]; then
+            echo "❌ **Status**: GitHub App not configured" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Required Actions:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Regenerate GitHub App private key at: https://github.com/settings/apps" >> $GITHUB_STEP_SUMMARY
+            echo "2. Add secrets: GH_APP_ID, GH_APP_PRIVATE_KEY_PEM" >> $GITHUB_STEP_SUMMARY
+            echo "3. Re-run this workflow with use_app_auth=true" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️  **Status**: App auth check skipped" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Re-run with use_app_auth=true to test" >> $GITHUB_STEP_SUMMARY
+          fi
