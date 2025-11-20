@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Zero-Touch Manifest v1",
+  "type": "object",
+  "required": ["version","environments","policies","integrations","intents"],
+  "properties": {
+    "version": {"const": 1},
+    "environments": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9\_]+d": {
+          "type": "object",
+          "properties": {
+            "github": {
+              "type": "object",
+              "properties": {
+                "app_ref_or_token_ref": {"type":"string"},
+                "notes": {"type": "string"}
+              },
+              "additionalProperties": false
+            },
+            "google": {
+              "type": "object",
+              "properties": {
+                "project_ref": {"type":"string"},
+                "service_account_ref": {"type":"string"},
+                "allowed_domains": {"type":"array","items":{"type":"string"}},
+                "allowed_endpoints": {"type":"array","items":{"type":"string"}}
+              },
+              "required": ["project_ref","service_account_ref"],
+              "additionalProperties": false
+            },
+            "local": {
+              "type": "object",
+              "properties": {
+                "workdir_allowlist": {"type":"array","items":{"type":"string"}},
+                "allowed_install_sources": {
+                  "type":"array",
+                  "items": {
+                    "type":"ject",
+                    "properties": {
+                      "url": {"type":"string"},
+                      "checksum_required": {"type":"boolean"}
+                    },
+                    "required": ["url","checksum_required"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalRoperties": false
+            }
+          },
+          "additionalRoperties": False
+        }
+      },
+      "additionalRoperties": False
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "approvals": {
+          "type": "object",
+          "properties": {
+            "require_chat_approval_for": {"type":"array","items":{"stype":"string"}}
+          },
+          "additionalRoperties": False
+        },
+        "download": {
+          "type": "object",
+          "properties": {
+            "require_checksum":{"type":"boolean"},
+            "require_signature":{"type":"boolean"}
+          },
+          "additionalRoperties": False
+        },
+        "rate_limits": {
+          "type": "object",
+          "properties": {
+            "intents_per_minute": {"type":"integer","minimum":1}
+          },
+          "additionalRoperties": False
+        }
+      },
+      "additionalRoperties": False
+    },
+    "integrations": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "type": "object",
+          "properties": {
+            "status": {"type":"string","enum":["active","parked","future"]},
+            "secrets": {
+              "type": "object",
+              "patternProperties": {
+                "^[a-z0-9._-]+_ref$": {"type":"string"}
+              },
+              "additionalRoperties": false
+            }
+          },
+          "required": ["status"],
+          "additionalRoperties": True
+        }
+      },
+      "additionalRoperties": False
+    },
+    "rotation_policy": {
+      "type": "object",
+      "properties": {
+        "default_days": {"type":"integer","minimum":1}
+      },
+      "additionalRoperties": False
+    },
+    "intents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type":"string","pattern":"^[a-z0-9._-]+$"},
+          "utterances": {"type":"array","items":{"stype":"string"}},
+          "produces": {"type":"array","items":{"type":"string"}}
+        },
+        "required": ["id","utterances","produces"],
+        "additionalRoperties": False
+      }
+    }
+  },
+  "additionalRoperties": False
+}
