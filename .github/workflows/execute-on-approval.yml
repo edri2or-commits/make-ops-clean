@@ -1,0 +1,285 @@
+name: Execute on Approval
+
+# Triggered by repository_dispatch (prod) or workflow_dispatch (bootstrap)
+# Purpose: Auto-merge approved PRs via Telegram gate or manual dispatch
+# Security: Kill-switch, secrets verification, no PAT required
+
+on:
+  repository_dispatch:
+    types: [merge_approved]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR to merge'
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-secrets:
+    name: Verify Required Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      secrets_valid: ${{ steps.check.outputs.valid }}
+      exec_enabled: ${{ steps.killswitch.outputs.enabled }}
+    
+    steps:
+      - name: Kill Switch Check
+        id: killswitch
+        run: |
+          # Kill switch: Check EXEC_ENABLED variable (default: true)
+          EXEC_ENABLED="${{ vars.EXEC_ENABLED }}"
+          
+          if [ -z "$EXEC_ENABLED" ]; then
+            EXEC_ENABLED="true"
+          fi
+          
+          if [ "$EXEC_ENABLED" != "true" ]; then
+            echo "🛑 Kill switch activated: EXEC_ENABLED=$EXEC_ENABLED"
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            exit 78
+          else
+            echo "✅ Execution enabled"
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check Secrets Presence
+        id: check
+        run: |
+          # Verify secrets exist (without printing values)
+          MISSING=""
+          
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            MISSING="${MISSING}TELEGRAM_BOT_TOKEN "
+          fi
+          
+          if [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            MISSING="${MISSING}TELEGRAM_CHAT_ID "
+          fi
+          
+          if [ -z "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
+            MISSING="${MISSING}MAKE_WEBHOOK_URL "
+          fi
+          
+          if [ -n "$MISSING" ]; then
+            echo "❌ Missing secrets: $MISSING"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All required secrets present"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          fi
+
+  execute:
+    name: Execute Approved Merge
+    runs-on: ubuntu-latest
+    needs: verify-secrets
+    if: |
+      needs.verify-secrets.outputs.secrets_valid == 'true' &&
+      needs.verify-secrets.outputs.exec_enabled == 'true'
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Resolve PR Number
+        id: resolve
+        run: |
+          # Determine PR number based on trigger type
+          PR_NUMBER="${{ github.event.client_payload.pr_number }}"
+          APPROVAL_ID="${{ github.event.client_payload.approval_id }}"
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            echo "📌 Using workflow_dispatch input: PR #$PR_NUMBER"
+          else
+            echo "📌 Using repository_dispatch payload: PR #$PR_NUMBER"
+          fi
+          
+          if [ -z "$PR_NUMBER" ]; then
+            echo "❌ Missing pr_number"
+            exit 1
+          fi
+          
+          # Log approval_id if present (audit trail)
+          if [ -n "$APPROVAL_ID" ]; then
+            echo "🔍 APPROVAL_ID=$APPROVAL_ID"
+          fi
+          
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "✅ Resolved PR Number: $PR_NUMBER"
+      
+      - name: Parse Payload
+        id: payload
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          APPROVED_BY="${{ github.event.client_payload.approved_by }}"
+          APPROVED_AT="${{ github.event.client_payload.approved_at }}"
+          
+          # For workflow_dispatch, use github.actor as approver
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APPROVED_BY="${{ github.actor }}"
+            APPROVED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+          
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "approved_by=${APPROVED_BY:-unknown}" >> $GITHUB_OUTPUT
+          echo "approved_at=${APPROVED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" >> $GITHUB_OUTPUT
+          
+          echo "📋 PR Number: $PR_NUMBER"
+          echo "👤 Approved by: ${APPROVED_BY:-unknown}"
+          echo "🕐 Approved at: ${APPROVED_AT:-now}"
+          echo "🔔 Trigger: ${{ github.event_name }}"
+      
+      - name: Verify PR Exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          
+          echo "🔍 Verifying PR #$PR_NUMBER exists..."
+          if ! gh pr view "$PR_NUMBER" --json number,state,headRefName; then
+            echo "❌ PR #$PR_NUMBER not found"
+            exit 1
+          fi
+          
+          PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
+          if [ "$PR_STATE" != "OPEN" ]; then
+            echo "❌ PR #$PR_NUMBER is not open (state: $PR_STATE)"
+            exit 1
+          fi
+          
+          echo "✅ PR #$PR_NUMBER is open and ready"
+      
+      - name: Run Pre-Merge Validation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          
+          # Get PR branch name
+          BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+          echo "📦 Branch: $BRANCH"
+          
+          # Checkout PR branch for validation
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          
+          # Run validation script if exists
+          if [ -f .github/scripts/apply-changes.sh ]; then
+            echo "🔍 Running validation..."
+            bash .github/scripts/apply-changes.sh "PR-$PR_NUMBER"
+          else
+            echo "⚠️  No validation script found, skipping"
+          fi
+      
+      - name: Merge PR
+        id: merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          APPROVED_BY="${{ steps.payload.outputs.approved_by }}"
+          
+          echo "🔀 Merging PR #$PR_NUMBER..."
+          
+          # Merge with squash and delete branch
+          gh pr merge "$PR_NUMBER" \
+            --squash \
+            --delete-branch \
+            --subject "Merge PR #$PR_NUMBER (approved by $APPROVED_BY)" \
+            --body "Automated merge via ${{ github.event_name }}"
+          
+          echo "✅ PR #$PR_NUMBER merged successfully"
+          echo "merged=true" >> $GITHUB_OUTPUT
+      
+      - name: Get Merge Commit SHA
+        id: commit
+        run: |
+          # Wait a moment for merge to complete
+          sleep 2
+          
+          # Get latest commit on main
+          git fetch origin main
+          SHA=$(git rev-parse origin/main)
+          
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "✅ Merge commit: $SHA"
+      
+      - name: Notify Telegram (post-merge)
+        if: success() && steps.merge.outputs.merged == 'true'
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          COMMIT_SHA="${{ steps.commit.outputs.sha }}"
+          TRIGGER="${{ github.event_name }}"
+          
+          echo "📢 Sending success notification to Telegram..."
+          
+          # Send Telegram notification
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=✅ Merged PR #${PR_NUMBER} to main%0A%0ACommit: ${COMMIT_SHA:0:7}%0ATrigger: ${TRIGGER}%0AStatus: Success" \
+            -d "disable_web_page_preview=true"
+          
+          echo "✅ Telegram notification sent"
+      
+      - name: Notify Completion
+        if: always()
+        run: |
+          PR_NUMBER="$PR_NUMBER"
+          COMMIT_SHA="${{ steps.commit.outputs.sha }}"
+          STATUS="${{ job.status }}"
+          
+          echo "📢 Execution completed"
+          echo "PR: #$PR_NUMBER"
+          echo "Commit: $COMMIT_SHA"
+          echo "Status: $STATUS"
+          echo "Trigger: ${{ github.event_name }}"
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: execute
+    if: failure()
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Revert Last Commit
+        run: |
+          echo "🔙 Rolling back last commit on main"
+          git fetch origin main
+          git checkout main
+          git revert HEAD --no-edit
+          git push origin main
+          echo "✅ Rollback complete"
+      
+      - name: Notify Rollback to Telegram
+        if: always()
+        run: |
+          echo "📢 Sending rollback notification to Telegram..."
+          
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=🚨 Rollback executed due to merge failure%0A%0ATrigger: ${{ github.event_name }}%0AStatus: Failed%0AAction: Last commit reverted" \
+            -d "disable_web_page_preview=true"
+          
+          echo "✅ Rollback notification sent to Telegram"
